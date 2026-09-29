@@ -1,0 +1,39 @@
+# 의존성
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# 생성되는 네이티브 폴더 — app.config.ts로부터 생성되므로 직접 고치지 않고 커밋하지 않는다(mobile/CLAUDE.md §2-14)
+/ios
+/android
+
+# 네이티브 빌드 산출물
+.kotlin/
+*.orig.*
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.hprof
+
+# Metro
+.metro-health-check*
+
+# 패키지 매니저 로그
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# TypeScript
+*.tsbuildinfo
+
+# 테스트
+coverage/
+
+# Maestro E2E 실행 결과
+.maestro/screenshots/
+.maestro/tests-output/

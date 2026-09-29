@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: weave
+  config:
+    # Spring Boot는 .env를 자동으로 읽지 않는다 — 없으면 ${...}를 못 풀어 부팅 실패(§3-1)
+    import: optional:file:.env[.properties]
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # 스키마는 Flyway만 바꾼다
+  threads:
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
