@@ -27,7 +27,8 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: 'weave',
-  userInterfaceStyle: 'automatic',
+  // 밝은 테마만 지원 — 다크 모드 미지원
+  userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'com.weave.app',
   },
@@ -47,7 +48,7 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#208AEF',
+        backgroundColor: '#F5F6FA',
         image: './assets/images/splash-icon.png',
         imageWidth: 76,
       },

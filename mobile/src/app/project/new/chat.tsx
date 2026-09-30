@@ -19,7 +19,7 @@ type Message = { from: 'bot' | 'me'; text: string };
 export default function ChatScreen() {
   const router = useRouter();
   const { dispatch } = useMockStore();
-  const { colors, spacing } = useAppTheme();
+  const { colors, spacing, radius } = useAppTheme();
   const [messages, setMessages] = useState<Message[]>([{ from: 'bot', text: MOCK_CHAT_QUESTIONS[0] }]);
   const [input, setInput] = useState('');
   const answered = messages.filter((m) => m.from === 'me').length;
@@ -46,8 +46,10 @@ export default function ChatScreen() {
             accessibilityLabel={`${m.from === 'bot' ? '도우미' : '나'}: ${m.text}`}
             style={[
               styles.bubble,
-              { padding: spacing.sm + 4 },
-              m.from === 'bot' ? { alignSelf: 'flex-start', backgroundColor: colors.surface } : { alignSelf: 'flex-end', backgroundColor: colors.primary },
+              { paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 4, borderRadius: radius.panel },
+              m.from === 'bot'
+                ? { alignSelf: 'flex-start', backgroundColor: colors.surface, borderBottomLeftRadius: 6 }
+                : { alignSelf: 'flex-end', backgroundColor: colors.primary, borderBottomRightRadius: 6 },
             ]}>
             <AppText style={m.from === 'me' ? { color: colors.onPrimary } : undefined}>{m.text}</AppText>
           </View>
@@ -67,5 +69,5 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  bubble: { maxWidth: '85%', borderRadius: 16 },
+  bubble: { maxWidth: '85%' },
 });

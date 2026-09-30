@@ -19,7 +19,7 @@ type ScreenProps = {
  */
 export function Screen({ children, style, scroll = false, edges = ['top', 'bottom'] }: ScreenProps) {
   const { colors, spacing } = useAppTheme();
-  const contentStyle = [{ padding: spacing.md, gap: spacing.md }, style];
+  const contentStyle = [{ paddingHorizontal: spacing.lg - 4, paddingVertical: spacing.md, gap: spacing.lg - 4 }, style];
 
   return (
     <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }]}>

@@ -6,6 +6,7 @@ import type { Project } from '@/mocks/types';
 import { useAppTheme } from '@/theme';
 
 import { AppText } from './AppText';
+import { Card } from './Card';
 import { TaskList } from './TaskList';
 
 function sectionTitle(key: ScheduleSection['key'], today: DateKey): string {
@@ -23,16 +24,23 @@ type Props = {
 };
 
 export function ScheduleSections({ sections, projects, today, onToggle, showProject = true }: Props) {
-  const { spacing } = useAppTheme();
+  const { colors, spacing } = useAppTheme();
   if (sections.length === 0) return <AppText tone="secondary">예정된 작업이 없어요.</AppText>;
   return (
     <View style={{ gap: spacing.lg }}>
-      {sections.map((section) => (
-        <View key={section.key} style={{ gap: spacing.xs }}>
-          <AppText variant="subtitle">{sectionTitle(section.key, today)}</AppText>
-          <TaskList tasks={section.tasks} projects={projects} today={today} onToggle={onToggle} showProject={showProject} overdue={section.key === 'overdue'} />
-        </View>
-      ))}
+      {sections.map((section) => {
+        const overdue = section.key === 'overdue';
+        return (
+          <View key={section.key} style={{ gap: spacing.sm }}>
+            <AppText variant="subtitle" style={overdue ? { color: colors.danger } : section.key === today ? { color: colors.primary } : undefined}>
+              {sectionTitle(section.key, today)}
+            </AppText>
+            <Card tone={overdue ? 'danger' : 'default'} style={{ paddingVertical: spacing.xs }}>
+              <TaskList tasks={section.tasks} projects={projects} today={today} onToggle={onToggle} showProject={showProject} overdue={overdue} />
+            </Card>
+          </View>
+        );
+      })}
     </View>
   );
 }

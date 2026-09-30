@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
+import { ThreadMark } from '@/components/ThreadMark';
 import { TextField } from '@/components/TextField';
 import { fieldErrors, loginSchema } from '@/lib/validation';
 import { useMockStore } from '@/mocks/MockStoreProvider';
@@ -27,8 +28,9 @@ export default function LoginScreen() {
 
   return (
     <Screen scroll style={{ justifyContent: 'center', flexGrow: 1 }}>
-      <AppText variant="title">Weave</AppText>
-      <AppText tone="secondary">여러 프로젝트를 하나의 일정으로</AppText>
+      <ThreadMark />
+      <AppText variant="display">Weave</AppText>
+      <AppText tone="secondary">여러 프로젝트를 하나의 일정으로 엮어요.</AppText>
       <TextField label="이메일" value={email} onChangeText={setEmail} error={errors.email} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" />
       <TextField label="비밀번호" value={password} onChangeText={setPassword} error={errors.password} secureTextEntry autoComplete="password" textContentType="password" />
       <Button label="로그인" onPress={submit} />

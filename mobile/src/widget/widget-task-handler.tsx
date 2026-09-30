@@ -2,7 +2,7 @@ import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { todayKey } from '@/lib/date';
 import { createSeed } from '@/mocks/seed';
-import { palette } from '@/theme/colors';
+import { colors } from '@/theme/colors';
 
 import { TodayWidget } from './TodayWidget';
 import { buildTodayWidgetData } from './today-widget-data';
@@ -18,10 +18,8 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     case 'WIDGET_RESIZED': {
       const today = todayKey();
       const data = buildTodayWidgetData({ session: null, draft: null, ...createSeed(today) }, today);
-      props.renderWidget({
-        light: <TodayWidget data={data} colors={palette.light} />,
-        dark: <TodayWidget data={data} colors={palette.dark} />,
-      });
+      // 앱과 같이 밝은 테마만 쓴다
+      props.renderWidget(<TodayWidget data={data} colors={colors} />);
       break;
     }
     default:

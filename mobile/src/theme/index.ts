@@ -1,24 +1,23 @@
-import { useColorScheme, type ColorSchemeName } from 'react-native';
-
-import { palette, type ColorTokens } from './colors';
-import { spacing } from './spacing';
+import { colors, type ColorTokens } from './colors';
+import { radius, spacing } from './spacing';
 import { typography } from './typography';
 
 export type Theme = {
-  scheme: 'light' | 'dark';
   colors: ColorTokens;
   spacing: typeof spacing;
+  radius: typeof radius;
   typography: typeof typography;
 };
 
-export function getTheme(scheme: ColorSchemeName | undefined): Theme {
-  const resolved = scheme === 'dark' ? 'dark' : 'light';
-  return { scheme: resolved, colors: palette[resolved], spacing, typography };
+const theme: Theme = { colors, spacing, radius, typography };
+
+/** 밝은 테마만 쓴다 — 다크 모드는 지원하지 않는다(루트 CLAUDE.md §1). */
+export function getTheme(): Theme {
+  return theme;
 }
 
-/** 라이트/다크는 시스템 설정을 따르고 토큰 세트만 바꾼다(§5.2-14). */
 export function useAppTheme(): Theme {
-  return getTheme(useColorScheme());
+  return theme;
 }
 
-export { spacing, typography };
+export { colors, radius, spacing, typography };

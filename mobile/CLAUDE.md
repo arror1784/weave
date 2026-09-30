@@ -35,7 +35,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 
 ## 2. 필수 규칙
 
-1. **색상·간격·글자 크기 단일 소스** — `src/theme/`(`colors` · `spacing` · `typography`)에서만. 컴포넌트에 `#fff`·`fontSize: 13`을 직접 쓰지 않는다. 라이트/다크는 `useAppTheme()`이 토큰 세트만 바꾼다. 색을 바꾸면 `theme.test.ts`가 명도 대비를 검사한다.
+1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 컴포넌트에 `#fff`·`fontSize: 13`을 직접 쓰지 않는다. **밝은 테마만 쓴다(다크 모드 미지원)** — `useColorScheme()`으로 분기하지 않는다. 글꼴은 Pretendard(`assets/fonts`, OFL) — 굵기는 `fontWeight`가 아니라 `typography`의 `fontFamily`로 고른다(Android).
 2. **공통 컴포넌트로만 UI 제작** — `Screen` · `AppText`(+ 필요 시 `Button` · `TextField` · `ListItem` 추가). 화면에서 RN 기본 `<Text>`/`<Pressable>`/`<TextInput>`을 새로 스타일링하지 않는다.
 3. **API는 도메인 클라이언트로만** — 컴포넌트에서 `axios`/`fetch` 직접 호출 금지. `src/api/<domain>.ts` → `src/queries/<domain>.ts`(TanStack Query 훅). 토큰 첨부·갱신은 인터셉터 전담.
 4. **서버 상태 ≠ 클라이언트 상태** — 서버 데이터는 Query 캐시, Zustand엔 UI 상태만.
@@ -53,6 +53,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 16. **목업 데이터는 `src/mocks/`에만** — 화면은 `useMockStore()`로만 목업에 접근한다. API 연동 시 이 폴더를 API 클라이언트·TanStack Query 훅으로 바꾸고 지운다. 목업 코드에는 `⚠ 목업` 주석을 단다.
 17. **앱 진입점은 `index.ts`** — `expo-router/entry`를 불러온 뒤 위젯 처리기를 등록한다(`package.json`의 `main`). 진입점을 `expo-router/entry`로 되돌리면 위젯이 동작하지 않는다.
 18. **위젯 컴포넌트(`src/widget/`)엔 `'use no memo'`** — 위젯 라이브러리가 컴포넌트를 React 렌더링 밖에서 함수로 호출하므로 React Compiler가 넣는 훅이 깨진다. 위젯은 스크린리더가 읽지 못하는 이미지로 그려지므로 `accessibilityLabel`에 요약 문장을 넣는다.
+19. **프로젝트는 "실" 색으로 구분한다** — `threadColorFor(projectId, projects)`(등록 순서대로 5색 순환). 여러 프로젝트가 섞인 목록(오늘·전체 일정)에선 작업 행 왼쪽에 실 색을 단다. 색만으로 구분하지 않고 항상 프로젝트 이름을 함께 쓴다(§4-4). 오늘 화면의 진행 띠(`DayWeave`)가 이 앱의 시각적 핵심이다.
 
 ## 3. 디렉터리 골격
 
@@ -62,6 +63,7 @@ mobile/
 ├── app.config.ts            # 이름·scheme(weave)·package(com.weave.app)·아이콘·위젯·plugin
 ├── eslint.config.js · jest.setup.ts(네이티브·expo-router 목) · tsconfig.json · .nvmrc
 ├── assets/images/           # 아이콘·스플래시
+├── assets/fonts/            # Pretendard Regular·SemiBold·Bold + OFL 라이선스
 └── src/
     ├── app/                 # Expo Router — 라우트 파일만 (§2-15)
     │   ├── _layout.tsx      # 루트 Stack + Stack.Protected(로그인 여부로 화면 묶음 전환)
@@ -71,8 +73,8 @@ mobile/
     │   ├── project/[id]/    # index(상세+태스크 확인) · schedule(일정 확인) · task/[taskId](수정·삭제)
     │   └── settings/        # account(계정 관리)
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
-    ├── components/          # Screen · AppText · Button · TextField · Card · ListItem · TaskRow · TaskList · ScheduleSections
-    ├── theme/               # colors · spacing · typography · useAppTheme (단일 소스)
+    ├── components/          # Screen · AppText · Button · TextField · Card · ListItem · TaskRow · TaskList · ScheduleSections · ProjectRow · DayWeave · DateHeading · ThreadMark
+    ├── theme/               # colors(+실 색) · spacing(+radius) · typography(Pretendard) · useAppTheme (단일 소스, 밝은 테마만)
     ├── lib/                 # 순수 헬퍼: date(DateKey 'YYYY-MM-DD') · validation(Zod) · contrast
     ├── mocks/               # ⚠ 목업 데이터·상태 (§2-16) — API 연동 시 제거
     ├── widget/              # Android 홈 화면 위젯 (§2-18)
@@ -87,7 +89,7 @@ mobile/
 2. 의미 있는 이미지는 `accessibilityLabel`, 장식용은 `accessible={false}`.
 3. 입력칸엔 보이는 라벨(placeholder는 라벨이 아니다). 제출 실패는 `AccessibilityInfo.announceForAccessibility`.
 4. 색만으로 정보 전달 금지 — 아이콘·문구를 함께.
-5. 명도 대비 본문 4.5:1, 큰 글자·아이콘 3:1 — `theme.test.ts`가 라이트·다크 모두 검사.
+5. 명도 대비 본문 4.5:1, 큰 글자·아이콘·그래픽 3:1 — `theme.test.ts`가 배경·카드 위의 모든 토큰과 프로젝트 실 색을 검사.
 6. 시스템 글자 크기를 따른다 — `allowFontScaling={false}` 금지. 최대 글자 크기에서도 잘림·겹침 없이(고정 높이 대신 패딩).
 7. 터치 영역 Android 48×48dp · iOS 44×44pt 이상(`hitSlop`/패딩).
 8. 제스처 전용 기능 금지 — 같은 일을 하는 버튼을 함께.
@@ -98,7 +100,7 @@ mobile/
 11. 작은 화면(폭 360dp)부터 — 고정 `width` 대신 `flex`·`maxWidth`.
 12. Safe Area는 `react-native-safe-area-context`(공통 `Screen`에서). RN 기본 `SafeAreaView` 금지.
 13. 키보드가 입력칸을 가리지 않게(`KeyboardAvoidingView` 등).
-14. 다크 모드는 시스템 설정을 따르고 토큰만 바꾼다.
+14. 다크 모드는 지원하지 않는다 — `app.config.ts`의 `userInterfaceStyle: 'light'`로 고정한다.
 15. 세로 고정(`orientation: 'portrait'`).
 
 ## 5. 명령어 (2026-09-29 실제 실행 확인)
