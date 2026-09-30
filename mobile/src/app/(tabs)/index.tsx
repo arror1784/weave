@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import { IconChevron, IconClock, IconPlus, IconWarn } from '@/components/icons';
+import { IconChevron, IconPlus, IconWarn } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { SectionLabel } from '@/components/SectionLabel';
 import { TaskCard } from '@/components/TaskCard';
@@ -13,7 +13,7 @@ import { selectDayLoad, selectTodayTasks } from '@/mocks/store';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
-/** 오늘의 일정 (Figma 02-a): 날짜·남은 일 / 과부하 카드 / 오늘 할 일 / 고정 일정 / 새 프로젝트 버튼 */
+/** 오늘의 일정 (Figma 02-a): 날짜·남은 일 / 과부하 카드 / 오늘 할 일 / 새 프로젝트 버튼. Figma의 고정 일정 구역은 뺐다(사용자 결정 G — 고정 일정은 나중에) */
 export default function TodayScreen() {
   const router = useRouter();
   const { colors, typography, radius } = useAppTheme();
@@ -21,7 +21,6 @@ export default function TodayScreen() {
   const tasks = selectTodayTasks(state, today);
   const left = tasks.filter((t) => !t.done).length;
   const load = selectDayLoad(state, today, { includeOverdue: true });
-  const events = state.events.filter((e) => e.date === today);
   const [date, weekday] = splitWeekday(formatDateLabel(today));
 
   return (
@@ -89,22 +88,6 @@ export default function TodayScreen() {
         )}
       </View>
 
-      {events.length > 0 ? (
-        <View>
-          <SectionLabel>일정</SectionLabel>
-          <View style={styles.list}>
-            {events.map((e) => (
-              <View key={e.id} style={[styles.event, { borderColor: colors.control, backgroundColor: colors.surface, borderRadius: radius.card }]}>
-                <IconClock size={16} color={colors.inkSoft} />
-                <AppText variant="small" style={styles.flex}>
-                  {e.title}
-                </AppText>
-                <AppText variant="mono" tone="soft">{`${e.time} · ${formatHours(e.hours)}`}</AppText>
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
     </Screen>
   );
 }
@@ -126,8 +109,6 @@ const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
   list: { gap: 8 },
-  event: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 16, paddingVertical: 12 },
-  flex: { flex: 1 },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', elevation: 6 },
   pressed: { transform: [{ scale: 0.95 }] },
   pressedCard: { transform: [{ scale: 0.99 }] },

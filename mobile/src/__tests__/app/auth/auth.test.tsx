@@ -40,12 +40,23 @@ describe('회원가입', () => {
   it('비밀번호가 다르면 오류, 맞으면 가입 후 로그인된다 (목업)', async () => {
     await renderWithStore(<SignupScreen />);
     await fireEvent.changeText(screen.getByLabelText('이메일'), 'me@example.com');
-    await fireEvent.changeText(screen.getByLabelText('비밀번호'), 'secret123');
-    await fireEvent.changeText(screen.getByLabelText('비밀번호 확인'), 'secret999');
+    await fireEvent.changeText(screen.getByLabelText('비밀번호'), 'secret12!');
+    await fireEvent.changeText(screen.getByLabelText('비밀번호 확인'), 'secret99!');
     await fireEvent.press(screen.getByRole('button', { name: '가입하기' }));
     expect(screen.getByText('비밀번호가 일치하지 않아요.')).toBeOnTheScreen();
-    await fireEvent.changeText(screen.getByLabelText('비밀번호 확인'), 'secret123');
+    await fireEvent.changeText(screen.getByLabelText('비밀번호 확인'), 'secret12!');
     await fireEvent.press(screen.getByRole('button', { name: '가입하기' }));
     expect(storeRef.current?.session).toEqual({ email: 'me@example.com' });
+  });
+
+  it('비밀번호 규칙(영문·숫자·특수문자 8자 이상)을 안내하고, 어기면 가입하지 않는다', async () => {
+    await renderWithStore(<SignupScreen />);
+    expect(screen.getByText('영문·숫자·특수문자를 모두 넣어 8자 이상')).toBeOnTheScreen();
+    await fireEvent.changeText(screen.getByLabelText('이메일'), 'me@example.com');
+    await fireEvent.changeText(screen.getByLabelText('비밀번호'), 'secret123');
+    await fireEvent.changeText(screen.getByLabelText('비밀번호 확인'), 'secret123');
+    await fireEvent.press(screen.getByRole('button', { name: '가입하기' }));
+    expect(screen.getByText('영문·숫자·특수문자를 모두 넣어 주세요.')).toBeOnTheScreen();
+    expect(storeRef.current?.session).toBeNull();
   });
 });

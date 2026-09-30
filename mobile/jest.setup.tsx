@@ -21,3 +21,7 @@ jest.mock('expo-router', () => {
     Tabs: Object.assign(Null, { Screen: Null, Protected: Null }),
   };
 });
+
+// 파일·사진 선택기(네이티브) — 테스트마다 jest.mocked(...).mockResolvedValueOnce로 결과를 정한다
+jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
+jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));

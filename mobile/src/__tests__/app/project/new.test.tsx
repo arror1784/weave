@@ -1,4 +1,6 @@
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 import ChatScreen from '@/app/project/new/chat';
 import NewProjectScreen from '@/app/project/new/index';
@@ -9,7 +11,7 @@ import { renderWithStore, storeRef } from '@/test-utils/render';
 
 beforeEach(resetRouterMock);
 
-const draft = { name: '임베디드시스템 과제', description: '', deadline: '2026-10-09', tasks: [] };
+const draft = { name: '임베디드시스템 과제', description: '', deadline: '2026-10-09', color: 'gray' as const, attachments: [], tasks: [] };
 
 describe('등록 1/3 기본 정보', () => {
   it('단계 표시와 입력칸을 보여준다', async () => {
@@ -38,10 +40,48 @@ describe('등록 1/3 기본 정보', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
   });
 
-  it('참고자료 첨부는 아직 준비 중임을 알린다 (목업)', async () => {
+  it('프로젝트 색을 고른다 — 기본은 아직 쓰지 않은 색', async () => {
+    await renderWithStore(<NewProjectScreen />);
+    const group = screen.getByLabelText('프로젝트 색');
+    expect(within(group).getByRole('radio', { name: '회색' })).toBeSelected();
+    await fireEvent.press(within(group).getByRole('radio', { name: '파랑' }));
+    await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
+    await fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    expect(storeRef.current?.draft?.color).toBe('blue');
+  });
+
+  it('링크 첨부: 주소 형식이 틀리면 오류, 맞으면 목록에 추가하고 지울 수 있다', async () => {
     await renderWithStore(<NewProjectScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'URL 첨부' }));
-    expect(screen.getByText('첨부는 아직 준비 중이에요')).toBeOnTheScreen();
+    const sheet = screen.getByLabelText('링크 첨부');
+    await fireEvent.changeText(within(sheet).getByLabelText('링크 주소'), 'example');
+    await fireEvent.press(within(sheet).getByRole('button', { name: '추가' }));
+    expect(within(sheet).getByText('https://로 시작하는 주소를 입력해 주세요.')).toBeOnTheScreen();
+    await fireEvent.changeText(within(sheet).getByLabelText('링크 주소'), 'https://example.com/spec');
+    await fireEvent.press(within(sheet).getByRole('button', { name: '추가' }));
+    expect(screen.queryByLabelText('링크 첨부')).toBeNull();
+    expect(screen.getByText('https://example.com/spec')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'https://example.com/spec 첨부 삭제' }));
+    expect(screen.queryByText('https://example.com/spec')).toBeNull();
+  });
+
+  it('파일·사진 첨부: 고른 파일을 목록에 추가하고, 취소하면 아무것도 추가하지 않는다', async () => {
+    jest.mocked(DocumentPicker.getDocumentAsync).mockResolvedValueOnce({ canceled: false, assets: [{ name: '명세서.pdf', uri: 'file:///cache/spec.pdf' }] } as never);
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({ canceled: false, assets: [{ fileName: 'capture.png', uri: 'file:///cache/capture.png' }] } as never);
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({ canceled: true, assets: null } as never);
+    await renderWithStore(<NewProjectScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
+    await fireEvent.press(screen.getByRole('button', { name: '캡처 첨부' }));
+    await fireEvent.press(screen.getByRole('button', { name: '캡처 첨부' }));
+    expect(screen.getByText('명세서.pdf')).toBeOnTheScreen();
+    expect(screen.getByText('capture.png')).toBeOnTheScreen();
+
+    await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
+    await fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    expect(storeRef.current?.draft?.attachments.map((a) => [a.kind, a.name])).toEqual([
+      ['file', '명세서.pdf'],
+      ['image', 'capture.png'],
+    ]);
   });
 });
 
@@ -113,7 +153,10 @@ describe('등록 3/3 작업 검토', () => {
     expect(created.name).toBe('임베디드시스템 과제');
     expect(storeRef.current!.draft).toBeNull();
     expect(mockRouter.dismissAll).toHaveBeenCalled();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(`/projects/${created.id}`);
-    expect(screen.getByText('임베디드시스템 과제가 등록됐어요')).toBeOnTheScreen();
+    // 상세 아래에 프로젝트 목록을 깔아 둔다 — 뒤로 가면 목록으로 (없으면 오늘 탭으로 튕겼다)
+    expect(mockRouter.navigate).toHaveBeenCalledWith(`/projects/${created.id}`, { withAnchor: true });
+    expect(screen.getByText(/^임베디드시스템 과제가 등록됐어요/)).toBeOnTheScreen();
+    // 임시 일정 알고리즘으로 날짜가 배정된다
+    expect(storeRef.current!.tasks.filter((t) => t.projectId === created.id).every((t) => t.scheduledDate !== null)).toBe(true);
   });
 });

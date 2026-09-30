@@ -15,12 +15,13 @@ describe('설정', () => {
     expect(screen.getByText('me@example.com')).toBeOnTheScreen();
   });
 
-  it('과부하 기준: 주간 가용 시간을 바꾸면 하루 평균도 바뀐다', async () => {
+  it('하루 가용 시간(기본 3시간)을 바꾼다 — 일정 배정과 과부하 기준', async () => {
     await renderWithStore(<SettingsScreen />, { session });
-    expect(screen.getByText('25시간')).toBeOnTheScreen();
-    await act(async () => screen.getByTestId('slider').props.onValueChange(35));
-    expect(storeRef.current?.settings.weeklyAvailableHours).toBe(35);
-    expect(screen.getByText(/하루 평균 약 7시간/)).toBeOnTheScreen();
+    expect(screen.getByLabelText('하루 가용 시간')).toBeOnTheScreen();
+    expect(screen.getByText('3시간')).toBeOnTheScreen();
+    await act(async () => screen.getByTestId('slider').props.onValueChange(4.5));
+    expect(storeRef.current?.settings.dailyAvailableHours).toBe(4.5);
+    expect(screen.getByText('4.5시간')).toBeOnTheScreen();
   });
 
   it('홈 화면 위젯 미리보기로 간다', async () => {
@@ -52,6 +53,6 @@ describe('홈 화면 위젯 미리보기', () => {
     expect(screen.getByText('소형 2×2')).toBeOnTheScreen();
     expect(screen.getByText('중형 4×2')).toBeOnTheScreen();
     expect(screen.getByLabelText(/^오늘 6개 남음, 가장 급한 일 행사 장소 섭외/)).toBeOnTheScreen();
-    expect(screen.getByText('과부하 11h / 5h')).toBeOnTheScreen();
+    expect(screen.getByText('과부하 7.5h / 3h')).toBeOnTheScreen();
   });
 });

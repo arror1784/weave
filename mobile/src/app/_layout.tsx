@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ProjectCompleteDialog } from '@/components/ProjectCompleteDialog';
 import { Splash } from '@/components/Splash';
 import { ToastProvider } from '@/components/Toast';
 import { MockStoreProvider, useMockStore } from '@/mocks/MockStoreProvider';
@@ -66,7 +67,15 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <ToastProvider>
           {/* 로딩 화면(00)이 끝난 뒤에 내비게이션을 띄운다 — 겹쳐 그리면 Android에서 로딩 화면이 보이지 않았다 */}
-          {splashDone ? <RootStack /> : <Splash onDone={finishSplash} />}
+          {splashDone ? (
+            <>
+              <RootStack />
+              {/* 마지막 작업을 끝내면 어느 화면에서든 프로젝트 완료 여부를 묻는다 */}
+              <ProjectCompleteDialog />
+            </>
+          ) : (
+            <Splash onDone={finishSplash} />
+          )}
         </ToastProvider>
         <StatusBar style="dark" />
       </ThemeProvider>

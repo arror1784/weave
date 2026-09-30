@@ -10,16 +10,19 @@ import { StepHeader } from '@/components/StepHeader';
 import { useToast } from '@/components/Toast';
 import { formatHours, withParticle } from '@/lib/korean';
 import { useMockStore } from '@/mocks/MockStoreProvider';
-import { createId } from '@/mocks/store';
+import { createId, previewDraftSchedule } from '@/mocks/store';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
-/** 프로젝트 등록 3/3: AI가 제안한 작업 검토 (Figma 02-b-iii) — 이름·시간 수정, 삭제, 선행 연결, 직접 추가 */
+/**
+ * 프로젝트 등록 3/3: AI가 제안한 작업 검토 (Figma 02-b-iii) — 이름·시간 수정, 삭제, 선행 연결, 직접 추가.
+ * 작업을 고칠 수 있는 곳은 여기뿐이다 — 등록한 뒤에는 고칠 수 없다(사용자 결정 B).
+ */
 export default function ReviewScreen() {
   const router = useRouter();
   const toast = useToast();
   const { colors, radius, typography } = useAppTheme();
-  const { state, dispatch } = useMockStore();
+  const { state, dispatch, today } = useMockStore();
   const draft = state.draft;
 
   if (!draft) {
@@ -36,10 +39,12 @@ export default function ReviewScreen() {
   function confirm() {
     const projectId = createId('p');
     const name = draft!.name;
-    dispatch({ type: 'confirmDraft', projectId });
-    toast(`${withParticle(name, '이', '가')} 등록됐어요`);
+    // 등록하면 임시 일정 알고리즘이 날짜를 배정한다(src/lib/scheduler.ts)
+    const { lateCount } = previewDraftSchedule(state, today);
+    dispatch({ type: 'confirmDraft', projectId, today });
+    toast(`${withParticle(name, '이', '가')} 등록됐어요${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
     router.dismissAll();
-    router.navigate(`/projects/${projectId}`);
+    router.navigate(`/projects/${projectId}`, { withAnchor: true });
   }
 
   return (

@@ -4,34 +4,36 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Badge } from '@/components/Badge';
+import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Checkbox } from '@/components/Checkbox';
+import { ColorPicker } from '@/components/ColorPicker';
 import { DDay } from '@/components/DDay';
-import { EditTaskSheet } from '@/components/EditTaskSheet';
 import { Gantt } from '@/components/Gantt';
-import { IconArrowDep, IconChat, IconEdit, IconPlus } from '@/components/icons';
+import { IconArrowDep, IconChat } from '@/components/icons';
 import { Screen } from '@/components/Screen';
-import { useToast } from '@/components/Toast';
 import { TopBar } from '@/components/TopBar';
 import { dDayLabel } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
 import { useMockStore } from '@/mocks/MockStoreProvider';
-import { createId, selectGanttRange, selectProjectSummary } from '@/mocks/store';
-import type { Task } from '@/mocks/types';
+import { selectGanttRange, selectProjectSummary } from '@/mocks/store';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 
 type Tab = 'tasks' | 'plan';
 
-/** 프로젝트 상세 (Figma 04-a 태스크 / 04-b 일정) */
+/**
+ * 프로젝트 상세 (Figma 04-a 태스크 / 04-b 일정).
+ * 등록된 작업은 완료 체크만 된다 — 일정 알고리즘이 정한 일정을 지키려고 수정·추가를 막았다(사용자 결정 B, 바뀔 수 있음).
+ * 프로젝트 색은 바꿀 수 있다(사용자 결정 I — Figma에 없음).
+ */
 export default function ProjectDetailScreen() {
   const router = useRouter();
-  const toast = useToast();
   const { colors, radius } = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch, today } = useMockStore();
   const [tab, setTab] = useState<Tab>('tasks');
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [colorOpen, setColorOpen] = useState(false);
   const project = state.projects.find((p) => p.id === id);
 
   if (!project) {
@@ -45,13 +47,6 @@ export default function ProjectDetailScreen() {
   const palette = projectPaletteFor(project.color);
   const tasks = state.tasks.filter((t) => t.projectId === project.id);
   const summary = selectProjectSummary(state, project.id, today);
-  const editing = tasks.find((t) => t.id === editingId);
-
-  function addTask() {
-    const task: Task = { id: createId('t'), projectId: project!.id, title: '새 작업', estimatedHours: 1, dependsOn: null, scheduledDate: null, spanDays: 1, dueDate: null, done: false, prerequisite: false };
-    dispatch({ type: 'addTask', task });
-    setEditingId(task.id);
-  }
 
   return (
     <Screen
@@ -59,7 +54,15 @@ export default function ProjectDetailScreen() {
         <>
           <TopBar title="" onBack={() => router.back()} right={<DDay label={project.deadline ? dDayLabel(project.deadline, today) : '상시'} />} />
           <View style={[styles.head, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
-            <Badge project={project} small />
+            <View style={styles.badgeRow}>
+              <Badge project={project} small />
+              <Pressable accessibilityRole="button" accessibilityLabel="프로젝트 색 바꾸기" onPress={() => setColorOpen(true)} style={styles.colorButton}>
+                <View style={[styles.colorDot, { backgroundColor: palette.dot }]} />
+                <AppText variant="caption" tone="soft">
+                  색 변경
+                </AppText>
+              </Pressable>
+            </View>
             <AppText variant="heading" style={styles.name}>
               {project.name}
             </AppText>
@@ -91,23 +94,18 @@ export default function ProjectDetailScreen() {
       }
       contentStyle={styles.pad}
       overlay={
-        editing ? (
-          <EditTaskSheet
-            key={editing.id}
-            task={editing}
-            others={tasks.filter((t) => t.id !== editing.id)}
-            onClose={() => setEditingId(null)}
-            onSave={(changes) => {
-              dispatch({ type: 'updateTask', taskId: editing.id, changes });
-              setEditingId(null);
-              toast('작업을 수정했어요');
-            }}
-            onDelete={() => {
-              dispatch({ type: 'deleteTask', taskId: editing.id });
-              setEditingId(null);
-              toast('작업을 삭제했어요');
-            }}
-          />
+        colorOpen ? (
+          <BottomSheet visible onClose={() => setColorOpen(false)} label="프로젝트 색">
+            <AppText variant="sheetTitle">프로젝트 색</AppText>
+            <ColorPicker
+              label="프로젝트 색 목록"
+              value={project.color}
+              onChange={(color) => {
+                dispatch({ type: 'setProjectColor', projectId: project.id, color });
+                setColorOpen(false);
+              }}
+            />
+          </BottomSheet>
         ) : null
       }>
       {tab === 'tasks' ? (
@@ -119,11 +117,7 @@ export default function ProjectDetailScreen() {
               return (
                 <View key={t.id} style={[styles.taskRow, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.card }]}>
                   <Checkbox checked={t.done} onToggle={() => dispatch({ type: 'toggleTask', taskId: t.id })} label={`${t.title} 완료`} color={palette.dot} />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t.title} 수정, ${t.estimatedHours ?? 0}시간${dep ? `, 선행 ${dep.title}${blocked ? ' 필요' : ''}` : ''}`}
-                    onPress={() => setEditingId(t.id)}
-                    style={styles.taskBody}>
+                  <View accessible accessibilityLabel={`${t.title}, ${t.estimatedHours ?? 0}시간${dep ? `, 선행 ${dep.title}${blocked ? ' 필요' : ''}` : ''}`} style={styles.taskBody}>
                     <View style={styles.flex}>
                       <View style={styles.inline}>
                         <AppText style={[styles.flex, t.done && { color: colors.inkSoft, textDecorationLine: 'line-through' }]}>{t.title}</AppText>
@@ -138,20 +132,12 @@ export default function ProjectDetailScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <IconEdit size={15} color={colors.inkSoft} />
-                  </Pressable>
+                  </View>
                 </View>
               );
             })}
           </View>
-          <View style={styles.actions}>
-            <View style={styles.flex}>
-              <Button label="작업 추가" variant="dashed" onPress={addTask} icon={(c) => <IconPlus size={16} color={c} />} />
-            </View>
-            <View style={styles.flex}>
-              <Button label="AI에게 재요청" variant="soft" onPress={() => router.push('/project/new')} icon={(c) => <IconChat size={16} color={c} />} />
-            </View>
-          </View>
+          <Button label="AI에게 재요청" variant="soft" onPress={() => router.push('/project/new')} icon={(c) => <IconChat size={16} color={c} />} />
         </>
       ) : (
         <Gantt tasks={tasks} range={selectGanttRange(today)} today={today} color={palette.dot} />
@@ -164,6 +150,9 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
   head: { paddingHorizontal: 20, paddingBottom: 0, borderBottomWidth: 1, gap: 6 },
   name: { marginTop: 4 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  colorButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingLeft: 12 },
+  colorDot: { width: 14, height: 14, borderRadius: 7 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
   track: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
@@ -176,5 +165,4 @@ const styles = StyleSheet.create({
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   depLine: { marginTop: 6, gap: 4 },
   flex: { flex: 1 },
-  actions: { flexDirection: 'row', gap: 8 },
 });

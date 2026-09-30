@@ -19,7 +19,7 @@ export default function SettingsScreen() {
   const { colors } = useAppTheme();
   const { state, dispatch } = useMockStore();
   const email = state.session?.email ?? '';
-  const hours = state.settings.weeklyAvailableHours;
+  const hours = state.settings.dailyAvailableHours;
 
   function confirmDelete() {
     Alert.alert('계정 삭제', '계정과 모든 프로젝트·일정이 삭제돼요. 되돌릴 수 없어요.', [
@@ -47,25 +47,28 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      <SettingsGroup title="과부하 기준">
+      {/* 하루 가용 시간(기본 3시간) — 사용자 결정 E. Figma는 주간 가용 시간 */}
+      <SettingsGroup title="일정 기준">
         <View style={styles.hours}>
           <View style={styles.between}>
-            <AppText variant="small">주간 가용 시간</AppText>
+            <AppText variant="small">하루 가용 시간</AppText>
             <AppText variant="monoBold" color={colors.thread} style={styles.hoursValue}>{`${hours}시간`}</AppText>
           </View>
           <Slider
-            accessibilityLabel="주간 가용 시간"
-            minimumValue={5}
-            maximumValue={50}
-            step={1}
+            accessibilityLabel="하루 가용 시간"
+            minimumValue={1}
+            maximumValue={8}
+            step={0.5}
             value={hours}
-            onValueChange={(v: number) => dispatch({ type: 'setWeeklyHours', hours: Math.round(v) })}
+            onValueChange={(v: number) => dispatch({ type: 'setDailyHours', hours: Math.round(v * 2) / 2 })}
             minimumTrackTintColor={colors.thread}
             maximumTrackTintColor={colors.line}
             thumbTintColor={colors.thread}
             style={styles.slider}
           />
-          <AppText variant="caption" tone="soft">{`하루 평균 약 ${Number((hours / 5).toFixed(1))}시간 (주 5일 기준) · 이 값을 넘으면 과부하로 알려드려요`}</AppText>
+          <AppText variant="caption" tone="soft">
+            새 프로젝트의 작업을 하루에 이만큼까지 배정하고, 넘으면 과부하로 알려드려요
+          </AppText>
         </View>
       </SettingsGroup>
 

@@ -6,7 +6,7 @@ import type { DraftTask, State, Task } from './types';
  * ⚠ UI 확인용 예시 데이터 — Figma(Weave Make 디자인)의 예시를 옮겼다.
  * 날짜는 오늘 기준 상대값이라 언제 실행해도 "지연·임박·과부하"가 보인다.
  */
-export function createSeed(today: DateKey): Pick<State, 'projects' | 'tasks' | 'events'> {
+export function createSeed(today: DateKey): Pick<State, 'projects' | 'tasks'> {
   const d = (n: number) => addDays(today, n);
   const task = (t: Partial<Task> & Pick<Task, 'id' | 'projectId' | 'title'>): Task => ({
     estimatedHours: 1,
@@ -42,10 +42,6 @@ export function createSeed(today: DateKey): Pick<State, 'projects' | 'tasks' | '
       task({ id: 'a-week', projectId: 'p-algo', title: '이번 주차 문제풀이', estimatedHours: 0.75, dependsOn: 'a-concept', scheduledDate: today, dueDate: d(1) }),
       task({ id: 'a-next', projectId: 'p-algo', title: '다음 주차 문제풀이', estimatedHours: 3, scheduledDate: d(6), dueDate: d(7) }),
       task({ id: 'a-review', projectId: 'p-algo', title: '코드 리뷰', estimatedHours: 1, scheduledDate: d(2), dueDate: d(3) }),
-    ],
-    events: [
-      { id: 'ev-meeting', projectId: 'p-club', title: '창업동아리 정기 회의', date: today, time: '19:00', hours: 1.5 },
-      { id: 'ev-meeting2', projectId: 'p-club', title: '창업동아리 회의', date: d(6), time: '19:00', hours: 2 },
     ],
   };
 }

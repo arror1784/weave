@@ -1,5 +1,7 @@
 import {
   dailyCapacity,
+  previewDraftSchedule,
+  suggestProjectColor,
   initialState,
   reducer,
   selectDayItems,
@@ -35,7 +37,7 @@ function stateWith(partial: Partial<State>): State {
 }
 
 const base = stateWith({
-  settings: { weeklyAvailableHours: 25 },
+  settings: { dailyAvailableHours: 5 },
   projects: [project({ id: 'p1', deadline: '2026-10-09' }), project({ id: 'p2', deadline: '2026-10-03', color: 'magenta' }), project({ id: 'p3', deadline: null, color: 'violet' })],
   tasks: [
     task({ id: 'late', projectId: 'p2', scheduledDate: '2026-09-28', dueDate: '2026-09-28', estimatedHours: 1 }),
@@ -46,8 +48,9 @@ const base = stateWith({
     task({ id: 'fri', scheduledDate: '2026-10-02', estimatedHours: 4 }),
     task({ id: 'nextWeek', scheduledDate: '2026-10-06', estimatedHours: 3 }),
     task({ id: 'oldDone', scheduledDate: '2026-09-20', done: true }),
+    // 9/29~10/1 사흘에 걸친 3시간 작업 → 하루 1시간씩
+    task({ id: 'multi', scheduledDate: '2026-09-29', spanDays: 3, estimatedHours: 3 }),
   ],
-  events: [{ id: 'ev', projectId: 'p2', title: '정기 회의', date: T, time: '19:00', hours: 1.5 }],
 });
 
 describe('reducer', () => {
@@ -63,34 +66,44 @@ describe('reducer', () => {
     expect(reducer(base, { type: 'toggleTask', taskId: 'today2' }).tasks.find((t) => t.id === 'today2')?.done).toBe(true);
   });
 
-  it('작업의 제목·소요 시간·선행 작업을 수정한다', () => {
-    const next = reducer(base, { type: 'updateTask', taskId: 'today2', changes: { title: '새 이름', estimatedHours: 3, dependsOn: 'fri' } });
-    expect(next.tasks.find((t) => t.id === 'today2')).toMatchObject({ title: '새 이름', estimatedHours: 3, dependsOn: 'fri' });
+  it('하루 가용 시간을 바꾼다', () => {
+    expect(reducer(base, { type: 'setDailyHours', hours: 4 }).settings.dailyAvailableHours).toBe(4);
   });
 
-  it('작업을 삭제하면 그 작업을 선행으로 둔 작업의 연결도 끊긴다', () => {
-    const next = reducer(base, { type: 'deleteTask', taskId: 'pre' });
-    expect(next.tasks.find((t) => t.id === 'pre')).toBeUndefined();
-    expect(next.tasks.find((t) => t.id === 'today1')?.dependsOn).toBeNull();
+  it('프로젝트의 마지막 작업을 완료하면 프로젝트 완료 여부를 묻는다', () => {
+    const s = stateWith({ projects: [project({ id: 'px' })], tasks: [task({ id: 'a', projectId: 'px', done: true }), task({ id: 'b', projectId: 'px' })] });
+    const asked = reducer(s, { type: 'toggleTask', taskId: 'b' });
+    expect(asked.completionPrompt).toBe('px');
+    // 다시 체크를 풀면 묻지 않는다
+    expect(reducer(asked, { type: 'toggleTask', taskId: 'b' }).completionPrompt).toBeNull();
+    // 아직 남은 작업이 있으면 묻지 않는다
+    expect(reducer(s, { type: 'toggleTask', taskId: 'a' }).completionPrompt).toBeNull();
   });
 
-  it('프로젝트에 작업을 추가한다', () => {
-    const next = reducer(base, { type: 'addTask', task: task({ id: 'new', projectId: 'p1', title: '새 작업', scheduledDate: null }) });
-    expect(next.tasks.at(-1)).toMatchObject({ id: 'new', title: '새 작업' });
+  it('완료 모달: 완료하면 프로젝트가 완료 상태가 되고, 아니라고 하면 진행중으로 둔다', () => {
+    const s = stateWith({ projects: [project({ id: 'px' })], tasks: [task({ id: 'b', projectId: 'px' })] });
+    const asked = reducer(s, { type: 'toggleTask', taskId: 'b' });
+    const completed = reducer(asked, { type: 'completeProject', projectId: 'px' });
+    expect(completed.projects[0].status).toBe('done');
+    expect(completed.completionPrompt).toBeNull();
+    const dismissed = reducer(asked, { type: 'dismissCompletionPrompt' });
+    expect(dismissed.projects[0].status).toBe('active');
+    expect(dismissed.completionPrompt).toBeNull();
   });
 
-  it('작업들을 다음 주로 미룬다 (예정일 +7일)', () => {
-    const next = reducer(base, { type: 'deferTasks', taskIds: ['fri', 'today2'] });
-    expect(next.tasks.find((t) => t.id === 'fri')?.scheduledDate).toBe('2026-10-09');
-    expect(next.tasks.find((t) => t.id === 'today2')?.scheduledDate).toBe('2026-10-07');
+  it('이미 완료된 프로젝트는 다시 묻지 않는다', () => {
+    const s = stateWith({ projects: [project({ id: 'px', status: 'done' })], tasks: [task({ id: 'b', projectId: 'px' })] });
+    expect(reducer(s, { type: 'toggleTask', taskId: 'b' }).completionPrompt).toBeNull();
   });
 
-  it('주간 가용 시간을 바꾼다', () => {
-    expect(reducer(base, { type: 'setWeeklyHours', hours: 30 }).settings.weeklyAvailableHours).toBe(30);
+  it('프로젝트 색을 바꾼다', () => {
+    expect(reducer(base, { type: 'setProjectColor', projectId: 'p1', color: 'amber' }).projects.find((p) => p.id === 'p1')?.color).toBe('amber');
   });
 
-  it('등록 초안: 수정·삭제·추가 후 확정하면 프로젝트와 작업(선행 연결 포함)이 생긴다', () => {
-    let s = reducer(base, { type: 'startDraft', name: '임베디드', description: '설명', deadline: '2026-10-09' });
+  it('등록 초안: 수정·삭제·추가 후 확정하면 프로젝트(고른 색·첨부 포함)와 작업(선행 연결 포함)이 생긴다', () => {
+    const attachment = { id: 'at1', kind: 'link' as const, name: 'https://example.com', uri: 'https://example.com' };
+    let s = reducer(base, { type: 'startDraft', name: '임베디드', description: '설명', deadline: '2026-10-09', color: 'blue', attachments: [attachment] });
+    expect(s.draft?.attachments).toEqual([attachment]);
     s = reducer(s, {
       type: 'setDraftTasks',
       tasks: [
@@ -102,10 +115,10 @@ describe('reducer', () => {
     s = reducer(s, { type: 'updateDraftTask', key: 'b', changes: { estimatedHours: 3.5 } });
     s = reducer(s, { type: 'deleteDraftTask', key: 'c' });
     s = reducer(s, { type: 'addDraftTask', key: 'd' });
-    s = reducer(s, { type: 'confirmDraft', projectId: 'p-new' });
+    s = reducer(s, { type: 'confirmDraft', projectId: 'p-new', today: T });
 
     const created = s.projects.find((p) => p.id === 'p-new');
-    expect(created).toMatchObject({ name: '임베디드', deadline: '2026-10-09', status: 'active' });
+    expect(created).toMatchObject({ name: '임베디드', deadline: '2026-10-09', status: 'active', color: 'blue' });
     const tasks = s.tasks.filter((t) => t.projectId === 'p-new');
     expect(tasks.map((t) => [t.title, t.estimatedHours, t.prerequisite])).toEqual([
       ['개념 학습', 2, true],
@@ -113,23 +126,38 @@ describe('reducer', () => {
       ['새 작업', 1, false],
     ]);
     expect(tasks[1].dependsOn).toBe(tasks[0].id);
-    expect(tasks.every((t) => t.scheduledDate === null)).toBe(true);
     expect(s.draft).toBeNull();
   });
 
-  it('새 프로젝트는 아직 쓰지 않은 프로젝트 색을 먼저 받는다', () => {
-    let s = reducer(base, { type: 'startDraft', name: 'x', description: '', deadline: null });
-    s = reducer(s, { type: 'confirmDraft', projectId: 'p-new' });
-    expect(s.projects.find((p) => p.id === 'p-new')?.color).toBe('gray');
+  it('등록을 확정하면 임시 일정 알고리즘으로 날짜·기간·작업 마감일을 배정한다', () => {
+    let s = stateWith({ settings: { dailyAvailableHours: 3 } });
+    s = reducer(s, { type: 'startDraft', name: '임베디드', description: '', deadline: '2026-10-09', color: 'teal', attachments: [] });
+    s = reducer(s, {
+      type: 'setDraftTasks',
+      tasks: [
+        { key: 'a', title: '개념 학습', estimatedHours: 2, dependsOnKey: null, prerequisite: true },
+        { key: 'b', title: '보고서', estimatedHours: 4, dependsOnKey: 'a', prerequisite: false },
+      ],
+    });
+    expect(previewDraftSchedule(s, T).lateCount).toBe(0);
+    s = reducer(s, { type: 'confirmDraft', projectId: 'p-new', today: T });
+    expect(s.tasks.map((t) => [t.title, t.scheduledDate, t.spanDays, t.dueDate])).toEqual([
+      ['개념 학습', '2026-09-30', 1, '2026-10-07'],
+      ['보고서', '2026-10-01', 2, '2026-10-09'],
+    ]);
+  });
+
+  it('새 프로젝트의 기본 색은 아직 쓰지 않은 색이다', () => {
+    expect(suggestProjectColor(base)).toBe('gray');
   });
 });
 
 describe('selectors', () => {
-  it('오늘 할 일: 오늘 예정 작업 + 밀린 작업, 지연 먼저·그다음 마감 가까운 순, 완료는 맨 뒤', () => {
-    expect(selectTodayTasks(base, T).map((t) => t.id)).toEqual(['late', 'today1', 'today2', 'doneToday']);
+  it('오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업, 지연 먼저·그다음 마감 가까운 순, 완료는 맨 뒤', () => {
+    expect(selectTodayTasks(base, T).map((t) => t.id)).toEqual(['late', 'today1', 'today2', 'multi', 'doneToday']);
   });
 
-  it('밀린 작업은 예정일이 지났고 완료되지 않은 작업이다', () => {
+  it('밀린 작업은 끝나는 날이 지났고 완료되지 않은 작업이다 (여러 날 작업은 끝나는 날 기준)', () => {
     expect(selectOverdueTasks(base, T).map((t) => t.id)).toEqual(['late']);
   });
 
@@ -141,32 +169,40 @@ describe('selectors', () => {
     expect(taskTone(task({ id: 'x', dueDate: '2026-09-29', done: true }), T)).toBe('soft');
   });
 
-  it('하루 가용 시간은 주간 가용 시간 ÷ 5 (주 5일 기준)', () => {
+  it('하루 가용 시간은 설정 값이다 (기본 3시간)', () => {
     expect(dailyCapacity(base.settings)).toBe(5);
+    expect(initialState.settings.dailyAvailableHours).toBe(3);
   });
 
-  it('오늘 부하: 오늘 할 일(밀린 작업 포함) + 고정 일정 시간을 하루 가용 시간과 비교한다', () => {
-    // late 1 + today1 0.75 + today2 2 + doneToday 1.5 + 정기 회의 1.5 = 6.75
-    expect(selectDayLoad(base, T, { includeOverdue: true })).toEqual({ hours: 6.75, capacity: 5, over: true });
+  it('오늘 부하: 오늘 몫(여러 날 작업은 하루 몫) + 밀린 작업 전부를 하루 가용 시간과 비교한다', () => {
+    // late 1 + today1 0.75 + today2 2 + doneToday 1.5 + multi 1 = 6.25
+    expect(selectDayLoad(base, T, { includeOverdue: true })).toEqual({ hours: 6.25, capacity: 5, over: true });
   });
 
-  it('달력의 날짜 부하: 그날 예정된 작업 + 고정 일정만 센다 (밀린 작업 제외)', () => {
-    expect(selectDayLoad(base, T)).toEqual({ hours: 5.75, capacity: 5, over: true });
+  it('달력의 날짜 부하: 그날 몫만 센다 (밀린 작업 제외)', () => {
+    expect(selectDayLoad(base, T)).toEqual({ hours: 5.25, capacity: 5, over: true });
+    expect(selectDayLoad(base, '2026-10-01')).toEqual({ hours: 1, capacity: 5, over: false });
     expect(selectDayLoad(base, '2026-10-02')).toEqual({ hours: 4, capacity: 5, over: false });
   });
 
-  it('날짜별 항목: 그날 작업 + 고정 일정 + 그날 마감인 프로젝트', () => {
+  it('날짜별 항목: 그날이 기간에 들어가는 작업(하루 몫 시간) + 그날 마감인 프로젝트', () => {
     const items = selectDayItems(base, '2026-10-03');
     expect(items).toEqual([{ kind: 'due', projectId: 'p2', title: 'p2 마감', hours: 0, due: true }]);
-    expect(selectDayItems(base, T).map((i) => i.title)).toEqual(['today1', 'today2', 'doneToday', '정기 회의']);
+    expect(selectDayItems(base, T).map((i) => [i.title, i.hours])).toEqual([
+      ['today1', 0.75],
+      ['today2', 2],
+      ['doneToday', 1.5],
+      ['multi', 1],
+    ]);
   });
 
-  it('이번 주 부하: 이번 주(월~일) 남은 작업 + 밀린 작업 시간 합과 주간 가용 시간, 미룰 후보(시간 큰 순)', () => {
+  it('이번 주 부하: 오늘~일요일 남은 작업 몫 + 밀린 작업 vs 하루 가용 시간 × 남은 날 수, 작업은 시간 큰 순', () => {
     const load = selectWeekLoad(base, T);
-    // late 1 + today1 0.75 + today2 2 + fri 4 (완료·다음 주·미배정 제외)
-    expect(load.estimated).toBe(7.75);
+    // late 1 + today1 0.75 + today2 2 + fri 4 + multi 2(9/30·10/1) = 9.75
+    expect(load.estimated).toBe(9.75);
+    // 수~일 5일 × 5시간
     expect(load.available).toBe(25);
-    expect(load.candidates.map((t) => t.id)).toEqual(['fri', 'today2', 'late', 'today1']);
+    expect(load.tasks.map((t) => t.id)).toEqual(['fri', 'multi', 'today2', 'late', 'today1']);
   });
 
   it('프로젝트 목록: 상태로 거르고 마감 가까운 순, 상시는 맨 뒤', () => {
@@ -176,7 +212,7 @@ describe('selectors', () => {
 
   it('프로젝트 요약: 진행률과 안내 문구 (지연이 있으면 지연, 아니면 다음 작업)', () => {
     expect(selectProjectSummary(base, 'p2', T)).toMatchObject({ done: 0, total: 1, percent: 0, note: '지연 1건 · late', late: true });
-    expect(selectProjectSummary(base, 'p1', T)).toMatchObject({ done: 2, total: 5, percent: 40, note: '다음: today2', late: false });
+    expect(selectProjectSummary(base, 'p1', T)).toMatchObject({ done: 2, total: 6, percent: 33, note: '다음: multi', late: false });
   });
 
   it('프로젝트 일정(간트) 범위: 오늘 이틀 전부터 9일', () => {

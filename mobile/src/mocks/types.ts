@@ -23,9 +23,9 @@ export type Task = {
   estimatedHours: number | null;
   /** 선행 작업 하나 (Figma: 작업마다 선행 작업은 최대 1개) */
   dependsOn: string | null;
-  /** 서비스가 배정한 수행 시작일. 일정 생성 알고리즘이 미정이라 새 작업은 null */
+  /** 일정 알고리즘이 배정한 수행 시작일 (src/lib/scheduler.ts — 임시안). null이면 미배정 */
   scheduledDate: DateKey | null;
-  /** 수행 기간(일) — 프로젝트 일정(간트)에서 막대 길이 */
+  /** 수행 기간(일). 소요 시간을 이 기간에 똑같이 나눠 하루 몫으로 센다 */
   spanDays: number;
   /** 작업 마감일 (D-day 표시) */
   dueDate: DateKey | null;
@@ -34,14 +34,13 @@ export type Task = {
   prerequisite: boolean;
 };
 
-/** 시간이 정해진 고정 일정 (예: 정기 회의) */
-export type ScheduleEvent = {
+/** 등록할 때 첨부한 참고자료 (앱 쪽만 구현 — AI로 보내는 것은 백엔드 연동 때) */
+export type Attachment = {
   id: string;
-  projectId: string;
-  title: string;
-  date: DateKey;
-  time: string;
-  hours: number;
+  kind: 'link' | 'file' | 'image';
+  /** 목록에 보여줄 이름 (링크는 주소, 파일·사진은 파일 이름) */
+  name: string;
+  uri: string;
 };
 
 export type DraftTask = {
@@ -57,19 +56,22 @@ export type Draft = {
   name: string;
   description: string;
   deadline: DateKey | null;
+  color: ProjectColorKey;
+  attachments: Attachment[];
   tasks: DraftTask[];
 };
 
 export type Settings = {
-  /** 주간 가용 시간 — 과부하 기준 */
-  weeklyAvailableHours: number;
+  /** 하루 가용 시간 — 일정 배정·과부하 기준 (기본 3시간, 사용자 결정 E) */
+  dailyAvailableHours: number;
 };
 
 export type State = {
   session: { email: string } | null;
   projects: Project[];
   tasks: Task[];
-  events: ScheduleEvent[];
   draft: Draft | null;
   settings: Settings;
+  /** 마지막 작업을 끝내서 "프로젝트가 완료되었습니까?"를 물어볼 프로젝트 */
+  completionPrompt: string | null;
 };

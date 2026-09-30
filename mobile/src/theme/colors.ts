@@ -36,19 +36,26 @@ export const colors = {
 
 export type ColorTokens = typeof colors;
 
-/** 프로젝트별 색 — 경고색(주황/빨강)과 겹치지 않는 톤만 (Figma PROJECTS). */
+/**
+ * 프로젝트별 색 — 사용자가 고른다. 경고색(주황/빨강)과 겹치지 않는 톤만.
+ * 앞 4개는 Figma PROJECTS, 뒤 4개는 사용자 요청(5가지 이상)으로 추가한 임시안(사용자 확인 필요).
+ */
 export const projectPaletteMap = {
-  teal: { dot: '#0d9488', soft: '#e4f6f3', text: '#0a7166' },
-  magenta: { dot: '#b23a7a', soft: '#fbe8f2', text: '#97306a' },
-  violet: { dot: '#6a4fc4', soft: '#f0ecfc', text: '#5a3fb0' },
-  gray: { dot: '#7c828f', soft: '#eef0f3', text: '#5b6069' },
+  teal: { dot: '#0d9488', soft: '#e4f6f3', text: '#0a7166', label: '청록' },
+  magenta: { dot: '#b23a7a', soft: '#fbe8f2', text: '#97306a', label: '자홍' },
+  violet: { dot: '#6a4fc4', soft: '#f0ecfc', text: '#5a3fb0', label: '보라' },
+  gray: { dot: '#7c828f', soft: '#eef0f3', text: '#5b6069', label: '회색' },
+  blue: { dot: '#2f6fd0', soft: '#e8f0fc', text: '#2459a8', label: '파랑' },
+  green: { dot: '#3a8a3f', soft: '#e8f4e8', text: '#2e6e32', label: '초록' },
+  amber: { dot: '#b7791f', soft: '#fbf1dd', text: '#8a5a12', label: '황토' },
+  brown: { dot: '#8d6344', soft: '#f4ece5', text: '#72503a', label: '갈색' },
 } as const;
 
 export type ProjectColorKey = keyof typeof projectPaletteMap;
 export type ProjectPalette = (typeof projectPaletteMap)[ProjectColorKey];
 
 export const projectPalettes: ProjectPalette[] = Object.values(projectPaletteMap);
-export const projectColorOrder: ProjectColorKey[] = ['teal', 'magenta', 'violet', 'gray'];
+export const projectColorOrder: ProjectColorKey[] = ['teal', 'magenta', 'violet', 'gray', 'blue', 'green', 'amber', 'brown'];
 
 export function projectPaletteFor(key: ProjectColorKey): ProjectPalette {
   return projectPaletteMap[key];

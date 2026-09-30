@@ -35,10 +35,10 @@ const config: ExpoConfig = {
   android: {
     // 출시 후엔 바꿀 수 없다
     package: 'com.weave.app',
+    // Weave 로고(WeaveMark)로 만든 아이콘 — 바탕은 실 색(colors.thread), 전경은 날실·씨실
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#2B4C8C',
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
@@ -48,9 +48,19 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#F5F6FA',
+        // 앱 안 로딩 화면(Splash, 흰 바탕 + 96dp 로고)과 이어지도록
+        backgroundColor: '#FFFFFF',
         image: './assets/images/splash-icon.png',
-        imageWidth: 76,
+        imageWidth: 96,
+      },
+    ],
+    [
+      'expo-image-picker',
+      {
+        // 참고자료 사진 첨부 — Android는 시스템 사진 선택기라 권한이 필요 없다. 카메라·마이크는 쓰지 않으니 막는다(§3-15).
+        photosPermission: '프로젝트 참고자료로 첨부할 사진을 고르기 위해 사진 보관함에 접근해요.',
+        cameraPermission: false,
+        microphonePermission: false,
       },
     ],
     ['react-native-android-widget', widgetConfig],

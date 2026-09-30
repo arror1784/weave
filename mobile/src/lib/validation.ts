@@ -9,10 +9,22 @@ export const loginSchema = z.object({
   password: z.string().min(1, '비밀번호를 입력해 주세요.'),
 });
 
+/**
+ * 비밀번호 규칙 — Claude 임시안(사용자 확인 필요): 8~64자, 영문·숫자·특수문자 각 1개 이상, 공백 없음.
+ * 서버도 같은 규칙으로 다시 검증해야 한다(§3-7).
+ */
+export const PASSWORD_HINT = '영문·숫자·특수문자를 모두 넣어 8자 이상';
+const passwordRule = z
+  .string()
+  .min(8, '비밀번호는 8자 이상이어야 해요.')
+  .max(64, '비밀번호는 64자 이하로 입력해 주세요.')
+  .refine((v) => !/\s/.test(v), '비밀번호에 공백을 넣을 수 없어요.')
+  .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v) && /[^A-Za-z\d]/.test(v), '영문·숫자·특수문자를 모두 넣어 주세요.');
+
 export const signupSchema = z
   .object({
     email,
-    password: z.string().min(8, '비밀번호는 8자 이상이어야 해요.'),
+    password: passwordRule,
     passwordConfirm: z.string(),
   })
   .refine((v) => v.password === v.passwordConfirm, { message: '비밀번호가 일치하지 않아요.', path: ['passwordConfirm'] });
@@ -27,6 +39,12 @@ export const projectBasicSchema = z.object({
     .refine((v) => v === '' || isValidDateKey(v), '2026-10-09처럼 입력해 주세요.')
     .transform((v) => (v === '' ? null : v)),
 });
+
+/** 참고자료 링크: http(s) 주소만 */
+export const linkSchema = z
+  .string()
+  .trim()
+  .pipe(z.url({ protocol: /^https?$/, error: 'https://로 시작하는 주소를 입력해 주세요.' }));
 
 /** 'YYYY-MM-DD' 형식이고 실제로 있는 날짜인지 */
 export function isValidDateKey(v: string): boolean {

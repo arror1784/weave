@@ -1,31 +1,32 @@
-import { fireEvent, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 
 import OverloadScreen from '@/app/overload';
-import { mockRouter, resetRouterMock } from '@/test-utils/router';
-import { renderWithStore, storeRef } from '@/test-utils/render';
+import { resetRouterMock } from '@/test-utils/router';
+import { renderWithStore } from '@/test-utils/render';
 
 beforeEach(resetRouterMock);
 
 describe('이번 주 과부하', () => {
-  // 이번 주 남은 작업 + 밀린 작업 = 3+1.5+2+2+1+1.25+0.75+1(코드 리뷰) = 12.5h
-  const lowCapacity = { settings: { weeklyAvailableHours: 10 } };
+  // 오늘(수)~일 5일. 밀린 작업 4h + 남은 작업 몫 ≈ 7.17h = 11.17h
+  const lowCapacity = { settings: { dailyAvailableHours: 2 } };
 
-  it('예상 소요가 가용 시간을 넘으면 초과 시간을 알려준다', async () => {
+  it('예상 소요가 이번 주 가용 시간(하루 가용 × 남은 날)을 넘으면 초과 시간을 알려준다', async () => {
     await renderWithStore(<OverloadScreen />, lowCapacity);
     expect(screen.getByRole('header', { name: '이번 주 과부하' })).toBeOnTheScreen();
-    expect(screen.getByLabelText('예상 소요 12.5시간')).toBeOnTheScreen();
-    expect(screen.getByText('2.5시간이 초과됐어요.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('예상 소요 11.17시간')).toBeOnTheScreen();
+    expect(screen.getByLabelText('가용 시간 10시간')).toBeOnTheScreen();
+    expect(screen.getByText('1.17시간이 초과됐어요.')).toBeOnTheScreen();
   });
 
-  it('미룰 작업을 고르면 예상 시간이 줄고, 반영하면 다음 주로 옮긴다', async () => {
+  it('이번 주 작업을 시간 큰 순으로 보여주고, 작업을 미루는 기능은 없다', async () => {
     await renderWithStore(<OverloadScreen />, lowCapacity);
-    expect(screen.getByRole('button', { name: '일정에 반영하기' })).toBeDisabled();
-    await fireEvent.press(screen.getByRole('button', { name: /^설계 문서 작성, 3h/ }));
-    expect(screen.getByLabelText('예상 소요 9.5시간')).toBeOnTheScreen();
-    expect(screen.getByText(/가용 안으로 들어와요/)).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole('button', { name: '일정에 반영하기' }));
-    expect(storeRef.current?.tasks.find((t) => t.id === 'e-design')?.scheduledDate).toBe('2026-10-06');
-    expect(mockRouter.back).toHaveBeenCalled();
-    expect(screen.getByText('3시간을 다음 주로 옮겼어요')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/^설계 문서 작성, 3h/)).toBeOnTheScreen();
+    expect(screen.queryByText('미루기')).toBeNull();
+    expect(screen.queryByRole('button', { name: '일정에 반영하기' })).toBeNull();
+  });
+
+  it('가용 시간 안이면 여유 있다고 알려준다', async () => {
+    await renderWithStore(<OverloadScreen />);
+    expect(screen.getByRole('header', { name: '이번 주는 여유가 있어요' })).toBeOnTheScreen();
   });
 });

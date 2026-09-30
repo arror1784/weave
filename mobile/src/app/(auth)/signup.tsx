@@ -7,7 +7,7 @@ import { IconLock, IconMail } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { TopBar } from '@/components/TopBar';
-import { fieldErrors, signupSchema } from '@/lib/validation';
+import { fieldErrors, PASSWORD_HINT, signupSchema } from '@/lib/validation';
 import { useMockStore } from '@/mocks/MockStoreProvider';
 
 /** 회원가입 — Figma에 없는 화면이라 로그인과 같은 스타일로 만들었다. */
@@ -33,7 +33,7 @@ export default function SignupScreen() {
     <Screen background="surface" edges={['top', 'bottom']} header={<TopBar title="회원가입" onBack={() => router.back()} />} contentStyle={styles.content}>
       <View style={styles.fields}>
         <TextField label="이메일" placeholder="you@example.com" value={email} onChangeText={setEmail} error={errors.email} leading={(c) => <IconMail size={18} color={c} />} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" />
-        <TextField label="비밀번호" placeholder="8자 이상" value={password} onChangeText={setPassword} error={errors.password} leading={(c) => <IconLock size={18} color={c} />} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
+        <TextField label="비밀번호" value={password} onChangeText={setPassword} error={errors.password} hint={PASSWORD_HINT} leading={(c) => <IconLock size={18} color={c} />} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
         <TextField label="비밀번호 확인" value={passwordConfirm} onChangeText={setPasswordConfirm} error={errors.passwordConfirm} leading={(c) => <IconLock size={18} color={c} />} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
       </View>
       <Button label="가입하기" onPress={submit} />

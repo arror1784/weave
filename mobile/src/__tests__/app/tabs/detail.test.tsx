@@ -24,30 +24,21 @@ describe('프로젝트 상세', () => {
     expect(storeRef.current?.tasks.find((t) => t.id === 'e-design')?.done).toBe(true);
   });
 
-  it('작업을 누르면 수정 시트가 열리고 제목·소요 시간·선행 작업을 저장한다', async () => {
+  it('등록된 작업은 고칠 수 없다: 작업 수정·작업 추가가 없다 (완료 체크만 가능)', async () => {
     await renderWithStore(<ProjectDetailScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: /^발표자료 제작 수정/ }));
-    const sheet = screen.getByLabelText('작업 수정');
-    await fireEvent.changeText(within(sheet).getByLabelText('제목'), '발표자료 제작 (슬라이드)');
-    await fireEvent.press(within(sheet).getByRole('radio', { name: '4시간' }));
-    await fireEvent.press(within(sheet).getByRole('radio', { name: '보고서 v2 초안 작성' }));
-    await fireEvent.press(within(sheet).getByRole('button', { name: '저장' }));
-    expect(storeRef.current?.tasks.find((t) => t.id === 'e-slides')).toMatchObject({ title: '발표자료 제작 (슬라이드)', estimatedHours: 4, dependsOn: 'e-report' });
-    expect(screen.getByText('작업을 수정했어요')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /수정/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '작업 추가' })).toBeNull();
+    expect(screen.queryByLabelText('작업 수정')).toBeNull();
   });
 
-  it('수정 시트에서 삭제한다', async () => {
+  it('프로젝트 색을 바꾼다', async () => {
     await renderWithStore(<ProjectDetailScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: /^발표자료 제작 수정/ }));
-    await fireEvent.press(within(screen.getByLabelText('작업 수정')).getByRole('button', { name: '삭제' }));
-    expect(storeRef.current?.tasks.some((t) => t.id === 'e-slides')).toBe(false);
-  });
-
-  it('작업 추가는 새 작업을 만들고 수정 시트를 연다', async () => {
-    await renderWithStore(<ProjectDetailScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: '작업 추가' }));
-    expect(storeRef.current?.tasks.filter((t) => t.projectId === 'p-embedded')).toHaveLength(6);
-    expect(screen.getByLabelText('작업 수정')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '프로젝트 색 바꾸기' }));
+    const sheet = screen.getByLabelText('프로젝트 색');
+    expect(within(sheet).getByRole('radio', { name: '청록' })).toBeSelected();
+    await fireEvent.press(within(sheet).getByRole('radio', { name: '파랑' }));
+    expect(storeRef.current?.projects.find((p) => p.id === 'p-embedded')?.color).toBe('blue');
+    expect(screen.queryByLabelText('프로젝트 색')).toBeNull();
   });
 
   it('AI에게 재요청하면 등록 흐름으로 간다', async () => {

@@ -8,6 +8,8 @@ import { AppText } from './AppText';
 type TextFieldProps = Omit<TextInputProps, 'style'> & {
   label: string;
   error?: string;
+  /** 입력 규칙 안내 (에러가 없을 때 입력칸 아래에 보인다) */
+  hint?: string;
   /** 입력칸 안 왼쪽 아이콘 */
   leading?: (color: string) => ReactNode;
   /** 입력칸 오른쪽에 붙는 요소 (예: D-9 배지) */
@@ -16,7 +18,7 @@ type TextFieldProps = Omit<TextInputProps, 'style'> & {
 };
 
 /** 입력칸엔 항상 보이는 라벨(§5.2-3). 에러는 입력칸 바로 아래 글자로. 포커스되면 테두리가 실 색으로. */
-export function TextField({ label, error, leading, accessory, mono, multiline, onFocus, onBlur, ...rest }: TextFieldProps) {
+export function TextField({ label, error, hint, leading, accessory, mono, multiline, onFocus, onBlur, ...rest }: TextFieldProps) {
   const { colors, radius, typography } = useAppTheme();
   const [focused, setFocused] = useState(false);
   const borderColor = error ? colors.danger : focused ? colors.thread : colors.control;
@@ -31,7 +33,7 @@ export function TextField({ label, error, leading, accessory, mono, multiline, o
           {leading ? <View style={styles.leading}>{leading(colors.inkSoft)}</View> : null}
           <TextInput
             accessibilityLabel={label}
-            accessibilityHint={error}
+            accessibilityHint={error ?? hint}
             placeholderTextColor={colors.inkSoft}
             multiline={multiline}
             onFocus={(e) => {
@@ -57,6 +59,10 @@ export function TextField({ label, error, leading, accessory, mono, multiline, o
       {error ? (
         <AppText variant="caption" color={colors.dangerText}>
           {error}
+        </AppText>
+      ) : hint ? (
+        <AppText variant="caption" tone="soft">
+          {hint}
         </AppText>
       ) : null}
     </View>
