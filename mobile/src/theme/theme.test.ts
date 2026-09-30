@@ -22,5 +22,27 @@ describe('getTheme', () => {
     it('보조 글자도 배경 대비 4.5:1 이상이다', () => {
       expect(contrastRatio(colors.textSecondary, colors.background)).toBeGreaterThanOrEqual(4.5);
     });
+
+    it('카드(surface) 위의 본문·보조 글자도 4.5:1 이상이다', () => {
+      expect(contrastRatio(colors.text, colors.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors.textSecondary, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('주 버튼 글자(onPrimary)는 주 버튼 배경 대비 4.5:1 이상이다', () => {
+      expect(contrastRatio(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('링크·강조 글자(primary)는 배경 대비 4.5:1 이상이다', () => {
+      expect(contrastRatio(colors.primary, colors.background)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('경고 글자(danger)는 경고 배경 대비 4.5:1 이상이다', () => {
+      expect(contrastRatio(colors.danger, colors.dangerSurface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors.danger, colors.background)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('테두리는 배경 대비 3:1 이상이다 (입력칸·체크박스 경계, §5.2-5)', () => {
+      expect(contrastRatio(colors.borderStrong, colors.background)).toBeGreaterThanOrEqual(3);
+    });
   });
 });

@@ -6,7 +6,11 @@ export const palette = {
     background: '#FFFFFF',
     surface: '#F0F0F3',
     border: '#D9D9E0',
+    borderStrong: '#7C8088',
     primary: '#1D6FD8',
+    onPrimary: '#FFFFFF',
+    danger: '#B3261E',
+    dangerSurface: '#FCEBEA',
   },
   dark: {
     text: '#ECEDEE',
@@ -14,7 +18,11 @@ export const palette = {
     background: '#111113',
     surface: '#212225',
     border: '#363A3F',
+    borderStrong: '#7C8088',
     primary: '#6BA8F5',
+    onPrimary: '#0B1B2E',
+    danger: '#FF8A80',
+    dangerSurface: '#3A1614',
   },
 } as const;
 
