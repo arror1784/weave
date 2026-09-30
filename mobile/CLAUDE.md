@@ -26,6 +26,8 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 | expo-dev-client | 57.0.x | 개발 빌드(§2-13) |
 | @expo/vector-icons (+ expo-asset) | 15.x (+ 57.0.x) | 아이콘. **expo-asset이 없으면 앱·테스트 모두 실행 중에 깨진다**(expo-font가 필요로 함) |
 | Zod | 4.x | 폼 입력 검증 (`src/lib/validation.ts`) |
+| react-native-svg | 15.x | Figma 아이콘·로고·간트 선 |
+| @react-native-community/slider | 5.x | 설정의 주간 가용 시간 |
 | react-native-android-widget | 0.22.x | Android 홈 화면 위젯(config plugin). 공식 예제는 SDK 55 기준 — SDK 57 실기기 동작은 확인 전 |
 | Jest + jest-expo | 29.7 + 57.0.x | jest-expo 57은 Jest 29 기반 — 30으로 올리지 않는다 |
 | @testing-library/react-native | 14.x | 역할·이름으로 요소를 찾는다 |
@@ -35,7 +37,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 
 ## 2. 필수 규칙
 
-1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 컴포넌트에 `#fff`·`fontSize: 13`을 직접 쓰지 않는다. **밝은 테마만 쓴다(다크 모드 미지원)** — `useColorScheme()`으로 분기하지 않는다. 글꼴은 Pretendard(`assets/fonts`, OFL) — 굵기는 `fontWeight`가 아니라 `typography`의 `fontFamily`로 고른다(Android).
+1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 값은 **Figma(Weave Make 디자인) 토큰**을 따른다: 잉크 `#1c1d22` · 실 `#2b4c8c` · 캔버스 `#f7f7f9` · 임박 주황 · 지연 빨강 · 프로젝트 4색(teal·magenta·violet·gray). 원본 색이 글자 대비(§4-5)에 모자라면 글자용 변형(`warnText`·`dangerText`)을 쓰고, `inkFaint`는 장식·비활성에만 쓴다. **밝은 테마만**(다크 모드 미지원). 글꼴: 본문 Pretendard, 숫자·날짜·시간은 JetBrains Mono(`assets/fonts`, 둘 다 OFL) — 굵기는 `fontFamily`로 고른다(Android).
 2. **공통 컴포넌트로만 UI 제작** — `Screen` · `AppText`(+ 필요 시 `Button` · `TextField` · `ListItem` 추가). 화면에서 RN 기본 `<Text>`/`<Pressable>`/`<TextInput>`을 새로 스타일링하지 않는다.
 3. **API는 도메인 클라이언트로만** — 컴포넌트에서 `axios`/`fetch` 직접 호출 금지. `src/api/<domain>.ts` → `src/queries/<domain>.ts`(TanStack Query 훅). 토큰 첨부·갱신은 인터셉터 전담.
 4. **서버 상태 ≠ 클라이언트 상태** — 서버 데이터는 Query 캐시, Zustand엔 UI 상태만.
@@ -53,7 +55,9 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 16. **목업 데이터는 `src/mocks/`에만** — 화면은 `useMockStore()`로만 목업에 접근한다. API 연동 시 이 폴더를 API 클라이언트·TanStack Query 훅으로 바꾸고 지운다. 목업 코드에는 `⚠ 목업` 주석을 단다.
 17. **앱 진입점은 `index.ts`** — `expo-router/entry`를 불러온 뒤 위젯 처리기를 등록한다(`package.json`의 `main`). 진입점을 `expo-router/entry`로 되돌리면 위젯이 동작하지 않는다.
 18. **위젯 컴포넌트(`src/widget/`)엔 `'use no memo'`** — 위젯 라이브러리가 컴포넌트를 React 렌더링 밖에서 함수로 호출하므로 React Compiler가 넣는 훅이 깨진다. 위젯은 스크린리더가 읽지 못하는 이미지로 그려지므로 `accessibilityLabel`에 요약 문장을 넣는다.
-19. **프로젝트는 "실" 색으로 구분한다** — `threadColorFor(projectId, projects)`(등록 순서대로 5색 순환). 여러 프로젝트가 섞인 목록(오늘·전체 일정)에선 작업 행 왼쪽에 실 색을 단다. 색만으로 구분하지 않고 항상 프로젝트 이름을 함께 쓴다(§4-4). 오늘 화면의 진행 띠(`DayWeave`)가 이 앱의 시각적 핵심이다.
+19. **프로젝트는 고유 색으로 구분한다** — `Project.color`(teal·magenta·violet·gray, 새 프로젝트는 안 쓴 색부터)와 `projectPaletteFor()`. 배지·막대·점에 쓰고, 색만으로 구분하지 않도록 항상 프로젝트 이름을 함께 쓴다(§4-4).
+20. **아이콘은 `src/components/icons.tsx`(react-native-svg)만** — Figma의 선 아이콘(24 그리드, 1.6 선) 경로를 그대로 옮겼다. 새 아이콘도 같은 규칙으로 추가한다. 아이콘은 장식이라 의미는 글자나 `accessibilityLabel`로 전한다.
+21. **Figma와 다른 부분은 주석으로 남긴다** — 예: 입력칸의 보이는 라벨(§4-3, Figma는 placeholder만), 대비 보정 색, Google 로그인·알림 설정 제외.
 
 ## 3. 디렉터리 골격
 
@@ -63,19 +67,20 @@ mobile/
 ├── app.config.ts            # 이름·scheme(weave)·package(com.weave.app)·아이콘·위젯·plugin
 ├── eslint.config.js · jest.setup.ts(네이티브·expo-router 목) · tsconfig.json · .nvmrc
 ├── assets/images/           # 아이콘·스플래시
-├── assets/fonts/            # Pretendard Regular·SemiBold·Bold + OFL 라이선스
+├── assets/fonts/            # Pretendard 5굵기 · JetBrains Mono 2굵기 + 각 OFL 라이선스
 └── src/
-    ├── app/                 # Expo Router — 라우트 파일만 (§2-15)
-    │   ├── _layout.tsx      # 루트 Stack + Stack.Protected(로그인 여부로 화면 묶음 전환)
-    │   ├── (auth)/          # login · signup
-    │   ├── (tabs)/          # index(오늘의 일정) · schedule(전체 일정) · projects · settings
-    │   ├── project/new/     # index(기본 정보) → chat(챗봇) → review(태스크 검토)
-    │   ├── project/[id]/    # index(상세+태스크 확인) · schedule(일정 확인) · task/[taskId](수정·삭제)
-    │   └── settings/        # account(계정 관리)
+    ├── app/                 # Expo Router — 라우트 파일만 (§2-15). 화면 번호는 Figma 기준
+    │   ├── _layout.tsx      # 글꼴·로딩(00)·Toast + 루트 Stack.Protected(로그인 여부로 화면 묶음 전환)
+    │   ├── (auth)/          # login(01) · signup
+    │   ├── (tabs)/          # 커스텀 TabBar — index(02-a 오늘) · schedule(03 전체 일정) · settings(05)
+    │   │   └── projects/    # 탭 안 스택: index(04 목록) · [id](04-a/b 상세 — 탭이 보인다)
+    │   ├── project/new/     # index(02-b-i 기본 정보) → chat(02-b-ii 챗봇) → review(02-b-iii 작업 검토)
+    │   ├── overload.tsx     # 04-c 이번 주 과부하
+    │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
-    ├── components/          # Screen · AppText · Button · TextField · Card · ListItem · TaskRow · TaskList · ScheduleSections · ProjectRow · DayWeave · DateHeading · ThreadMark
-    ├── theme/               # colors(+실 색) · spacing(+radius) · typography(Pretendard) · useAppTheme (단일 소스, 밝은 테마만)
-    ├── lib/                 # 순수 헬퍼: date(DateKey 'YYYY-MM-DD') · validation(Zod) · contrast
+    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · EditTaskSheet · SettingsGroup · TabBar · Splash · WeaveMark · icons
+    ├── theme/               # colors(+프로젝트 팔레트) · spacing(+radius) · typography(Pretendard·JetBrains Mono) · useAppTheme (단일 소스, 밝은 테마만)
+    ├── lib/                 # 순수 헬퍼: date(DateKey·주·월 달력) · korean(조사 이/가·시간 표시) · validation(Zod) · contrast
     ├── mocks/               # ⚠ 목업 데이터·상태 (§2-16) — API 연동 시 제거
     ├── widget/              # Android 홈 화면 위젯 (§2-18)
     ├── test-utils/          # renderWithStore · expo-router 목

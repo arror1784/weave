@@ -18,9 +18,23 @@ export const signupSchema = z
   .refine((v) => v.password === v.passwordConfirm, { message: '비밀번호가 일치하지 않아요.', path: ['passwordConfirm'] });
 
 export const projectBasicSchema = z.object({
-  name: z.string().trim().min(1, '프로젝트 이름을 입력해 주세요.'),
+  name: z.string().trim().min(1, '프로젝트명을 입력해 주세요.'),
   description: z.string().trim(),
+  /** 비우면 마감 없음(상시) */
+  deadline: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || isValidDateKey(v), '2026-10-09처럼 입력해 주세요.')
+    .transform((v) => (v === '' ? null : v)),
 });
+
+/** 'YYYY-MM-DD' 형식이고 실제로 있는 날짜인지 */
+export function isValidDateKey(v: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
 
 /** 빈 값은 "미정"(null), 아니면 0보다 큰 숫자 */
 export const hoursSchema = z
@@ -36,10 +50,6 @@ export const hoursSchema = z
     return n;
   });
 
-export const taskEditSchema = z.object({
-  title: z.string().trim().min(1, '작업 이름을 입력해 주세요.'),
-  hours: hoursSchema,
-});
 
 /** safeParse 결과를 { 필드명: 첫 오류 메시지 }로 */
 export function fieldErrors(error: z.ZodError): Record<string, string> {

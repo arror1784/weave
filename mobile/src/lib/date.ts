@@ -2,6 +2,7 @@
 export type DateKey = string;
 
 const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+const MONTHS_EN = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 export function toDateKey(date: Date): DateKey {
   const y = date.getFullYear();
@@ -45,4 +46,45 @@ export function dDayLabel(target: DateKey, today: DateKey): string {
 export function formatDateLabel(key: DateKey): string {
   const date = fromDateKey(key);
   return `${date.getMonth() + 1}월 ${date.getDate()}일 ${WEEKDAYS[date.getDay()]}`;
+}
+
+export function formatShortDate(key: DateKey): string {
+  const date = fromDateKey(key);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+export function weekdayLabel(key: DateKey): string {
+  return WEEKDAYS[fromDateKey(key).getDay()][0];
+}
+
+export function dayOfMonth(key: DateKey): number {
+  return fromDateKey(key).getDate();
+}
+
+export function monthOf(key: DateKey): number {
+  return fromDateKey(key).getMonth() + 1;
+}
+
+export function formatMonthEyebrow(key: DateKey): string {
+  const date = fromDateKey(key);
+  return `${date.getFullYear()} · ${MONTHS_EN[date.getMonth()]}`;
+}
+
+/** 그 주의 월요일~일요일 */
+export function weekDays(key: DateKey): DateKey[] {
+  const offset = (fromDateKey(key).getDay() + 6) % 7; // 월=0 … 일=6
+  const monday = addDays(key, -offset);
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+/** 월간 달력 칸: 월요일 시작, 그 달이 아닌 칸은 null, 길이는 7의 배수 */
+export function monthGrid(key: DateKey): (DateKey | null)[] {
+  const date = fromDateKey(key);
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7;
+  const cells: (DateKey | null)[] = Array.from({ length: lead }, () => null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(toDateKey(new Date(first.getFullYear(), first.getMonth(), d)));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
 }

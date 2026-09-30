@@ -1,39 +1,55 @@
-// 색의 단일 소스(§5-1). 밝은 테마만 쓴다. 값을 바꾸면 theme.test.ts가 명도 대비(§5.2-5)를 다시 검사한다.
+// 색의 단일 소스(§5-1). Figma(Weave Make 디자인) 토큰을 따른다. 밝은 테마만 쓴다.
+// 원본 색이 글자로 쓰기엔 대비가 모자라면(§5.2-5) 글자용 변형(…Text)을 따로 둔다 — theme.test.ts가 검사.
 export const colors = {
-  /** 화면 바탕 — 차가운 흰색 */
-  background: '#F5F6FA',
-  /** 카드·입력칸 바탕 */
-  surface: '#FFFFFF',
-  /** 본문 글자 — 짙은 남색 잉크 */
-  text: '#1C1F3B',
-  textSecondary: '#5A607A',
-  /** 옅은 구분선 (장식용) */
-  border: '#E3E5EE',
-  /** 입력칸·체크박스 테두리 (3:1 이상) */
-  borderStrong: '#8A90A8',
-  /** 코발트 블루 — 주요 동작·강조 */
-  primary: '#2F4BDB',
-  primarySoft: '#E8ECFD',
-  onPrimary: '#FFFFFF',
-  danger: '#C9362F',
-  dangerSurface: '#FFF0EE',
-  /** 경고 패널 안의 구분선 */
-  dangerBorder: '#F6D5D1',
+  ink: '#1c1d22',
+  inkSoft: '#6b6f7a',
+  /** 장식·비활성 전용 (대비 2.4:1 — 정보를 담은 글자에 쓰지 않는다) */
+  inkFaint: '#a2a6b0',
+  line: '#ecedf1',
+  surface: '#ffffff',
+  canvas: '#f7f7f9',
+
+  /** 실 — 주요 동작·강조 (Figma thread) */
+  thread: '#2b4c8c',
+  threadSoft: '#ebf0f8',
+  onThread: '#ffffff',
+
+  /** 임박·과부하 — 막대·아이콘용 원본 */
+  warn: '#e0632c',
+  /** 임박·과부하 글자 (원본 #e0632c는 글자 대비 부족) */
+  warnText: '#b84a1a',
+  warnSoft: '#fbede6',
+
+  /** 지연 — 막대·아이콘용 원본 */
+  danger: '#d6455a',
+  /** 지연 글자 (원본 #d6455a는 글자 대비 부족) */
+  dangerText: '#c4384c',
+  dangerSoft: '#fdecef',
+
+  /** 체크박스·입력칸 경계 (Figma #d3d5dc는 대비 부족 → 3:1 이상으로) */
+  control: '#8a8e99',
+  /** 위젯 미리보기 뒤 바탕화면 느낌 (Figma 그라데이션의 중간색) */
+  wallpaper: '#d6dcea',
+  /** 하단 시트 뒤 어둡게 */
+  scrim: 'rgba(28, 29, 34, 0.25)',
 } as const;
 
 export type ColorTokens = typeof colors;
 
-/**
- * 프로젝트 "실" 색 — 여러 프로젝트가 섞인 목록에서 어느 프로젝트의 작업인지 구분한다.
- * 색만으로 구분하지 않고 항상 프로젝트 이름을 함께 보여준다(§5.2-4).
- */
-export const threadColors = ['#3D63F0', '#0E8C7C', '#B8720F', '#E0508A', '#8057E0'] as const;
+/** 프로젝트별 색 — 경고색(주황/빨강)과 겹치지 않는 톤만 (Figma PROJECTS). */
+export const projectPaletteMap = {
+  teal: { dot: '#0d9488', soft: '#e4f6f3', text: '#0a7166' },
+  magenta: { dot: '#b23a7a', soft: '#fbe8f2', text: '#97306a' },
+  violet: { dot: '#6a4fc4', soft: '#f0ecfc', text: '#5a3fb0' },
+  gray: { dot: '#7c828f', soft: '#eef0f3', text: '#5b6069' },
+} as const;
 
-/**
- * 프로젝트의 실 색 — 등록 순서대로 배정해 프로젝트 5개까지는 모두 다른 색이 된다.
- * (사용자가 색을 직접 고르는 기능은 미정)
- */
-export function threadColorFor(projectId: string, projects: readonly { id: string }[]): string {
-  const index = projects.findIndex((p) => p.id === projectId);
-  return threadColors[Math.max(index, 0) % threadColors.length];
+export type ProjectColorKey = keyof typeof projectPaletteMap;
+export type ProjectPalette = (typeof projectPaletteMap)[ProjectColorKey];
+
+export const projectPalettes: ProjectPalette[] = Object.values(projectPaletteMap);
+export const projectColorOrder: ProjectColorKey[] = ['teal', 'magenta', 'violet', 'gray'];
+
+export function projectPaletteFor(key: ProjectColorKey): ProjectPalette {
+  return projectPaletteMap[key];
 }

@@ -1,58 +1,49 @@
 import { contrastRatio } from '@/lib/contrast';
 
-import { threadColorFor, threadColors } from './colors';
-import { getTheme } from './index';
+import { colors, projectPalettes, projectPaletteFor } from './colors';
 
-// 앱은 밝은 테마만 쓴다(다크 모드 미지원 — 루트 CLAUDE.md §1).
-const { colors } = getTheme();
-
+// Figma(Weave Make 디자인) 토큰 기준. 대비가 모자란 색은 글자용 변형(…Text)을 따로 둔다 — §5.2-5.
 describe('명도 대비 (§5.2-5)', () => {
-  it('본문·보조 글자는 배경과 카드 위에서 4.5:1 이상이다', () => {
-    for (const bg of [colors.background, colors.surface]) {
-      expect(contrastRatio(colors.text, bg)).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(colors.textSecondary, bg)).toBeGreaterThanOrEqual(4.5);
+  it('본문·보조 글자는 흰 카드와 캔버스 위에서 4.5:1 이상이다', () => {
+    for (const bg of [colors.surface, colors.canvas]) {
+      expect(contrastRatio(colors.ink, bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors.inkSoft, bg)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it('주 버튼 글자(onPrimary)는 주 버튼 배경 대비 4.5:1 이상이다', () => {
-    expect(contrastRatio(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(4.5);
+  it('실(주요) 색은 흰 바탕·옅은 실 바탕 위에서 4.5:1 이상이고, 그 위 흰 글자도 4.5:1 이상이다', () => {
+    expect(contrastRatio(colors.thread, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.thread, colors.threadSoft)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.onThread, colors.thread)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('강조 글자(primary)는 배경·카드 대비 4.5:1 이상이다', () => {
-    expect(contrastRatio(colors.primary, colors.background)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(colors.primary, colors.surface)).toBeGreaterThanOrEqual(4.5);
+  it('임박(warn)·지연(danger) 글자는 흰 바탕과 각자의 옅은 바탕 위에서 4.5:1 이상이다', () => {
+    expect(contrastRatio(colors.warnText, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.warnText, colors.warnSoft)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.dangerText, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.dangerText, colors.dangerSoft)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('경고 글자(danger)는 경고 배경·카드 대비 4.5:1 이상이다', () => {
-    expect(contrastRatio(colors.danger, colors.dangerSurface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(colors.danger, colors.surface)).toBeGreaterThanOrEqual(4.5);
+  it('임박·지연 막대·아이콘(그래픽)은 흰 바탕 대비 3:1 이상이다', () => {
+    expect(contrastRatio(colors.warn, colors.surface)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(colors.danger, colors.surface)).toBeGreaterThanOrEqual(3);
   });
 
-  it('입력칸·체크박스 테두리는 카드 대비 3:1 이상이다', () => {
-    expect(contrastRatio(colors.borderStrong, colors.surface)).toBeGreaterThanOrEqual(3);
+  it('체크박스·입력칸 경계는 흰 바탕 대비 3:1 이상이다', () => {
+    expect(contrastRatio(colors.control, colors.surface)).toBeGreaterThanOrEqual(3);
   });
 
-  it('프로젝트 실 색은 모두 카드 대비 3:1 이상이다 (그래픽 요소 기준)', () => {
-    for (const color of threadColors) {
-      expect(contrastRatio(color, colors.surface)).toBeGreaterThanOrEqual(3);
+  it('프로젝트 색: 점·막대는 흰 바탕 대비 3:1, 배지 글자는 배지 바탕·흰 바탕 대비 4.5:1 이상이다', () => {
+    for (const p of projectPalettes) {
+      expect(contrastRatio(p.dot, colors.surface)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(p.text, p.soft)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(p.text, colors.surface)).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
 
-describe('threadColorFor', () => {
-  // 실제 목업 프로젝트 ID — ID 해시로 색을 정하면 p-club과 p-clubroom이 같은 색이 됐다
-  const projects = ['p-hackathon', 'p-study', 'p-club', 'p-clubroom', 'p-embedded', 'p-sixth'].map((id) => ({ id }));
-
-  it('등록 순서대로 색을 배정해 프로젝트 5개까지는 모두 다른 색이다', () => {
-    const firstFive = projects.slice(0, 5).map((p) => threadColorFor(p.id, projects));
-    expect(new Set(firstFive).size).toBe(5);
-  });
-
-  it('6번째 프로젝트부터는 색을 처음부터 다시 쓴다', () => {
-    expect(threadColorFor('p-sixth', projects)).toBe(threadColorFor('p-hackathon', projects));
-  });
-
-  it('목록에 없는 프로젝트에도 실 색 목록 안의 색을 준다', () => {
-    expect(threadColors).toContain(threadColorFor('unknown', projects));
+describe('projectPaletteFor', () => {
+  it('프로젝트에 지정된 색 키로 팔레트를 고른다', () => {
+    expect(projectPaletteFor('magenta').dot).toBe('#b23a7a');
   });
 });

@@ -3,7 +3,7 @@ import { createContext, useContext, useMemo, useReducer, type Dispatch, type Rea
 import { todayKey, type DateKey } from '@/lib/date';
 
 import { createSeed } from './seed';
-import { reducer, type Action } from './store';
+import { initialState, reducer, type Action } from './store';
 import type { State } from './types';
 
 // ⚠ UI 확인용 목업 저장소. API 연동 시 제거한다.
@@ -14,8 +14,7 @@ const MockStoreContext = createContext<MockStore | null>(null);
 
 export function MockStoreProvider({ children, initial, today = todayKey() }: { children: ReactNode; initial?: Partial<State>; today?: DateKey }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({
-    session: null,
-    draft: null,
+    ...initialState,
     ...createSeed(today),
     ...initial,
   }));

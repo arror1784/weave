@@ -2,10 +2,12 @@ import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { Splash } from '@/components/Splash';
+import { ToastProvider } from '@/components/Toast';
 import { MockStoreProvider, useMockStore } from '@/mocks/MockStoreProvider';
-import { colors, typography } from '@/theme';
+import { colors } from '@/theme';
 import { fonts } from '@/theme/typography';
 
 SplashScreen.preventAutoHideAsync();
@@ -13,7 +15,7 @@ SplashScreen.preventAutoHideAsync();
 // 밝은 테마만 쓴다 — 내비게이션 기본 색도 앱 토큰에 맞춘다.
 const navigationTheme = {
   ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: colors.background, card: colors.background, primary: colors.primary, text: colors.text, border: colors.border },
+  colors: { ...DefaultTheme.colors, background: colors.canvas, card: colors.surface, primary: colors.thread, text: colors.ink, border: colors.line },
 };
 
 function RootStack() {
@@ -21,27 +23,18 @@ function RootStack() {
   const signedIn = state.session !== null;
 
   return (
-    <Stack
-      screenOptions={{
-        headerTintColor: colors.primary,
-        headerStyle: { backgroundColor: colors.background },
-        headerTitleStyle: { color: colors.text, fontFamily: typography.subtitle.fontFamily },
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
       {/* 로그인 전 화면 — 로그인하면 자동으로 (tabs)로 이동한다 */}
       <Stack.Protected guard={!signedIn}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" />
       </Stack.Protected>
       <Stack.Protected guard={signedIn}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="project/new/index" options={{ title: '새 프로젝트' }} />
-        <Stack.Screen name="project/new/chat" options={{ title: '작업 단계 만들기' }} />
-        <Stack.Screen name="project/new/review" options={{ title: '작업 단계 검토' }} />
-        <Stack.Screen name="project/[id]/index" options={{ title: '' }} />
-        <Stack.Screen name="project/[id]/schedule" options={{ title: '프로젝트 일정' }} />
-        <Stack.Screen name="project/[id]/task/[taskId]" options={{ title: '작업 수정' }} />
-        <Stack.Screen name="settings/account" options={{ title: '계정 관리' }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="project/new/index" />
+        <Stack.Screen name="project/new/chat" />
+        <Stack.Screen name="project/new/review" />
+        <Stack.Screen name="overload" />
+        <Stack.Screen name="widgets" />
       </Stack.Protected>
     </Stack>
   );
@@ -50,10 +43,16 @@ function RootStack() {
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     [fonts.regular]: require('../../assets/fonts/Pretendard-Regular.otf'),
+    [fonts.medium]: require('../../assets/fonts/Pretendard-Medium.otf'),
     [fonts.semibold]: require('../../assets/fonts/Pretendard-SemiBold.otf'),
     [fonts.bold]: require('../../assets/fonts/Pretendard-Bold.otf'),
+    [fonts.black]: require('../../assets/fonts/Pretendard-Black.otf'),
+    [fonts.mono]: require('../../assets/fonts/JetBrainsMono-SemiBold.ttf'),
+    [fonts.monoBold]: require('../../assets/fonts/JetBrainsMono-Bold.ttf'),
   });
   const ready = fontsLoaded || fontError !== null;
+  const [splashDone, setSplashDone] = useState(false);
+  const finishSplash = useCallback(() => setSplashDone(true), []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -65,7 +64,10 @@ export default function RootLayout() {
   return (
     <MockStoreProvider>
       <ThemeProvider value={navigationTheme}>
-        <RootStack />
+        <ToastProvider>
+          {/* 로딩 화면(00)이 끝난 뒤에 내비게이션을 띄운다 — 겹쳐 그리면 Android에서 로딩 화면이 보이지 않았다 */}
+          {splashDone ? <RootStack /> : <Splash onDone={finishSplash} />}
+        </ToastProvider>
         <StatusBar style="dark" />
       </ThemeProvider>
     </MockStoreProvider>

@@ -6,37 +6,51 @@ import { renderWithStore } from '@/test-utils/render';
 
 beforeEach(resetRouterMock);
 
-describe('오늘의 일정 화면', () => {
-  it('오늘 날짜를 제목으로 보여준다', async () => {
+describe('오늘의 일정', () => {
+  it('날짜 제목과 남은 일 개수를 보여준다', async () => {
     await renderWithStore(<TodayScreen />);
     expect(screen.getByRole('header', { name: '9월 30일 수요일' })).toBeOnTheScreen();
+    expect(screen.getByText(/6개의 일이 남았어요/)).toBeOnTheScreen();
   });
 
-  it('밀린 작업을 지연 일수(D+n)와 함께 보여준다', async () => {
+  it('오늘 부하가 하루 가용 시간을 넘으면 과부하 카드를 보여주고, 누르면 이번 주 과부하로 간다', async () => {
     await renderWithStore(<TodayScreen />);
-    expect(screen.getByRole('header', { name: '밀린 작업 1건' })).toBeOnTheScreen();
-    expect(screen.getByRole('checkbox', { name: '해커톤 장소 섭외 완료' })).toBeOnTheScreen();
-    expect(screen.getByText('해커톤 준비 · D+5')).toBeOnTheScreen();
+    const card = screen.getByRole('button', { name: /과부하, 11시간 \/ 가용 5시간/ });
+    await fireEvent.press(card);
+    expect(mockRouter.push).toHaveBeenCalledWith('/overload');
   });
 
-  it('오늘 할 일을 체크박스로 보여주고, 누르면 완료 상태가 바뀐다', async () => {
+  it('작업 카드: 프로젝트 배지·지연 표시·D-day·소요 시간·선행 미완료 경고', async () => {
     await renderWithStore(<TodayScreen />);
-    const cleaning = screen.getByRole('checkbox', { name: '동아리방 청소 완료' });
-    expect(cleaning).not.toBeChecked();
-
-    await fireEvent.press(cleaning);
-    expect(screen.getByRole('checkbox', { name: '동아리방 청소 완료' })).toBeChecked();
+    expect(screen.getAllByText('지연')).toHaveLength(2);
+    expect(screen.getByText('D+2')).toBeOnTheScreen();
+    expect(screen.getByText('45분')).toBeOnTheScreen();
+    expect(screen.getByText('개념 정리 미완료')).toBeOnTheScreen();
+    expect(screen.getAllByText('알고리즘 스터디').length).toBeGreaterThan(0);
   });
 
-  it('할 일이 없으면 빈 상태 안내를 보여준다', async () => {
-    await renderWithStore(<TodayScreen />, { tasks: [] });
-    expect(screen.getByText('오늘 예정된 작업이 없어요.')).toBeOnTheScreen();
-    expect(screen.queryByText(/밀린 작업/)).toBeNull();
+  it('체크하면 완료되고 남은 개수가 줄어든다', async () => {
+    await renderWithStore(<TodayScreen />);
+    await fireEvent.press(screen.getByRole('checkbox', { name: '후원사 제안서 수정 완료' }));
+    expect(screen.getByRole('checkbox', { name: '후원사 제안서 수정 완료' })).toBeChecked();
+    expect(screen.getByText(/5개의 일이 남았어요/)).toBeOnTheScreen();
   });
 
-  it('새 프로젝트 등록으로 이동한다', async () => {
+  it('오늘의 고정 일정을 시간과 함께 보여준다', async () => {
+    await renderWithStore(<TodayScreen />);
+    expect(screen.getByText('창업동아리 정기 회의')).toBeOnTheScreen();
+    expect(screen.getByText('19:00 · 1.5h')).toBeOnTheScreen();
+  });
+
+  it('떠 있는 + 버튼으로 새 프로젝트를 등록한다', async () => {
     await renderWithStore(<TodayScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '새 프로젝트 등록' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new');
+  });
+
+  it('할 일이 없으면 빈 상태 안내를 보여준다', async () => {
+    await renderWithStore(<TodayScreen />, { tasks: [], events: [] });
+    expect(screen.getByText('오늘 예정된 작업이 없어요.')).toBeOnTheScreen();
+    expect(screen.queryByText(/과부하/)).toBeNull();
   });
 });

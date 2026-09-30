@@ -1,4 +1,4 @@
-import { addDays, dDayLabel, diffInDays, formatDateLabel, toDateKey } from './date';
+import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, toDateKey, weekDays, weekdayLabel } from './date';
 
 describe('date', () => {
   it('Date를 로컬 기준 YYYY-MM-DD 키로 바꾼다', () => {
@@ -21,7 +21,27 @@ describe('date', () => {
     expect(dDayLabel('2026-09-25', '2026-09-30')).toBe('D+5');
   });
 
-  it('날짜를 "9월 18일 금요일" 형식으로 표시한다', () => {
+  it('날짜를 "9월 18일 금요일", "10/1", 요일 한 글자로 표시한다', () => {
     expect(formatDateLabel('2026-09-18')).toBe('9월 18일 금요일');
+    expect(formatShortDate('2026-10-01')).toBe('10/1');
+    expect(weekdayLabel('2026-10-01')).toBe('목');
+    expect(dayOfMonth('2026-10-01')).toBe(1);
+  });
+
+  it('상단 작은 표시용으로 "2026 · SEP"를 만든다', () => {
+    expect(formatMonthEyebrow('2026-09-30')).toBe('2026 · SEP');
+  });
+
+  it('그 주의 월요일부터 일요일까지 7일을 돌려준다', () => {
+    expect(weekDays('2026-09-30')).toEqual(['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    expect(weekDays('2026-10-04')[0]).toBe('2026-09-28');
+  });
+
+  it('월간 달력: 월요일 시작, 1일 앞은 빈칸(null), 7의 배수 칸', () => {
+    const cells = monthGrid('2026-10-15');
+    // 2026-10-01은 목요일 → 앞에 월·화·수 3칸이 빈칸
+    expect(cells.slice(0, 4)).toEqual([null, null, null, '2026-10-01']);
+    expect(cells.length % 7).toBe(0);
+    expect(cells.filter(Boolean)).toHaveLength(31);
   });
 });
