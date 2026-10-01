@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -43,6 +44,10 @@ class ProjectController(private val projectService: ProjectService) {
 
     @GetMapping("/{id}")
     fun detail(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long): ProjectDetailResponse = projectService.detail(jwt.userId(), id)
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long) = projectService.delete(jwt.userId(), id)
 
     @PatchMapping("/{id}")
     fun update(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long, @Valid @RequestBody request: UpdateProjectRequest): ProjectDetailResponse =

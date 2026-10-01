@@ -43,7 +43,7 @@ class Replanner(
             today,
             capacity,
         ).associateBy { it.key.toLong() }
-        movable.forEach { t -> plan[t.id!!]?.let { t.reschedule(it.scheduledDate, it.spanDays, it.dueDate) } }
+        movable.forEach { t -> plan[t.id!!]?.let(t::reschedule) }
         return plan
     }
 

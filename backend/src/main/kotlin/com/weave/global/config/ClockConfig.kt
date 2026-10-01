@@ -6,7 +6,7 @@ import java.time.Clock
 import java.time.ZoneId
 
 /**
- * 서버의 '오늘'은 한국 시간 고정(사용자 결정). 날짜 계산은 LocalDate.now(clock)으로만 해서 테스트에서 시계를 바꿀 수 있게 한다.
+ * 서버 시계는 한국 시간 고정(사용자 결정). '오늘' 날짜는 TodayProvider로만 구한다(하루가 아침 6시에 바뀐다).
  */
 @Configuration
 class ClockConfig {

@@ -12,6 +12,7 @@ import com.weave.client.AiClient
 import com.weave.client.AiResult
 import com.weave.client.AiTurn
 import com.weave.global.error.ApiException
+import com.weave.global.time.TodayProvider
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -20,13 +21,19 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import tools.jackson.databind.json.JsonMapper
+import java.time.Clock
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class ProjectChatServiceTest : FunSpec({
     val ai = mockk<AiClient>()
     val loader = mockk<AttachmentContentLoader>()
     every { loader.load(any(), any()) } returns emptyList()
-    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build())
+    // 한국 시간 10/2 새벽 5시 — 하루가 아침 6시에 바뀌므로 '오늘'은 10/1
+    val seoul = ZoneId.of("Asia/Seoul")
+    val clock = Clock.fixed(ZonedDateTime.of(2026, 10, 2, 5, 0, 0, 0, seoul).toInstant(), seoul)
+    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build(), TodayProvider(clock))
     val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"), deliverable = "보고서, 발표자료", progress = "회로 구성은 끝냄")
     val proposal = mapOf(
         "tasks" to listOf(
@@ -50,6 +57,7 @@ class ProjectChatServiceTest : FunSpec({
         intro shouldContain "2026-10-09"
         intro shouldContain "보고서, 발표자료"
         intro shouldContain "회로 구성은 끝냄"
+        intro shouldContain "오늘 날짜: 2026-10-01"
     }
 
     test("propose_tasks 호출이 오면 작업 목록으로: key(k1…)·제목으로 찾은 선행 key·0.5 단위 시간·세부 설명·AI 마감일(참고)·가정") {

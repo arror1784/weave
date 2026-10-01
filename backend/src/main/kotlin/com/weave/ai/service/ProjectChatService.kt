@@ -10,6 +10,7 @@ import com.weave.client.AiClient
 import com.weave.client.AiTool
 import com.weave.client.AiTurn
 import com.weave.global.error.ApiException
+import com.weave.global.time.TodayProvider
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -27,6 +28,7 @@ class ProjectChatService(
     private val prompt: ProjectBreakdownPrompt,
     private val attachmentContentLoader: AttachmentContentLoader,
     private val objectMapper: ObjectMapper,
+    private val todayProvider: TodayProvider,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -70,7 +72,7 @@ class ProjectChatService(
         appendLine("프로젝트 설명: ${p.description.ifBlank { "(입력 안 함)" }}")
         appendLine("결과물 형태: ${p.deliverable.ifBlank { "(입력 안 함)" }}")
         appendLine("기 진행사항: ${p.progress.ifBlank { "(입력 안 함)" }}")
-        append("오늘 날짜: ${LocalDate.now(SEOUL)}")
+        append("오늘 날짜: ${todayProvider.today()}")
     }
 
     /** 앞서 받은 제안(assistant)·직접 고친 목록(user)은 JSON으로 풀어 대화에 다시 싣는다 — 서버가 대화를 저장하지 않으므로 */
@@ -128,8 +130,6 @@ class ProjectChatService(
     private fun unavailable() = ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AI_UNAVAILABLE", "AI가 잠시 응답하지 않아요. 다시 시도해 주세요.")
 
     companion object {
-        private val SEOUL = java.time.ZoneId.of("Asia/Seoul")
-
         /** 프롬프트 대화 규칙 1 — 최초 제안까지 사용자 답 최대 5번 */
         const val MAX_TURNS_BEFORE_PROPOSAL = 5
 
