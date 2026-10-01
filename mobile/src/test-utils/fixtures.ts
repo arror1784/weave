@@ -10,6 +10,7 @@ export function sampleSchedule(today: DateKey): Schedule {
     dependsOnId: null,
     scheduledDate: null,
     spanDays: 1,
+    days: [],
     dueDate: null,
     done: false,
     prerequisite: false,

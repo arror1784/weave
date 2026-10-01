@@ -25,8 +25,9 @@ function isUnmoved(task: Task, today: DateKey): boolean {
   return !task.done && end !== null && end < today;
 }
 
-/** 그날이 작업 기간(시작일 ~ 끝나는 날)에 들어가는지 */
+/** 그날이 작업 기간에 들어가는지 — 서버가 날짜별로 배정했으면 배정된 날만(사이에 빈 날이 있을 수 있다) */
 function coversDate(task: Task, date: DateKey): boolean {
+  if (task.days.length > 0) return task.days.some((d) => d.date === date);
   const end = taskEndDate(task);
   return task.scheduledDate !== null && task.scheduledDate <= date && end !== null && date <= end;
 }
@@ -37,12 +38,22 @@ export function selectOverdueTasks(data: ScheduleData, today: DateKey): Task[] {
   return data.tasks.filter((t) => isOverdue(t, today)).sort((a, b) => delayKey(a).localeCompare(delayKey(b)));
 }
 
-/** 오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업. 지연 → 마감 가까운 순 → 완료는 맨 뒤 */
+/** 밀렸던 작업인지 — 완료 여부와 상관없이 (오늘 할 일 순서가 체크로 바뀌지 않게) */
+function wasDelayed(task: Task, today: DateKey): boolean {
+  const end = taskEndDate(task);
+  return task.delayedFrom !== null || (end !== null && end < today);
+}
+
+/**
+ * 오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업. 지연 → 마감 가까운 순.
+ * 완료 여부로는 순서를 바꾸지 않는다 — 체크해도 그 자리에 있다(사용자 결정 2026-10-01, Figma의 "완료는 맨 뒤"에서 바꿈).
+ */
 export function selectTodayTasks(data: ScheduleData, today: DateKey): Task[] {
+  // 지난 날짜의 작업은 아직 안 끝낸(밀린) 것만 — 서버가 밀린 작업을 오늘로 옮기므로 체크해도 목록에 남는다
   const list = data.tasks.filter((t) => coversDate(t, today) || isOverdue(t, today));
-  const rank = (t: Task) => (t.done ? 2 : isOverdue(t, today) ? 0 : 1);
+  const rank = (t: Task) => (wasDelayed(t, today) ? 0 : 1);
   const order = (t: Task) => (rank(t) === 0 ? delayKey(t) : (t.dueDate ?? '9999'));
-  return list.sort((a, b) => rank(a) - rank(b) || order(a).localeCompare(order(b)));
+  return list.sort((a, b) => rank(a) - rank(b) || order(a).localeCompare(order(b)) || a.id - b.id);
 }
 
 /** 정상 soft / 임박(D-1~D-Day) near / 지연 over */
@@ -79,14 +90,22 @@ export function selectDayItems(data: ScheduleData, date: DateKey): DayItem[] {
   return [...tasks, ...dues];
 }
 
-/** 이번 주(오늘~일요일) 부하: 남은 작업 몫 + 밀린 작업 vs 하루 가용 시간 × 남은 날 수. 작업은 시간 큰 순 */
-export function selectWeekLoad(data: ScheduleData, today: DateKey) {
-  const days = weekDays(today).filter((d) => d >= today);
-  const overdue = data.tasks.filter((t) => isUnmoved(t, today));
-  const upcoming = data.tasks.filter((t) => !t.done && !isUnmoved(t, today) && days.some((d) => coversDate(t, d)));
-  const estimated = round(overdue.reduce((a, t) => a + hoursOf(t), 0) + upcoming.reduce((a, t) => a + days.reduce((b, d) => b + taskHoursOn(t, d), 0), 0));
-  const tasks = [...overdue, ...upcoming].sort((a, b) => hoursOf(b) - hoursOf(a));
-  return { estimated, available: data.dailyAvailableHours * days.length, tasks };
+export type WeekDay = { date: DateKey; hours: number; capacity: number; over: boolean; tasks: { task: Task; hours: number }[] };
+
+/**
+ * 이번 주 날짜별 부하(오늘~일요일): 하루씩 그날 몫 vs 하루 가용 시간(사용자 결정 2026-10-01 — 주간 합계 비교에서 바꿈).
+ * 오늘엔 아직 서버가 옮기기 전인 밀린 작업 시간도 더한다(오늘 화면과 같은 기준). 작업은 그날 드는 시간이 큰 순.
+ */
+export function selectWeekDays(data: ScheduleData, today: DateKey): WeekDay[] {
+  return weekDays(today)
+    .filter((d) => d >= today)
+    .map((date) => {
+      const planned = data.tasks.filter((t) => !t.done && coversDate(t, date)).map((task) => ({ task, hours: round(taskHoursOn(task, date)) }));
+      const overdue = date === today ? data.tasks.filter((t) => isUnmoved(t, today)).map((task) => ({ task, hours: hoursOf(task) })) : [];
+      const tasks = [...overdue, ...planned].sort((a, b) => b.hours - a.hours || a.task.id - b.task.id);
+      const { hours, capacity, over } = selectDayLoad(data, date, { includeOverdue: date === today });
+      return { date, hours, capacity, over, tasks };
+    });
 }
 
 /** 프로젝트 일정(간트)에 보여줄 날짜 범위: 오늘 이틀 전부터 9일 */

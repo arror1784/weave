@@ -237,6 +237,18 @@ describe('등록 3/3 작업 검토', () => {
     expect(tasks[3].dependsOnKey).toBe('k3');
   });
 
+  it('작업 순서를 위아래로 바꾼다 — 선행 작업보다 앞으로 가는 버튼은 막혀 있다', async () => {
+    await renderWithProviders(<ReviewScreen />, { draft: withTasks });
+    // 2번(설계 문서)은 1번(개념 학습)이 선행이라 위로 못 간다
+    expect(screen.getByRole('button', { name: '2번 작업 위로' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '1번 작업 아래로' })).toBeDisabled();
+    // 4번(발표자료)은 선행이 없어 3번 위로 올라간다
+    await fireEvent.press(screen.getByRole('button', { name: '4번 작업 위로' }));
+    expect(draftRef.current!.tasks.map((t) => t.key)).toEqual(['k1', 'k2', 'k4', 'k3']);
+    expect(screen.getByRole('button', { name: '1번 작업 위로' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '4번 작업 아래로' })).toBeDisabled();
+  });
+
   it('등록 완료하면 서버에 초안(작업·색·첨부 id)을 보내고, 알림 후 새 프로젝트 상세로 간다', async () => {
     const s = sampleSchedule(TEST_TODAY);
     projects.createProject.mockResolvedValueOnce({ project: { ...s.projects[0], id: 9, tasks: [], attachments: [] }, lateCount: 1 });

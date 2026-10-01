@@ -1,6 +1,6 @@
 import type { Project, Task } from '@/api/types';
 
-import { isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectWeekLoad, taskTone, type ScheduleData } from './schedule';
+import { isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectWeekDays, taskTone, type ScheduleData } from './schedule';
 
 const T = '2026-09-30'; // 수요일
 
@@ -12,6 +12,7 @@ const task = (t: Partial<Task> & { id: number }): Task => ({
   dependsOnId: null,
   scheduledDate: T,
   spanDays: 1,
+  days: [],
   dueDate: null,
   done: false,
   prerequisite: false,
@@ -49,13 +50,27 @@ describe('밀린 작업 (서버가 오늘로 옮긴 추가 작업)', () => {
   it('부하에는 한 번만 센다 (오늘 몫으로)', () => {
     // 기존 4.75 + rolled 2
     expect(selectDayLoad(withRolled, T, { includeOverdue: true }).hours).toBe(6.75);
-    expect(selectWeekLoad(withRolled, T).estimated).toBe(11.75);
+    expect(selectWeekDays(withRolled, T)[0].hours).toBe(6.75);
   });
 });
 
 describe('일정 계산', () => {
-  it('오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업, 지연 먼저·그다음 마감 가까운 순, 완료는 맨 뒤', () => {
-    expect(titles(selectTodayTasks(data, T))).toEqual(['late', 'today1', 'today2', 'multi', 'doneToday']);
+  it('오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업, 지연 먼저·그다음 마감 가까운 순 — 완료 여부로는 순서를 바꾸지 않는다', () => {
+    // doneToday(마감 10/5)는 완료했어도 마감 순서 자리에 그대로 있다
+    expect(titles(selectTodayTasks(data, T))).toEqual(['late', 'today1', 'today2', 'doneToday', 'multi']);
+  });
+
+  it('작업을 체크(완료)하거나 해제해도 오늘 할 일 순서가 바뀌지 않는다 (사용자 결정 2026-10-01)', () => {
+    // 서버는 밀린 작업을 오늘로 옮겨(delayedFrom) 보낸다 — 그 상태 그대로
+    const rolled: ScheduleData = { ...data, tasks: data.tasks.map((t) => (t.id === 1 ? { ...t, scheduledDate: T, delayedFrom: '2026-09-28' } : t)) };
+    const before = titles(selectTodayTasks(rolled, T));
+    const toggled = (id: number): ScheduleData => ({ ...rolled, tasks: rolled.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) });
+    for (const id of [1, 3, 4, 5, 8]) expect(titles(selectTodayTasks(toggled(id), T))).toEqual(before);
+  });
+
+  it('지난 날짜에 제때 끝낸 작업은 오늘 할 일에 나오지 않는다', () => {
+    const past: ScheduleData = { ...data, tasks: [task({ id: 30, title: 'pastDone', scheduledDate: '2026-09-28', done: true })] };
+    expect(selectTodayTasks(past, T)).toEqual([]);
   });
 
   it('밀린 작업은 끝나는 날이 지났고 완료되지 않은 작업이다 (여러 날 작업은 끝나는 날 기준)', () => {
@@ -92,12 +107,32 @@ describe('일정 계산', () => {
     ]);
   });
 
-  it('이번 주 부하: 오늘~일요일 남은 작업 몫 + 밀린 작업 vs 하루 가용 시간 × 남은 날 수, 작업은 시간 큰 순', () => {
-    const load = selectWeekLoad(data, T);
-    // late 1 + today1 0.75 + today2 2 + fri 4 + multi 2(9/30·10/1) = 9.75
-    expect(load.estimated).toBe(9.75);
-    expect(load.available).toBe(25);
-    expect(titles(load.tasks)).toEqual(['fri', 'multi', 'today2', 'late', 'today1']);
+  it('이번 주 날짜별 부하: 오늘~일요일 하루씩 그날 몫 vs 하루 가용 시간, 오늘엔 아직 안 옮긴 밀린 작업도 더한다', () => {
+    const days = selectWeekDays({ ...data, dailyAvailableHours: 3 }, T);
+    expect(days.map((d) => d.date)).toEqual(['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    // 오늘: late 1 + today1 0.75 + today2 2 + multi 1 = 4.75 (완료한 doneToday는 빼고)
+    expect(days.map((d) => d.hours)).toEqual([4.75, 1, 4, 0, 0]);
+    expect(days.map((d) => d.over)).toEqual([true, false, true, false, false]);
+    expect(days[0].capacity).toBe(3);
+  });
+
+  it('날짜별 작업은 그날 드는 시간이 큰 순, 시간은 그날 몫', () => {
+    const [today, tomorrow] = selectWeekDays(data, T);
+    expect(today.tasks.map((x) => [x.task.title, x.hours])).toEqual([['today2', 2], ['late', 1], ['multi', 1], ['today1', 0.75]]);
+    expect(tomorrow.tasks.map((x) => [x.task.title, x.hours])).toEqual([['multi', 1]]);
+  });
+
+  it('서버가 날짜별로 나눈 시간(days)대로 센다', () => {
+    const front: ScheduleData = { ...data, tasks: [task({ id: 40, title: 'front', estimatedHours: 4, spanDays: 2, days: [{ date: T, hours: 3 }, { date: '2026-10-01', hours: 1 }] })] };
+    expect(selectWeekDays(front, T).slice(0, 2).map((d) => d.hours)).toEqual([3, 1]);
+  });
+
+  it('날짜별 배정 사이의 빈 날에는 그 작업이 보이지 않는다', () => {
+    const gap = task({ id: 41, title: 'gap', estimatedHours: 4, spanDays: 3, days: [{ date: T, hours: 3 }, { date: '2026-10-02', hours: 1 }] });
+    const d: ScheduleData = { ...data, tasks: [gap] };
+    expect(selectDayItems(d, '2026-10-01')).toEqual([]);
+    expect(selectWeekDays(d, T)[1].tasks).toEqual([]);
+    expect(selectDayItems(d, '2026-10-02')[0].hours).toBe(1);
   });
 
   it('프로젝트 일정(간트) 범위: 오늘 이틀 전부터 9일', () => {

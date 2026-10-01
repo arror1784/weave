@@ -1,6 +1,8 @@
 package com.weave.project.domain
 
 import com.weave.global.domain.BaseEntity
+import com.weave.schedule.domain.DayHours
+import com.weave.schedule.domain.Placement
 import com.weave.schedule.domain.ScheduledTask
 import com.weave.schedule.domain.Scheduler
 import jakarta.persistence.Column
@@ -59,26 +61,45 @@ class Task(
     var dueDate: LocalDate? = dueDate
         protected set
 
+    /** 날짜별 배정 시간 "YYYY-MM-DD=시간;…" — 비어 있으면 기간에 똑같이 나눈다(예전 작업) */
+    @Column(name = "day_hours", nullable = false)
+    var dayHours: String = ""
+        protected set
+
     /** 밀려서 오늘로 옮겨졌다면 원래 끝나는 날 (처음 밀린 날을 유지) */
     @Column(name = "delayed_from")
     var delayedFrom: LocalDate? = null
         protected set
 
-    fun reschedule(start: LocalDate, span: Int, due: LocalDate) {
-        scheduledDate = start
-        spanDays = span
-        dueDate = due
+    fun reschedule(placement: Placement) {
+        scheduledDate = placement.scheduledDate
+        spanDays = placement.spanDays
+        dueDate = placement.dueDate
+        dayHours = encode(placement.days)
     }
+
+    fun days(): List<DayHours> = decode(dayHours)
 
     /** 밀린 작업을 오늘의 추가 작업으로 옮긴다 — 원래 끝나는 날을 기억해 "밀림"으로 보여준다(사용자 결정) */
     fun moveToToday(today: LocalDate) {
         delayedFrom = delayedFrom ?: Scheduler.endDate(toScheduled())
         scheduledDate = today
         spanDays = 1
+        // 남은 시간 전부를 오늘 하루에 (사용자 결정 — 과부하 감수)
+        dayHours = encode(listOf(DayHours(today, estimatedHours ?: 0.0)))
     }
 
     /** 끝나는 날이 지났는데 아직 안 끝낸 작업 */
     fun isOverdue(today: LocalDate): Boolean = !done && Scheduler.endDate(toScheduled())?.isBefore(today) == true
 
-    fun toScheduled() = ScheduledTask(scheduledDate, spanDays, estimatedHours, done)
+    fun toScheduled() = ScheduledTask(scheduledDate, spanDays, estimatedHours, done, days())
+
+    companion object {
+        fun encode(days: List<DayHours>) = days.joinToString(";") { "${it.date}=${it.hours}" }
+
+        fun decode(raw: String): List<DayHours> = raw.split(';').filter { it.isNotBlank() }.map {
+            val (date, hours) = it.split('=')
+            DayHours(LocalDate.parse(date), hours.toDouble())
+        }
+    }
 }

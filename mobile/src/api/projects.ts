@@ -35,5 +35,8 @@ export const createProject = (project: NewProject) => request('/api/v1/projects'
 export const updateProject = (id: number, changes: { color?: Project['color']; status?: 'done' }) =>
   request(`/api/v1/projects/${id}`, projectDetailSchema, { method: 'PATCH', body: changes });
 
+/** 삭제 — 작업·첨부 파일까지 서버가 지운다. 상시 프로젝트를 끝낼 때(사용자 결정 2026-10-01) */
+export const deleteProject = (id: number) => request(`/api/v1/projects/${id}`, null, { method: 'DELETE' });
+
 /** 작업은 완료 여부만 바꿀 수 있다(사용자 결정 B) */
 export const setTaskDone = (id: number, done: boolean) => request(`/api/v1/tasks/${id}`, updateTaskResponseSchema, { method: 'PATCH', body: { done } });

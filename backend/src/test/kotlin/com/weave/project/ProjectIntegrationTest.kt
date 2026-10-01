@@ -30,7 +30,8 @@ import java.util.UUID
 @ApplyExtension(SpringExtension::class)
 class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapper, jdbc: JdbcTemplate) : FunSpec({
     val api = ApiTestSupport(mockMvc, objectMapper)
-    val today = LocalDate.now(ZoneId.of("Asia/Seoul"))
+    // 서버의 '오늘'은 아침 6시에 바뀐다(TodayProvider)
+    val today = java.time.LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(6).toLocalDate()
     fun newUser() = api.signup("p-${UUID.randomUUID()}@example.com")
 
     fun task(key: String, title: String, hours: Double, dependsOn: String? = null, prerequisite: Boolean = false, description: String = "") =
@@ -62,7 +63,9 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         body["lateCount"].asInt() shouldBe 0
         val tasks = project["tasks"]
         tasks.asIterable().map { it["title"].asString() } shouldBe listOf("관련 개념 학습", "설계 문서 작성", "보고서 초안 작성", "발표자료 제작")
-        tasks.asIterable().map { it["scheduledDate"].asString() } shouldBe listOf(today, today.plusDays(1), today.plusDays(2), today.plusDays(4)).map { it.toString() }
+        // 하루에 최대한 채워 앞당기기: 개념 2h(오늘) → 설계 오늘 1h + 내일 2h → 보고서 내일 1h + 모레 3h → 발표 글피 2h
+        tasks.asIterable().map { it["scheduledDate"].asString() } shouldBe listOf(today, today, today.plusDays(1), today.plusDays(3)).map { it.toString() }
+        tasks[1]["days"].asIterable().map { it["date"].asString() to it["hours"].asDouble() } shouldBe listOf(today.toString() to 1.0, today.plusDays(1).toString() to 2.0)
         tasks[2]["spanDays"].asInt() shouldBe 2
         tasks[0]["dueDate"].asString() shouldBe today.plusDays(6).toString()
         tasks[1]["dependsOnId"].asLong() shouldBe tasks[0]["id"].asLong()
@@ -73,6 +76,22 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
     test("작업 세부 설명(목표·범위·완료 기준)을 저장하고 돌려준다") {
         val body = createOk(newUser(), tasks = listOf(task("a", "설계 문서 작성", 3.0, description = "블록도와 시퀀스 다이어그램, 리뷰 1회")))
         body["project"]["tasks"][0]["description"].asString() shouldBe "블록도와 시퀀스 다이어그램, 리뷰 1회"
+    }
+
+    test("상시(마감 없는) 프로젝트의 작업은 마감일이 없다") {
+        val tasks = createOk(newUser(), deadline = null, tasks = listOf(task("a", "꾸준히 할 일", 2.0)))["project"]["tasks"]
+        tasks[0]["dueDate"].isNull shouldBe true
+    }
+
+    test("프로젝트를 삭제하면 목록·상세·일정에서 사라진다 — 남의 프로젝트는 404") {
+        val tokens = newUser()
+        val other = newUser()
+        val id = createOk(tokens)["project"]["id"].asLong()
+        mockMvc.delete("/api/v1/projects/$id") { header("Authorization", api.bearer(other)) }.andExpect { status { isNotFound() } }
+        mockMvc.delete("/api/v1/projects/$id") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNoContent() } }
+        mockMvc.get("/api/v1/projects/$id") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNotFound() } }
+        mockMvc.get("/api/v1/projects?status=active") { header("Authorization", api.bearer(tokens)) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+        mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andExpect { jsonPath("$.tasks.length()") { value(0) } }
     }
 
     test("두 번째 프로젝트는 첫 프로젝트가 쓴 시간을 피해 배정한다") {
@@ -111,8 +130,8 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         val tasks = createOk(tokens, deadline = null, tasks = listOf(task("a", "어제 할 일", 2.0), task("b", "모레 할 일", 3.0)))["project"]["tasks"]
         val lateId = tasks[0]["id"].asLong()
         val otherId = tasks[1]["id"].asLong()
-        jdbc.update("UPDATE tasks SET scheduled_date = ?, span_days = 2 WHERE id = ?", today.minusDays(3), lateId)
-        jdbc.update("UPDATE tasks SET scheduled_date = ? WHERE id = ?", today.plusDays(2), otherId)
+        jdbc.update("UPDATE tasks SET scheduled_date = ?, span_days = 2, day_hours = '' WHERE id = ?", today.minusDays(3), lateId)
+        jdbc.update("UPDATE tasks SET scheduled_date = ?, day_hours = '' WHERE id = ?", today.plusDays(2), otherId)
 
         val snapshot = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)
         val late = snapshot["tasks"].asIterable().first { it["id"].asLong() == lateId }
@@ -135,8 +154,8 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         val tasks = createOk(tokens, deadline = null, tasks = listOf(task("a", "밀린 일", 3.0), task("b", "끝낸 일", 1.0), task("c", "다른 일", 3.0)))["project"]["tasks"]
         val lateId = tasks[0]["id"].asLong()
         val doneId = tasks[1]["id"].asLong()
-        jdbc.update("UPDATE tasks SET scheduled_date = ? WHERE id = ?", today.minusDays(2), lateId)
-        jdbc.update("UPDATE tasks SET done = true, scheduled_date = ? WHERE id = ?", today.minusDays(5), doneId)
+        jdbc.update("UPDATE tasks SET scheduled_date = ?, day_hours = '' WHERE id = ?", today.minusDays(2), lateId)
+        jdbc.update("UPDATE tasks SET done = true, scheduled_date = ?, day_hours = '' WHERE id = ?", today.minusDays(5), doneId)
         // 일정을 읽으면 밀린 일이 오늘로 옮겨져 오늘이 몰린다(밀린 일 3h + 다른 일)
         mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }
 

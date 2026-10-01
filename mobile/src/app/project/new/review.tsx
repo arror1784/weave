@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Footer } from '@/components/Footer';
-import { IconArrowDep, IconPlus, IconSparkle, IconTrash } from '@/components/icons';
+import { IconArrowDep, IconChevron, IconPlus, IconSparkle, IconTrash } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
 import { useToast } from '@/components/Toast';
@@ -14,13 +14,14 @@ import { errorMessage } from '@/api/errors';
 import { formatHours, withParticle } from '@/lib/korean';
 import { useCreateProject } from '@/queries/projects';
 import { formatShortDate } from '@/lib/date';
-import { assistantTurn, chatProject, newKey, toChatTasks } from '@/state/draft';
+import { assistantTurn, canMoveTask, chatProject, newKey, toChatTasks } from '@/state/draft';
 import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
 /**
  * 프로젝트 등록 3/3: AI가 제안한 작업 검토 (Figma 02-b-iii) — 이름·시간 수정, 삭제, 선행 연결, 직접 추가, 세부 설명 보기.
+ * 순서는 위·아래 버튼으로 바꾼다 — 선행 작업보다 앞으로는 못 간다(사용자 결정 2026-10-01, Figma에 없음). 서버는 이 순서대로 배치한다.
  * 직접 고친 목록을 "AI에게 다시 정리 요청"으로 보내 다시 제안받을 수 있다. "등록 완료"가 확정(사용자 결정 2026-10-01).
  * 작업을 고칠 수 있는 곳은 여기뿐이다 — 등록한 뒤에는 고칠 수 없다(사용자 결정 B).
  */
@@ -114,6 +115,24 @@ export default function ReviewScreen() {
                   onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title } })}
                   style={[typography.body, styles.nameInput, { color: colors.ink }]}
                 />
+                {([-1, 1] as const).map((offset) => {
+                  const can = canMoveTask(tasks, t.key, offset);
+                  return (
+                    <Pressable
+                      key={offset}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${n}번 작업 ${offset < 0 ? '위로' : '아래로'}`}
+                      accessibilityState={{ disabled: !can }}
+                      disabled={!can}
+                      onPress={() => dispatch({ type: 'moveTask', key: t.key, offset })}
+                      hitSlop={{ top: 6, bottom: 6 }}
+                      style={styles.iconButton}>
+                      <View style={{ transform: [{ rotate: offset < 0 ? '-90deg' : '90deg' }] }}>
+                        <IconChevron size={16} color={can ? colors.inkSoft : colors.inkFaint} />
+                      </View>
+                    </Pressable>
+                  );
+                })}
                 <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 삭제`} onPress={() => dispatch({ type: 'deleteTask', key: t.key })} hitSlop={12} style={styles.iconButton}>
                   <IconTrash size={17} color={colors.inkSoft} />
                 </Pressable>

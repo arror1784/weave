@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Badge } from '@/components/Badge';
@@ -10,19 +10,19 @@ import { Checkbox } from '@/components/Checkbox';
 import { ColorPicker } from '@/components/ColorPicker';
 import { DDay } from '@/components/DDay';
 import { Gantt } from '@/components/Gantt';
-import { IconArrowDep, IconChat, IconFile, IconImage, IconLink } from '@/components/icons';
+import { IconArrowDep, IconChat, IconFile, IconImage, IconLink, IconTrash } from '@/components/icons';
 import { LoadError, Loading } from '@/components/QueryStatus';
 import { Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
 import { TopBar } from '@/components/TopBar';
 import { dDayLabel } from '@/lib/date';
-import { formatHours } from '@/lib/korean';
+import { formatHours, withParticle } from '@/lib/korean';
 import { downloadAttachment } from '@/api/attachments';
 import { errorMessage } from '@/api/errors';
 import type { Attachment } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { selectGanttRange } from '@/lib/schedule';
-import { useProject, useUpdateProject } from '@/queries/projects';
+import { useDeleteProject, useProject, useUpdateProject } from '@/queries/projects';
 import { useToday } from '@/queries/use-today';
 import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
@@ -34,6 +34,7 @@ type Tab = 'tasks' | 'plan';
  * 프로젝트 상세 (Figma 04-a 태스크 / 04-b 일정).
  * 등록된 작업은 완료 체크만 된다 — 일정 알고리즘이 정한 일정을 지키려고 수정·추가를 막았다(사용자 결정 B, 바뀔 수 있음).
  * 프로젝트 색은 바꿀 수 있다(사용자 결정 I — Figma에 없음).
+ * 프로젝트를 삭제할 수 있다 — 마감이 없는 상시 프로젝트는 끝낼 때 삭제한다(사용자 결정 2026-10-01 — Figma에 없음).
  */
 export default function ProjectDetailScreen() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function ProjectDetailScreen() {
   const today = useToday();
   const query = useProject(Number(id));
   const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
   const toggle = useToggleTask(() => query.data?.name ?? '');
   const [tab, setTab] = useState<Tab>('tasks');
   const [colorOpen, setColorOpen] = useState(false);
@@ -66,6 +68,24 @@ export default function ProjectDetailScreen() {
     } catch (e) {
       toast(errorMessage(e));
     }
+  }
+
+  function confirmDelete(target: { id: number; name: string }) {
+    Alert.alert('프로젝트 삭제', `${target.name}의 작업과 참고자료가 모두 삭제돼요. 되돌릴 수 없어요.`, [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () =>
+          deleteProject.mutate(target.id, {
+            onSuccess: () => {
+              router.back();
+              toast(`${withParticle(target.name, '을', '를')} 삭제했어요`);
+            },
+            onError: (e) => toast(errorMessage(e)),
+          }),
+      },
+    ]);
   }
 
   const palette = projectPaletteFor(project.color);
@@ -182,6 +202,9 @@ export default function ProjectDetailScreen() {
               ))}
             </View>
           ) : null}
+          <View style={styles.danger}>
+            <Button label="프로젝트 삭제" variant="danger" onPress={() => confirmDelete(project)} icon={(c) => <IconTrash size={16} color={c} />} />
+          </View>
         </>
       ) : (
         <Gantt tasks={tasks} range={selectGanttRange(today)} today={today} color={palette.dot} />
@@ -234,5 +257,6 @@ const styles = StyleSheet.create({
   description: { marginTop: 8 },
   flex: { flex: 1 },
   attachments: { gap: 8, marginTop: 8 },
+  danger: { marginTop: 16 },
   attachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, paddingHorizontal: 14, minHeight: 48 },
 });

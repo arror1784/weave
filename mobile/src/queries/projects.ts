@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { createProject, getProject, listProjects, setTaskDone, updateProject, type NewProject } from '@/api/projects';
+import { createProject, deleteProject, getProject, listProjects, setTaskDone, updateProject, type NewProject } from '@/api/projects';
 import type { Project } from '@/api/types';
 
 import { queryKeys } from './keys';
@@ -49,4 +49,17 @@ export function useUpdateProject() {
 export function useCreateProject() {
   const invalidate = useInvalidateProjects();
   return useMutation({ mutationFn: (project: NewProject) => createProject(project), onSuccess: () => invalidate() });
+}
+
+/** 삭제 — 지운 프로젝트의 상세 캐시는 버린다(다시 받으면 404) */
+export function useDeleteProject() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: (id: number) => deleteProject(id),
+    onSuccess: (_, id) => {
+      client.removeQueries({ queryKey: queryKeys.project(id) });
+      return invalidate();
+    },
+  });
 }

@@ -8,6 +8,9 @@ export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'gray', '
 export const userSchema = z.object({ id: z.number(), email: z.string(), dailyAvailableHours: z.number() });
 export const tokenSchema = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), user: userSchema });
 
+/** 서버가 날짜별로 배정한 작업 시간 */
+export const dayHoursSchema = z.object({ date: dateKey, hours: z.number() });
+
 export const taskSchema = z.object({
   id: z.number(),
   projectId: z.number(),
@@ -18,6 +21,9 @@ export const taskSchema = z.object({
   dependsOnId: z.number().nullable(),
   scheduledDate: dateKey.nullable(),
   spanDays: z.number(),
+  /** 날짜별 배정 시간 — 하루에 최대한 채워 앞당긴다(4시간·하루 3시간 → 3 + 1) */
+  days: z.array(dayHoursSchema),
+  /** 작업 마감일 — 상시 프로젝트(마감 없음)면 null */
   dueDate: dateKey.nullable(),
   done: z.boolean(),
   prerequisite: z.boolean(),

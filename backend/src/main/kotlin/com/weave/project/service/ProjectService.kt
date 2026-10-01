@@ -1,5 +1,6 @@
 package com.weave.project.service
 
+import com.weave.global.time.TodayProvider
 import com.weave.attachment.service.AttachmentLinker
 import com.weave.global.error.ApiException
 import com.weave.global.web.PageResponse
@@ -19,7 +20,6 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
 import java.time.LocalDate
 
 @Service
@@ -30,7 +30,7 @@ class ProjectService(
     private val userService: UserService,
     private val overdueRoller: OverdueRoller,
     private val replanner: Replanner,
-    private val clock: Clock,
+    private val todayProvider: TodayProvider,
 ) {
     /**
      * 등록: 새 프로젝트와 진행중 프로젝트의 미완료 작업을 오늘부터 전부 다시 배치한다(사용자 결정 2026-10-01).
@@ -41,7 +41,7 @@ class ProjectService(
         validateTasks(request)
         val user = userService.find(userId)
         overdueRoller.roll(userId)
-        val today = LocalDate.now(clock)
+        val today = todayProvider.today()
 
         val project = projectRepository.save(Project(userId, request.name.trim(), request.description.trim(), request.deadline, request.color))
         val saved = request.tasks.mapIndexed { i, t ->
@@ -62,7 +62,7 @@ class ProjectService(
         if (status != Project.ACTIVE && status != Project.DONE) throw ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "status는 active 또는 done이에요.")
         val result = projectRepository.findPage(userId, status, PageRequest.of(page.coerceAtLeast(0), size.coerceIn(1, 100)))
         val tasksByProject = taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(result.content.map { it.id!! }).groupBy { it.projectId }
-        val today = LocalDate.now(clock)
+        val today = todayProvider.today()
         return PageResponse.of(result, result.content.map { summarize(it, tasksByProject[it.id].orEmpty(), today) })
     }
 
@@ -78,6 +78,17 @@ class ProjectService(
         request.color?.let { project.color = it }
         if (request.status == Project.DONE) project.complete()
         return ProjectDetailResponse.of(project, taskRepository.findByProjectIdOrderByPosition(projectId), attachmentLinker.ofProject(projectId))
+    }
+
+    /**
+     * 프로젝트 삭제 — 상시 프로젝트를 끝낼 때 등(사용자 결정 2026-10-01). 프로젝트·작업·첨부 행은 소프트 삭제, 첨부 파일은 디스크에서 지운다.
+     */
+    @Transactional
+    fun delete(userId: Long, projectId: Long) {
+        val project = owned(userId, projectId)
+        attachmentLinker.deleteOfProject(projectId)
+        taskRepository.deleteAll(taskRepository.findByProjectIdOrderByPosition(projectId))
+        projectRepository.delete(project)
     }
 
     private fun owned(userId: Long, projectId: Long) =
