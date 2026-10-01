@@ -27,6 +27,7 @@ spring-boot-starter-security-oauth2-resource-server = { module = "org.springfram
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 metadata-extractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadata-extractor" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
+poi-scratchpad = { module = "org.apache.poi:poi-scratchpad", version.ref = "poi" }
 hwplib = { module = "kr.dogfoot:hwplib", version.ref = "hwplib" }
 hwpxlib = { module = "kr.dogfoot:hwpxlib", version.ref = "hwpxlib" }
 springdoc-openapi-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }

@@ -74,6 +74,56 @@ class AttachmentIntegrationTest(
         upload(tokens, "empty.txt", ByteArray(0)).andExpect { status { isBadRequest() } }
     }
 
+    test("넓힌 형식(글자·코드·gif·webp·옛 Office·zip·음성)을 받고, 글자 파일은 text/plain으로 내려준다") {
+        val tokens = newUser()
+        val ole = byteArrayOf(0xD0.toByte(), 0xCF.toByte(), 0x11, 0xE0.toByte(), 0xA1.toByte(), 0xB1.toByte(), 0x1A, 0xE1.toByte(), 0, 0)
+        val zip = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0, 0)
+        val ftypM4a = byteArrayOf(0, 0, 0, 0x20) + "ftypM4A ".toByteArray()
+        val wav = "RIFF".toByteArray() + byteArrayOf(4, 0, 0, 0) + "WAVEfmt ".toByteArray()
+        val accepted = mapOf(
+            "회의록.md" to ("# 회의\n- 발표 준비".toByteArray() to "text/plain"),
+            "data.csv" to ("a,b\n1,2".toByteArray() to "text/plain"),
+            "Main.java" to ("class Main {}".toByteArray() to "text/plain"),
+            "config.yaml" to ("a: 1".toByteArray() to "text/plain"),
+            "움짤.gif" to (TestImages.gif() to "image/gif"),
+            "사진.webp" to (TestImages.webpWithExif() to "image/webp"),
+            "옛문서.doc" to (ole to "application/msword"),
+            "표.xls" to (ole to "application/vnd.ms-excel"),
+            "발표.ppt" to (ole to "application/vnd.ms-powerpoint"),
+            "소스.zip" to (zip to "application/zip"),
+            "녹음.mp3" to ("ID3".toByteArray() + byteArrayOf(4, 0, 0) to "audio/mpeg"),
+            "녹음.m4a" to (ftypM4a to "audio/mp4"),
+            "녹음.wav" to (wav to "audio/wav"),
+        )
+        accepted.forEach { (name, file) ->
+            val body = api.read(upload(tokens, name, file.first).andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+            body["contentType"].asString() shouldBe file.second
+        }
+    }
+
+    test("webp는 저장 전에 위치(EXIF)·XMP를 지운다") {
+        val body = api.read(upload(newUser(), "사진.webp", TestImages.webpWithExif()).andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        body["kind"].asString() shouldBe "image"
+        val saved = Files.readAllBytes(storageRoot.resolve(storageKeyOf(body["id"].asLong())))
+        String(saved, Charsets.ISO_8859_1).contains("GPS") shouldBe false
+    }
+
+    test("실행 파일·스크립트·html·영상은 계속 400") {
+        val tokens = newUser()
+        listOf("run.sh" to "#!/bin/sh".toByteArray(), "run.bat" to "echo".toByteArray(), "app.apk" to byteArrayOf(0x50, 0x4B, 0x03, 0x04),
+            "page.html" to "<script>".toByteArray(), "image.svg" to "<svg/>".toByteArray(),
+            "clip.mp4" to byteArrayOf(0, 0, 0, 0x20) + "ftypisom".toByteArray()).forEach { (name, bytes) ->
+            upload(tokens, name, bytes).andExpect { status { isBadRequest() }; jsonPath("$.code") { value("UNSUPPORTED_FILE") } }
+        }
+    }
+
+    test("확장자는 맞아도 내용이 다르면 400 (글자 파일에 NUL, gif가 아닌 gif)") {
+        val tokens = newUser()
+        upload(tokens, "bin.md", byteArrayOf(0x41, 0, 0x42)).andExpect { status { isBadRequest() } }
+        upload(tokens, "fake.gif", "not gif".toByteArray()).andExpect { status { isBadRequest() } }
+        upload(tokens, "fake.wav", "RIFF\u0004\u0000\u0000\u0000WEBP".toByteArray()).andExpect { status { isBadRequest() } }
+    }
+
     test("10MB를 넘는 파일은 413") {
         upload(newUser(), "big.pdf", pdf + ByteArray(10 * 1024 * 1024)).andExpect { status { isPayloadTooLarge() } }
     }

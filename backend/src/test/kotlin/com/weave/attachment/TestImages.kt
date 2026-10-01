@@ -32,5 +32,23 @@ object TestImages {
         return png.copyOfRange(0, ihdrEnd) + chunk + png.copyOfRange(ihdrEnd, png.size)
     }
 
+    /** VP8X(EXIF·XMP 표시) + 영상 청크(VP8L) + EXIF 청크(가짜 GPS) + XMP 청크를 담은 WebP. 홀수 길이 청크는 1바이트 채움 */
+    fun webpWithExif(): ByteArray {
+        val vp8x = chunk("VP8X", byteArrayOf(0x0C, 0, 0, 0, 3, 0, 0, 3, 0, 0))
+        val image = chunk("VP8L", byteArrayOf(0x2F, 3, 0xC0.toByte(), 0, 0, 0x07))
+        val exif = chunk("EXIF", "MM\u0000*GPS 37.5665,126.9780".toByteArray())
+        val xmp = chunk("XMP ", "<x:xmpmeta>Location</x:xmpmeta>".toByteArray())
+        val body = "WEBP".toByteArray() + vp8x + image + exif + xmp
+        return "RIFF".toByteArray() + le32(body.size) + body
+    }
+
+    /** GIF89a 1×1 */
+    fun gif(): ByteArray = "GIF89a".toByteArray() + byteArrayOf(1, 0, 1, 0, 0, 0, 0, 0x2C, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 0x44, 1, 0, 0x3B)
+
+    private fun chunk(type: String, data: ByteArray): ByteArray =
+        type.toByteArray() + le32(data.size) + data + (if (data.size % 2 == 1) byteArrayOf(0) else byteArrayOf())
+
+    fun le32(v: Int) = byteArrayOf(v.toByte(), (v shr 8).toByte(), (v shr 16).toByte(), (v shr 24).toByte())
+
     private fun int(v: Int) = byteArrayOf((v shr 24).toByte(), (v shr 16).toByte(), (v shr 8).toByte(), v.toByte())
 }
