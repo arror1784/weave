@@ -19,6 +19,8 @@ export const taskSchema = z.object({
   dueDate: dateKey.nullable(),
   done: z.boolean(),
   prerequisite: z.boolean(),
+  /** 밀려서 서버가 오늘로 옮긴 작업의 원래 끝나는 날 — 있으면 "지연" */
+  delayedFrom: dateKey.nullable(),
 });
 
 export const projectBriefSchema = z.object({

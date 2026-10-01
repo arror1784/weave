@@ -50,6 +50,14 @@ describe('전체 일정', () => {
     expect(firstWeekDays.at(-1)).toBe('9월 6일 일요일');
   });
 
+  it('범례는 전체 이름을 한 줄로, 길면 말줄임으로 보여준다', async () => {
+    await renderWithProviders(<ScheduleScreen />);
+    await screen.findByText('9/28 – 10/4');
+    const legendName = screen.getAllByText('임베디드시스템 과제')[0];
+    expect(legendName.props.numberOfLines).toBe(1);
+    expect(legendName.props.ellipsizeMode).toBe('tail');
+  });
+
   it('프로젝트 범례를 보여준다', async () => {
     await renderWithProviders(<ScheduleScreen />);
     await screen.findByText('9/28 – 10/4');

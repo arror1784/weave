@@ -5,12 +5,16 @@ import com.weave.attachment.dto.CreateLinkRequest
 import com.weave.attachment.service.AttachmentService
 import com.weave.global.security.userId
 import jakarta.validation.Valid
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -35,6 +39,17 @@ class AttachmentController(private val attachmentService: AttachmentService) {
     @ResponseStatus(HttpStatus.CREATED)
     fun addLink(@AuthenticationPrincipal jwt: Jwt, @Valid @RequestBody request: CreateLinkRequest): AttachmentResponse =
         attachmentService.addLink(jwt.userId(), request.url.trim())
+
+    /** 프로젝트 상세에서 내려받기 (사용자 결정 2026-10-01) — 원래 이름으로, 형식은 서버가 정한 것 */
+    @GetMapping("/{id}/content")
+    fun download(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long): ResponseEntity<ByteArray> {
+        val (attachment, bytes) = attachmentService.download(jwt.userId(), id)
+        val disposition = ContentDisposition.attachment().filename(attachment.name, Charsets.UTF_8).build()
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(attachment.contentType ?: MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .body(bytes)
+    }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -117,23 +117,34 @@ describe('등록 1/3 기본 정보', () => {
 });
 
 describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
+  it('등록 1단계에서 올린 첨부 id를 함께 보내 AI가 첨부를 읽게 한다', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '명세서를 읽었어요. 팀원은 몇 명인가요?', questionNumber: 1, totalQuestions: 5 });
+    await renderWithProviders(<ChatScreen />, { draft: { ...draft, attachments: [{ id: 21, kind: 'file', name: 'spec.pdf' }, { id: 22, kind: 'link', name: 'https://example.com', url: 'https://example.com' }] } });
+    expect(await screen.findByText('명세서를 읽었어요. 팀원은 몇 명인가요?')).toBeOnTheScreen();
+    expect(chat.sendChat).toHaveBeenCalledWith(expect.anything(), [], [21, 22]);
+  });
+
   it('처음 들어오면 기본 정보로 첫 질문을 받고, 답하면 대화 전체를 보내 다음 질문을 받는다', async () => {
     chat.sendChat
       .mockResolvedValueOnce({ type: 'question', message: '선행 지식이 있나요?', questionNumber: 1, totalQuestions: 5 })
       .mockResolvedValueOnce({ type: 'question', message: '누가 보고서를 맡나요?', questionNumber: 2, totalQuestions: 5 });
     await renderWithProviders(<ChatScreen />, { draft });
     expect(await screen.findByText('선행 지식이 있나요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09' }, []);
-    expect(screen.getByText('1/5')).toBeOnTheScreen();
+    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09' }, [], []);
+    // 질문 진행 표시(n/5)는 없앴다
+    expect(screen.queryByText(/\/5$/)).toBeNull();
 
     await fireEvent.changeText(screen.getByLabelText('답변 입력'), 'UART는 알아요');
     await fireEvent.press(screen.getByRole('button', { name: '보내기' }));
     expect(await screen.findByText('누가 보고서를 맡나요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenLastCalledWith(expect.anything(), [
-      { role: 'assistant', text: '선행 지식이 있나요?' },
-      { role: 'user', text: 'UART는 알아요' },
-    ]);
-    expect(screen.getByText('2/5')).toBeOnTheScreen();
+    expect(chat.sendChat).toHaveBeenLastCalledWith(
+      expect.anything(),
+      [
+        { role: 'assistant', text: '선행 지식이 있나요?' },
+        { role: 'user', text: 'UART는 알아요' },
+      ],
+      [],
+    );
   });
 
   it('AI가 작업을 제안하면 초안에 담고 검토로 갈 수 있다', async () => {

@@ -7,7 +7,7 @@ import { ProjectCompleteDialog } from './ProjectCompleteDialog';
 
 jest.mock('@/api/projects');
 const api = jest.mocked(projectsApi);
-const pending = { projectId: 1, name: '임베디드시스템 과제' };
+const pending = { projectId: 1, name: '임베디드시스템 과제', taskId: 105 };
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -23,10 +23,15 @@ describe('프로젝트 완료 모달', () => {
     expect(completionRef.current).toBeNull();
   });
 
-  it('아직이라고 하면 서버에 보내지 않고 닫는다', async () => {
+  it('아직이라고 하면 방금 체크한 마지막 작업의 체크를 풀고(완료 취소) 닫는다 — 다시 체크하면 또 묻는다', async () => {
+    api.setTaskDone.mockResolvedValueOnce({
+      task: { id: 105, projectId: 1, title: '발표자료 제작', estimatedHours: 2, dependsOnId: null, scheduledDate: null, spanDays: 1, dueDate: null, done: false, prerequisite: false, delayedFrom: null },
+      projectAllDone: false,
+    });
     await renderWithProviders(<ProjectCompleteDialog />, { completion: pending });
     await fireEvent.press(screen.getByRole('button', { name: '아직이에요' }));
     await waitFor(() => expect(completionRef.current).toBeNull());
+    expect(api.setTaskDone).toHaveBeenCalledWith(105, false);
     expect(api.updateProject).not.toHaveBeenCalled();
   });
 

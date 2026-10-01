@@ -12,6 +12,13 @@ interface AttachmentRepository : JpaRepository<Attachment, Long> {
 
     fun findByUserId(userId: Long): List<Attachment>
 
+    /** 프로젝트에 연결되지 않고 오래된 첨부 (정리 대상) */
+    fun findByProjectIdIsNullAndCreatedAtBefore(before: java.time.Instant): List<Attachment>
+
+    @Modifying
+    @Query(value = "DELETE FROM attachments WHERE id IN (:ids)", nativeQuery = true)
+    fun hardDeleteByIdIn(ids: Collection<Long>)
+
     /** 탈퇴 시 실제 삭제(§3-17) — 파일은 서비스가 먼저 지운다 */
     @Modifying
     @Query(value = "DELETE FROM attachments WHERE user_id = :userId", nativeQuery = true)

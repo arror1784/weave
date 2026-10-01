@@ -3,13 +3,13 @@ package com.weave.ai
 import com.weave.ai.dto.ChatMessage
 import com.weave.ai.dto.ChatProjectInfo
 import com.weave.ai.dto.ProjectChatRequest
+import com.weave.ai.service.AttachmentContentLoader
 import com.weave.ai.service.ProjectBreakdownPrompt
 import com.weave.ai.service.ProjectChatService
+import com.weave.client.AiAttachment
 import com.weave.client.AiClient
 import com.weave.client.AiTurn
-import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
-import com.weave.global.security.RateLimiter
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -18,13 +18,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import tools.jackson.databind.json.JsonMapper
-import java.time.Clock
 import java.time.LocalDate
 
 class ProjectChatServiceTest : FunSpec({
     val ai = mockk<AiClient>()
-    val properties = WeaveProperties(WeaveProperties.Jwt("x".repeat(32)), WeaveProperties.RateLimit(aiPerUser = 2))
-    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), RateLimiter(Clock.systemUTC()), properties, JsonMapper.builder().build())
+    val loader = mockk<AttachmentContentLoader>()
+    every { loader.load(any(), any()) } returns emptyList()
+    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build())
     val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"))
 
     test("첫 요청: 프로젝트 기본 정보를 첫 사용자 메시지로 보내고, AI 질문을 1번째 질문으로 돌려준다") {
@@ -61,17 +61,21 @@ class ProjectChatServiceTest : FunSpec({
         response.tasks!![0].prerequisite shouldBe true
     }
 
+    test("첨부 id를 함께 보내면 첫 사용자 메시지에 첨부 내용을 붙인다") {
+        val turns = slot<List<AiTurn>>()
+        val pdf = AiAttachment.Pdf("명세서.pdf", "JVBERi0=")
+        every { loader.load(5L, listOf(11L)) } returns listOf(pdf)
+        every { ai.complete(any(), capture(turns), any()) } returns """{"type":"question","message":"?","tasks":[]}"""
+        service.chat(5L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "?"), ChatMessage("user", "답")), listOf(11L)))
+        turns.captured.first().attachments shouldBe listOf(pdf)
+        turns.captured.drop(1).all { it.attachments.isEmpty() } shouldBe true
+    }
+
     test("AI 호출이 실패하거나 응답 형식이 깨지면 503(AI_UNAVAILABLE)") {
         every { ai.complete(any(), any(), any()) } throws RuntimeException("network")
         shouldThrow<ApiException> { service.chat(3L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
         every { ai.complete(any(), any(), any()) } returns "not json"
         shouldThrow<ApiException> { service.chat(3L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
-    }
-
-    test("사용자당 AI 호출 횟수를 제한한다(비용 보호)") {
-        every { ai.complete(any(), any(), any()) } returns """{"type":"question","message":"?","tasks":[]}"""
-        repeat(2) { service.chat(4L, ProjectChatRequest(info, emptyList())) }
-        shouldThrow<ApiException> { service.chat(4L, ProjectChatRequest(info, emptyList())) }.code shouldBe "TOO_MANY_REQUESTS"
     }
 
     test("임시 프롬프트는 별도 파일에서 읽고, '임시'임을 밝힌다") {

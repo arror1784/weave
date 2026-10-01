@@ -13,7 +13,7 @@ export const TEST_TODAY = '2026-09-30'; // 수요일
 
 /** 테스트에서 초안·완료 모달 상태를 들여다보는 창구 */
 export const draftRef: { current: Draft | null } = { current: null };
-export const completionRef: { current: { projectId: number; name: string } | null } = { current: null };
+export const completionRef: { current: { projectId: number; name: string; taskId: number } | null } = { current: null };
 
 export const testAuth = {
   status: 'signedIn' as 'signedIn' | 'signedOut' | 'loading',
@@ -34,7 +34,7 @@ function Probe() {
   return null;
 }
 
-type Options = { draft?: Draft | null; completion?: { projectId: number; name: string } | null; auth?: Partial<typeof testAuth> };
+type Options = { draft?: Draft | null; completion?: { projectId: number; name: string; taskId: number } | null; auth?: Partial<typeof testAuth> };
 
 /** 화면 테스트용: Query(재시도 없음)·로그인 상태·등록 초안·완료 모달·토스트를 감싼다. API는 각 테스트에서 jest.mock('@/api/…') */
 export async function renderWithProviders(ui: ReactElement, { draft = null, completion = null, auth }: Options = {}) {

@@ -15,6 +15,7 @@ const task = (t: Partial<Task> & { id: number }): Task => ({
   dueDate: null,
   done: false,
   prerequisite: false,
+  delayedFrom: null,
   ...t,
 });
 
@@ -35,6 +36,22 @@ const data: ScheduleData = {
 };
 const titles = (ts: Task[]) => ts.map((t) => t.title);
 
+describe('밀린 작업 (서버가 오늘로 옮긴 추가 작업)', () => {
+  const rolled = task({ id: 20, title: 'rolled', scheduledDate: T, delayedFrom: '2026-09-28', estimatedHours: 2 });
+  const withRolled: ScheduleData = { ...data, tasks: [...data.tasks, rolled] };
+
+  it('오늘로 옮겨졌어도 지연으로 보고, 오늘 할 일 맨 앞(지연 묶음)에 둔다', () => {
+    expect(isOverdue(rolled, T)).toBe(true);
+    expect(titles(selectTodayTasks(withRolled, T)).slice(0, 2)).toEqual(['late', 'rolled']);
+  });
+
+  it('부하에는 한 번만 센다 (오늘 몫으로)', () => {
+    // 기존 4.75 + rolled 2
+    expect(selectDayLoad(withRolled, T, { includeOverdue: true }).hours).toBe(6.75);
+    expect(selectWeekLoad(withRolled, T).estimated).toBe(11.75);
+  });
+});
+
 describe('일정 계산', () => {
   it('오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업, 지연 먼저·그다음 마감 가까운 순, 완료는 맨 뒤', () => {
     expect(titles(selectTodayTasks(data, T))).toEqual(['late', 'today1', 'today2', 'multi', 'doneToday']);
@@ -53,13 +70,13 @@ describe('일정 계산', () => {
     expect(taskTone(task({ id: 9, dueDate: '2026-09-29', done: true }), T)).toBe('soft');
   });
 
-  it('오늘 부하: 오늘 몫(여러 날 작업은 하루 몫) + 밀린 작업 전부를 하루 가용 시간과 비교한다', () => {
-    // late 1 + today1 0.75 + today2 2 + doneToday 1.5 + multi 1 = 6.25
-    expect(selectDayLoad(data, T, { includeOverdue: true })).toEqual({ hours: 6.25, capacity: 5, over: true });
+  it('오늘 부하: 오늘 몫(여러 날 작업은 하루 몫) + 밀린 작업 전부를 하루 가용 시간과 비교한다 — 완료한 작업은 빼고', () => {
+    // late 1 + today1 0.75 + today2 2 + multi 1 = 4.75 (doneToday 1.5는 완료라 뺀다 — 사용자 결정 2026-10-01)
+    expect(selectDayLoad(data, T, { includeOverdue: true })).toEqual({ hours: 4.75, capacity: 5, over: false });
   });
 
-  it('달력의 날짜 부하: 그날 몫만 센다 (밀린 작업 제외)', () => {
-    expect(selectDayLoad(data, T)).toEqual({ hours: 5.25, capacity: 5, over: true });
+  it('달력의 날짜 부하: 그날 몫만 센다 (밀린 작업·완료한 작업 제외)', () => {
+    expect(selectDayLoad(data, T)).toEqual({ hours: 3.75, capacity: 5, over: false });
     expect(selectDayLoad(data, '2026-10-01')).toEqual({ hours: 1, capacity: 5, over: false });
     expect(selectDayLoad(data, '2026-10-02')).toEqual({ hours: 4, capacity: 5, over: false });
   });

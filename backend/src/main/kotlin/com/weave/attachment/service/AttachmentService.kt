@@ -55,6 +55,14 @@ class AttachmentService(
     fun addLink(userId: Long, url: String): AttachmentResponse =
         AttachmentResponse.of(attachmentRepository.save(Attachment(userId, Attachment.LINK, url.take(300), url = url)))
 
+    /** 내 첨부 파일 내려받기 — 링크·남의 첨부는 404 */
+    @Transactional(readOnly = true)
+    fun download(userId: Long, id: Long): Pair<Attachment, ByteArray> {
+        val attachment = attachmentRepository.findByIdInAndUserId(listOf(id), userId).firstOrNull()?.takeIf { it.storageKey != null }
+            ?: throw ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "첨부를 찾을 수 없어요.")
+        return attachment to fileStorage.read(attachment.storageKey!!)
+    }
+
     /** 내 첨부 지우기 — 행은 소프트 삭제, 파일은 디스크에서 지운다 */
     @Transactional
     fun delete(userId: Long, id: Long) {

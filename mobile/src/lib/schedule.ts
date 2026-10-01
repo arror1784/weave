@@ -11,8 +11,16 @@ export type Tone = 'soft' | 'near' | 'over';
 const hoursOf = (t: Task) => t.estimatedHours ?? 0;
 const round = (n: number) => Number(n.toFixed(2));
 
-/** 끝나는 날(시작일 + 기간 − 1)이 지났는데 완료되지 않은 작업 */
+/**
+ * 지연(밀린) 작업: 서버가 오늘로 옮기며 원래 끝나는 날을 남긴 작업(delayedFrom),
+ * 또는 아직 옮기기 전인데 끝나는 날이 지난 작업. 미완료만.
+ */
 export function isOverdue(task: Task, today: DateKey): boolean {
+  return !task.done && (task.delayedFrom !== null || isUnmoved(task, today));
+}
+
+/** 끝나는 날이 지났는데 서버가 아직 오늘로 옮기지 않은 작업 — 부하에 '추가'로 더한다 */
+function isUnmoved(task: Task, today: DateKey): boolean {
   const end = taskEndDate(task);
   return !task.done && end !== null && end < today;
 }
@@ -23,15 +31,18 @@ function coversDate(task: Task, date: DateKey): boolean {
   return task.scheduledDate !== null && task.scheduledDate <= date && end !== null && date <= end;
 }
 
+const delayKey = (t: Task) => t.delayedFrom ?? taskEndDate(t) ?? '9999';
+
 export function selectOverdueTasks(data: ScheduleData, today: DateKey): Task[] {
-  return data.tasks.filter((t) => isOverdue(t, today)).sort((a, b) => a.scheduledDate!.localeCompare(b.scheduledDate!));
+  return data.tasks.filter((t) => isOverdue(t, today)).sort((a, b) => delayKey(a).localeCompare(delayKey(b)));
 }
 
 /** 오늘 할 일: 오늘이 기간에 들어가는 작업 + 밀린 작업. 지연 → 마감 가까운 순 → 완료는 맨 뒤 */
 export function selectTodayTasks(data: ScheduleData, today: DateKey): Task[] {
   const list = data.tasks.filter((t) => coversDate(t, today) || isOverdue(t, today));
   const rank = (t: Task) => (t.done ? 2 : isOverdue(t, today) ? 0 : 1);
-  return list.sort((a, b) => rank(a) - rank(b) || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
+  const order = (t: Task) => (rank(t) === 0 ? delayKey(t) : (t.dueDate ?? '9999'));
+  return list.sort((a, b) => rank(a) - rank(b) || order(a).localeCompare(order(b)));
 }
 
 /** 정상 soft / 임박(D-1~D-Day) near / 지연 over */
@@ -42,10 +53,14 @@ export function taskTone(task: Task, today: DateKey): Tone {
   return remaining <= 1 ? 'near' : 'soft';
 }
 
-/** 하루 부하: 그날 몫(여러 날 작업은 하루 몫). includeOverdue면(오늘 화면) 밀린 작업 시간 전부를 더한다 */
+/**
+ * 하루 부하: 그날 몫(여러 날 작업은 하루 몫 — 서버가 오늘로 옮긴 밀린 작업도 여기 들어간다).
+ * 완료한 작업은 세지 않는다(사용자 결정 2026-10-01 — 서버 배치도 완료한 작업은 자리를 차지하지 않는다).
+ * includeOverdue면(오늘 화면) 아직 옮기기 전인 밀린 작업 시간도 더한다.
+ */
 export function selectDayLoad(data: ScheduleData, date: DateKey, { includeOverdue = false } = {}) {
-  const planned = data.tasks.reduce((a, t) => a + taskHoursOn(t, date), 0);
-  const overdue = includeOverdue ? selectOverdueTasks(data, date).reduce((a, t) => a + hoursOf(t), 0) : 0;
+  const planned = data.tasks.filter((t) => !t.done).reduce((a, t) => a + taskHoursOn(t, date), 0);
+  const overdue = includeOverdue ? data.tasks.filter((t) => isUnmoved(t, date)).reduce((a, t) => a + hoursOf(t), 0) : 0;
   const hours = round(planned + overdue);
   const capacity = data.dailyAvailableHours;
   return { hours, capacity, over: hours > capacity };
@@ -67,8 +82,8 @@ export function selectDayItems(data: ScheduleData, date: DateKey): DayItem[] {
 /** 이번 주(오늘~일요일) 부하: 남은 작업 몫 + 밀린 작업 vs 하루 가용 시간 × 남은 날 수. 작업은 시간 큰 순 */
 export function selectWeekLoad(data: ScheduleData, today: DateKey) {
   const days = weekDays(today).filter((d) => d >= today);
-  const overdue = selectOverdueTasks(data, today);
-  const upcoming = data.tasks.filter((t) => !t.done && !isOverdue(t, today) && days.some((d) => coversDate(t, d)));
+  const overdue = data.tasks.filter((t) => isUnmoved(t, today));
+  const upcoming = data.tasks.filter((t) => !t.done && !isUnmoved(t, today) && days.some((d) => coversDate(t, d)));
   const estimated = round(overdue.reduce((a, t) => a + hoursOf(t), 0) + upcoming.reduce((a, t) => a + days.reduce((b, d) => b + taskHoursOn(t, d), 0), 0));
   const tasks = [...overdue, ...upcoming].sort((a, b) => hoursOf(b) - hoursOf(a));
   return { estimated, available: data.dailyAvailableHours * days.length, tasks };

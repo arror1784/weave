@@ -44,7 +44,7 @@ describe('오늘의 일정', () => {
     await renderWithProviders(<TodayScreen />);
     await fireEvent.press(await screen.findByRole('checkbox', { name: '후원사 제안서 수정 완료' }));
     expect(api.setTaskDone).toHaveBeenCalledWith(202, true);
-    await waitFor(() => expect(completionRef.current).toEqual({ projectId: 2, name: '창업동아리' }));
+    await waitFor(() => expect(completionRef.current).toEqual({ projectId: 2, name: '창업동아리', taskId: 202 }));
     // 완료 후 일정을 새로 받는다
     await waitFor(() => expect(api.getSchedule).toHaveBeenCalledTimes(2));
   });

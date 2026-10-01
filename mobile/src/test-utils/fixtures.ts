@@ -13,6 +13,7 @@ export function sampleSchedule(today: DateKey): Schedule {
     dueDate: null,
     done: false,
     prerequisite: false,
+    delayedFrom: null,
     ...t,
   });
   const projects: Project[] = [

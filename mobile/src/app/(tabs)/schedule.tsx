@@ -67,7 +67,8 @@ function Legend({ projects }: { projects: Project[] }) {
       {projects.map((p) => (
         <View key={p.id} style={styles.inline}>
           <View style={[styles.dot8, { backgroundColor: projectPaletteFor(p.color).dot }]} />
-          <AppText variant="caption" tone="soft">
+          {/* 전체 이름, 길면 말줄임 (사용자 결정 2026-10-01) */}
+          <AppText variant="caption" tone="soft" numberOfLines={1} ellipsizeMode="tail" style={styles.legendName}>
             {p.name}
           </AppText>
         </View>
@@ -266,6 +267,7 @@ function dateOnly(d: DateKey) {
 }
 
 const styles = StyleSheet.create({
+  legendName: { maxWidth: 140, flexShrink: 1 },
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, gap: 12 },
   header: { gap: 4, marginBottom: 4 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 4 },
