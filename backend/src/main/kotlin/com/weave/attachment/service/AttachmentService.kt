@@ -36,6 +36,7 @@ class AttachmentService(
             when (type) {
                 FileType.JPEG -> ImageMetadataStripper.stripJpeg(bytes)
                 FileType.PNG -> ImageMetadataStripper.stripPng(bytes)
+                FileType.WEBP -> ImageMetadataStripper.stripWebp(bytes)
                 FileType.HEIC -> bytes.also { rejectIfHasLocation(it) }
                 else -> bytes
             }
@@ -94,7 +95,7 @@ class AttachmentService(
         })
     }
 
-    private fun unsupported() = ApiException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_FILE", "PDF·이미지·Office·한글·txt 파일만 올릴 수 있어요.")
+    private fun unsupported() = ApiException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_FILE", "올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.")
 
     companion object {
         /** 사용자 결정: 파일당 10MB */

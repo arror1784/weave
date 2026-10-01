@@ -130,7 +130,7 @@ describe('등록 1/3 기본 정보', () => {
     attachments.uploadAttachment
       .mockResolvedValueOnce({ id: 21, kind: 'file', name: '명세서.pdf', contentType: 'application/pdf', size: 10 })
       .mockResolvedValueOnce({ id: 22, kind: 'image', name: 'capture.jpg', contentType: 'image/jpeg', size: 10 })
-      .mockRejectedValueOnce(new ApiError(400, 'UNSUPPORTED_FILE', 'PDF·이미지·Office·한글·txt 파일만 올릴 수 있어요.'));
+      .mockRejectedValueOnce(new ApiError(400, 'UNSUPPORTED_FILE', '올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.'));
     await renderWithProviders(<NewProjectScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
     await fireEvent.press(screen.getByRole('button', { name: '캡처 첨부' }));
@@ -139,7 +139,7 @@ describe('등록 1/3 기본 정보', () => {
     expect(await screen.findByText('capture.jpg')).toBeOnTheScreen();
     expect(attachments.uploadAttachment).toHaveBeenCalledTimes(2);
     await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
-    expect(await screen.findByText('PDF·이미지·Office·한글·txt 파일만 올릴 수 있어요.')).toBeOnTheScreen();
+    expect(await screen.findByText('올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.')).toBeOnTheScreen();
 
     await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
