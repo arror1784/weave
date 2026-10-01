@@ -7,6 +7,8 @@ data class TaskResponse(
     val id: Long,
     val projectId: Long,
     val title: String,
+    /** 목표·범위·완료 기준 */
+    val description: String,
     val estimatedHours: Double?,
     val dependsOnId: Long?,
     val scheduledDate: LocalDate?,
@@ -18,6 +20,6 @@ data class TaskResponse(
     val delayedFrom: LocalDate?,
 ) {
     companion object {
-        fun of(t: Task) = TaskResponse(t.id!!, t.projectId, t.title, t.estimatedHours, t.dependsOnId, t.scheduledDate, t.spanDays, t.dueDate, t.done, t.prerequisite, t.delayedFrom)
+        fun of(t: Task) = TaskResponse(t.id!!, t.projectId, t.title, t.description, t.estimatedHours, t.dependsOnId, t.scheduledDate, t.spanDays, t.dueDate, t.done, t.prerequisite, t.delayedFrom)
     }
 }

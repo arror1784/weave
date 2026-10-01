@@ -2,12 +2,14 @@ package com.weave.ai
 
 import com.weave.ai.dto.ChatMessage
 import com.weave.ai.dto.ChatProjectInfo
+import com.weave.ai.dto.ChatTask
 import com.weave.ai.dto.ProjectChatRequest
 import com.weave.ai.service.AttachmentContentLoader
 import com.weave.ai.service.ProjectBreakdownPrompt
 import com.weave.ai.service.ProjectChatService
 import com.weave.client.AiAttachment
 import com.weave.client.AiClient
+import com.weave.client.AiResult
 import com.weave.client.AiTurn
 import com.weave.global.error.ApiException
 import io.kotest.assertions.throwables.shouldThrow
@@ -25,60 +27,100 @@ class ProjectChatServiceTest : FunSpec({
     val loader = mockk<AttachmentContentLoader>()
     every { loader.load(any(), any()) } returns emptyList()
     val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build())
-    val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"))
+    val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"), deliverable = "보고서, 발표자료", progress = "회로 구성은 끝냄")
+    val proposal = mapOf(
+        "tasks" to listOf(
+            mapOf("title" to "인터럽트 개념 학습", "description" to "NVIC·EXTI 정리", "estimatedHours" to 2, "dueDate" to "2026-10-03", "dependsOnTitle" to null, "isPrerequisiteLearning" to true),
+            mapOf("title" to "설계 문서 작성", "description" to "블록도·시퀀스", "estimatedHours" to 3.2, "dueDate" to "2026-10-05", "dependsOnTitle" to "인터럽트 개념 학습", "isPrerequisiteLearning" to false),
+            mapOf("title" to "발표자료 제작", "description" to "10장", "estimatedHours" to 4, "dueDate" to "2026-10-09", "dependsOnTitle" to "없는 작업", "isPrerequisiteLearning" to false),
+        ),
+        "assumptions" to listOf("팀원 3명으로 가정했어요"),
+    )
 
-    test("첫 요청: 프로젝트 기본 정보를 첫 사용자 메시지로 보내고, AI 질문을 1번째 질문으로 돌려준다") {
+    test("첫 요청: 기본 정보(결과물 형태·기 진행사항 포함)로 소개하고, AI가 글로 답하면 질문으로 돌려준다 — 처음엔 도구를 강제하지 않는다") {
         val turns = slot<List<AiTurn>>()
-        every { ai.complete(any(), capture(turns), any()) } returns """{"type":"question","message":"선행 지식이 있나요?","tasks":[]}"""
+        val force = slot<Boolean>()
+        every { ai.converse(any(), capture(turns), any(), capture(force)) } returns AiResult("선행 지식이 있나요? 팀원은 몇 명인가요?", null)
         val response = service.chat(1L, ProjectChatRequest(info, emptyList()))
         response.type shouldBe "question"
-        response.message shouldBe "선행 지식이 있나요?"
-        response.questionNumber shouldBe 1
-        response.totalQuestions shouldBe 5
-        turns.captured.first().role shouldBe "user"
-        turns.captured.first().text shouldContain "임베디드시스템 과제"
-        turns.captured.first().text shouldContain "2026-10-09"
+        response.message shouldBe "선행 지식이 있나요? 팀원은 몇 명인가요?"
+        force.captured shouldBe false
+        val intro = turns.captured.single().text
+        intro shouldContain "임베디드시스템 과제"
+        intro shouldContain "2026-10-09"
+        intro shouldContain "보고서, 발표자료"
+        intro shouldContain "회로 구성은 끝냄"
     }
 
-    test("대화가 이어지면 기록을 그대로 보내고, 작업 제안이 오면 key(k1…)와 선행 key로 바꿔 돌려준다") {
-        val turns = slot<List<AiTurn>>()
-        every { ai.complete(any(), capture(turns), any()) } returns """
-            {"type":"tasks","message":"4개 작업을 만들었어요.","tasks":[
-              {"title":"개념 학습","estimatedHours":2,"dependsOnIndex":-1,"prerequisite":true},
-              {"title":"설계 문서","estimatedHours":3,"dependsOnIndex":0,"prerequisite":false},
-              {"title":"잘못된 선행","estimatedHours":1,"dependsOnIndex":9,"prerequisite":false}
-            ]}
-        """.trimIndent()
-        val history = listOf(ChatMessage("assistant", "선행 지식이 있나요?"), ChatMessage("user", "UART는 알아요"))
-        val response = service.chat(2L, ProjectChatRequest(info, history))
-        turns.captured.map { it.role } shouldBe listOf("user", "assistant", "user")
+    test("propose_tasks 호출이 오면 작업 목록으로: key(k1…)·제목으로 찾은 선행 key·0.5 단위 시간·세부 설명·AI 마감일(참고)·가정") {
+        every { ai.converse(any(), any(), any(), any()) } returns AiResult("정리했어요.", proposal)
+        val response = service.chat(2L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "선행 지식?"), ChatMessage("user", "처음이에요"))))
         response.type shouldBe "tasks"
-        response.tasks!!.map { Triple(it.key, it.title, it.dependsOnKey) } shouldBe listOf(
-            Triple("k1", "개념 학습", null),
-            Triple("k2", "설계 문서", "k1"),
-            Triple("k3", "잘못된 선행", null),
+        response.message shouldBe "정리했어요."
+        response.tasks!!.map { listOf(it.key, it.title, it.dependsOnKey, it.estimatedHours) } shouldBe listOf(
+            listOf("k1", "인터럽트 개념 학습", null, 2.0),
+            listOf("k2", "설계 문서 작성", "k1", 3.0),
+            listOf("k3", "발표자료 제작", null, 4.0),
         )
+        response.tasks!![0].description shouldBe "NVIC·EXTI 정리"
         response.tasks!![0].prerequisite shouldBe true
+        response.tasks!![1].aiDueDate shouldBe LocalDate.parse("2026-10-05")
+        response.assumptions shouldBe listOf("팀원 3명으로 가정했어요")
+    }
+
+    test("사용자 답이 5번 쌓였는데 아직 제안이 없으면 도구 호출을 강제한다 (최초 제안은 5턴 안에)") {
+        val force = slot<Boolean>()
+        every { ai.converse(any(), any(), any(), capture(force)) } returns AiResult("", proposal)
+        val five = (1..5).flatMap { listOf(ChatMessage("assistant", "질문 $it"), ChatMessage("user", "답 $it")) }
+        service.chat(3L, ProjectChatRequest(info, five)).type shouldBe "tasks"
+        force.captured shouldBe true
+    }
+
+    test("제안 뒤 수정 루프: 앞서 받은 제안과 직접 고친 목록을 글로 풀어 다시 보내고, 도구는 강제하지 않는다") {
+        val turns = slot<List<AiTurn>>()
+        val force = slot<Boolean>()
+        every { ai.converse(any(), capture(turns), any(), capture(force)) } returns AiResult("다시 정리했어요.", proposal)
+        val proposed = listOf(ChatTask("설계 문서 작성", "블록도", 3.0, null, false))
+        val edited = listOf(ChatTask("설계 문서 작성", "블록도", 2.0, null, false), ChatTask("회의록 정리", "", 1.0, "설계 문서 작성", false))
+        val history = (1..5).flatMap { listOf(ChatMessage("assistant", "질문 $it"), ChatMessage("user", "답 $it")) } +
+            listOf(ChatMessage("assistant", "정리했어요.", proposed), ChatMessage("user", "이렇게 고쳤어요", edited))
+        service.chat(4L, ProjectChatRequest(info, history))
+        force.captured shouldBe false
+        val texts = turns.captured.map { it.text }
+        texts[texts.size - 2] shouldContain "설계 문서 작성"
+        texts.last() shouldContain "직접 수정한 작업 목록"
+        texts.last() shouldContain "회의록 정리"
+        texts.last() shouldContain "이렇게 고쳤어요"
+    }
+
+    test("같은 역할이 연달아 오면 하나로 합친다 (API는 번갈아 와야 한다)") {
+        val turns = slot<List<AiTurn>>()
+        every { ai.converse(any(), capture(turns), any(), any()) } returns AiResult("?", null)
+        service.chat(5L, ProjectChatRequest(info, listOf(ChatMessage("user", "하나"), ChatMessage("user", "둘"))))
+        turns.captured.map { it.role } shouldBe listOf("user")
+        turns.captured.single().text shouldContain "둘"
     }
 
     test("첨부 id를 함께 보내면 첫 사용자 메시지에 첨부 내용을 붙인다") {
         val turns = slot<List<AiTurn>>()
         val pdf = AiAttachment.Pdf("명세서.pdf", "JVBERi0=")
-        every { loader.load(5L, listOf(11L)) } returns listOf(pdf)
-        every { ai.complete(any(), capture(turns), any()) } returns """{"type":"question","message":"?","tasks":[]}"""
-        service.chat(5L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "?"), ChatMessage("user", "답")), listOf(11L)))
+        every { loader.load(6L, listOf(11L)) } returns listOf(pdf)
+        every { ai.converse(any(), capture(turns), any(), any()) } returns AiResult("?", null)
+        service.chat(6L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "?"), ChatMessage("user", "답")), listOf(11L)))
         turns.captured.first().attachments shouldBe listOf(pdf)
         turns.captured.drop(1).all { it.attachments.isEmpty() } shouldBe true
     }
 
-    test("AI 호출이 실패하거나 응답 형식이 깨지면 503(AI_UNAVAILABLE)") {
-        every { ai.complete(any(), any(), any()) } throws RuntimeException("network")
-        shouldThrow<ApiException> { service.chat(3L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
-        every { ai.complete(any(), any(), any()) } returns "not json"
-        shouldThrow<ApiException> { service.chat(3L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
+    test("AI 호출이 실패하거나 빈 응답이면 503(AI_UNAVAILABLE)") {
+        every { ai.converse(any(), any(), any(), any()) } throws RuntimeException("network")
+        shouldThrow<ApiException> { service.chat(7L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
+        every { ai.converse(any(), any(), any(), any()) } returns AiResult("", null)
+        shouldThrow<ApiException> { service.chat(7L, ProjectChatRequest(info, emptyList())) }.code shouldBe "AI_UNAVAILABLE"
     }
 
-    test("임시 프롬프트는 별도 파일에서 읽고, '임시'임을 밝힌다") {
-        ProjectBreakdownPrompt().system() shouldContain "임시"
+    test("시스템 프롬프트는 사용자가 쓴 프롬프트 문서(docs/)에서 온다") {
+        val system = ProjectBreakdownPrompt().system()
+        system shouldContain "propose_tasks"
+        system shouldContain "6시간"
     }
 })
