@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import type { Project } from '@/mocks/types';
+import type { Project } from '@/api/types';
 import { projectPaletteFor } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 

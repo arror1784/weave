@@ -3,13 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { IconChevron, IconPlus, IconWarn } from '@/components/icons';
+import { LoadError, Loading } from '@/components/QueryStatus';
 import { Screen } from '@/components/Screen';
 import { SectionLabel } from '@/components/SectionLabel';
 import { TaskCard } from '@/components/TaskCard';
 import { formatDateLabel, formatMonthEyebrow } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectDayLoad, selectTodayTasks } from '@/mocks/store';
+import { selectDayLoad, selectTodayTasks } from '@/lib/schedule';
+import { useSchedule } from '@/queries/schedule';
+import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
@@ -17,23 +19,38 @@ import { fonts } from '@/theme/typography';
 export default function TodayScreen() {
   const router = useRouter();
   const { colors, typography, radius } = useAppTheme();
-  const { state, dispatch, today } = useMockStore();
-  const tasks = selectTodayTasks(state, today);
+  const schedule = useSchedule();
+  const data = schedule.data;
+  const toggle = useToggleTask((id) => data?.projects.find((p) => p.id === id)?.name ?? '');
+
+  const fab = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="새 프로젝트 등록"
+      onPress={() => router.push('/project/new')}
+      style={({ pressed }) => [styles.fab, { backgroundColor: colors.thread, borderRadius: radius.card }, pressed && styles.pressed]}>
+      <IconPlus size={24} color={colors.onThread} />
+    </Pressable>
+  );
+
+  if (!data) {
+    return (
+      <Screen contentStyle={styles.content} overlay={fab}>
+        {schedule.isError ? <LoadError error={schedule.error} onRetry={() => schedule.refetch()} /> : <Loading />}
+      </Screen>
+    );
+  }
+
+  const today = data.today;
+  const tasks = selectTodayTasks(data, today);
   const left = tasks.filter((t) => !t.done).length;
-  const load = selectDayLoad(state, today, { includeOverdue: true });
+  const load = selectDayLoad(data, today, { includeOverdue: true });
   const [date, weekday] = splitWeekday(formatDateLabel(today));
 
   return (
     <Screen
       contentStyle={styles.content}
-      overlay={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="새 프로젝트 등록"
-          onPress={() => router.push('/project/new')}
-          style={({ pressed }) => [styles.fab, { backgroundColor: colors.thread, borderRadius: radius.card }, pressed && styles.pressed]}>
-          <IconPlus size={24} color={colors.onThread} />
-        </Pressable>
+      overlay={fab
       }>
       <View style={styles.header}>
         <AppText variant="mono" tone="soft">
@@ -80,9 +97,9 @@ export default function TodayScreen() {
         ) : (
           <View style={styles.list}>
             {tasks.map((task) => {
-              const project = state.projects.find((p) => p.id === task.projectId)!;
-              const dep = task.dependsOn ? state.tasks.find((t) => t.id === task.dependsOn) : undefined;
-              return <TaskCard key={task.id} task={task} project={project} today={today} blockedBy={dep && !dep.done ? dep.title : undefined} onToggle={() => dispatch({ type: 'toggleTask', taskId: task.id })} />;
+              const project = data.projects.find((p) => p.id === task.projectId)!;
+              const dep = task.dependsOnId ? data.tasks.find((t) => t.id === task.dependsOnId) : undefined;
+              return <TaskCard key={task.id} task={task} project={project} today={today} blockedBy={dep && !dep.done ? dep.title : undefined} onToggle={() => toggle(task)} />;
             })}
           </View>
         )}

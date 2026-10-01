@@ -4,7 +4,7 @@ import Svg, { G, Line } from 'react-native-svg';
 
 import { diffInDays, formatShortDate, type DateKey } from '@/lib/date';
 import { withParticle } from '@/lib/korean';
-import type { Task } from '@/mocks/types';
+import type { Task } from '@/api/types';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
@@ -33,8 +33,8 @@ export function Gantt({ tasks, range, today, color }: Props) {
   const barX = (t: Task) => (span(t)?.start ?? 0) * col;
   const barW = (t: Task) => (span(t)?.length ?? 0) * col;
 
-  const lateWithDependents = tasks.find((t) => isLate(t, today) && tasks.some((x) => x.dependsOn === t.id));
-  const dependent = lateWithDependents ? tasks.find((x) => x.dependsOn === lateWithDependents.id) : undefined;
+  const lateWithDependents = tasks.find((t) => isLate(t, today) && tasks.some((x) => x.dependsOnId === t.id));
+  const dependent = lateWithDependents ? tasks.find((x) => x.dependsOnId === lateWithDependents.id) : undefined;
 
   return (
     <Card style={styles.card}>
@@ -82,7 +82,7 @@ export function Gantt({ tasks, range, today, color }: Props) {
             <Svg width={width} height={tasks.length * ROW_H}>
               {todayIndex >= 0 ? <Line x1={(todayIndex + 0.5) * col} y1={0} x2={(todayIndex + 0.5) * col} y2={tasks.length * ROW_H} stroke={colors.thread} strokeOpacity={0.4} strokeWidth={1} /> : null}
               {tasks.map((t, i) => {
-                const j = tasks.findIndex((x) => x.id === t.dependsOn);
+                const j = tasks.findIndex((x) => x.id === t.dependsOnId);
                 if (j < 0 || !span(t) || !span(tasks[j])) return null;
                 const from = tasks[j];
                 const x1 = barX(from) + barW(from);

@@ -2,30 +2,42 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import type { ProjectSummary } from '@/api/types';
 import { AppText } from '@/components/AppText';
+import { Button } from '@/components/Button';
 import { DDay } from '@/components/DDay';
+import { LoadError, Loading } from '@/components/QueryStatus';
 import { Screen } from '@/components/Screen';
 import { dDayLabel } from '@/lib/date';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectProjectSummary, selectProjects } from '@/mocks/store';
+import { useProjectList } from '@/queries/projects';
+import { useToday } from '@/queries/use-today';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 type Filter = 'active' | 'done';
 
-/** 프로젝트 목록 (Figma 04): 진행중/완료 필터, 마감 가까운 순 카드 */
+/** 목록 카드 안내 문구·진행률 — 서버 요약 값으로 만든다 */
+function describe(p: ProjectSummary) {
+  const note = p.overdueCount > 0 ? `지연 ${p.overdueCount}건 · ${p.firstOverdueTitle}` : p.nextTaskTitle ? `다음: ${p.nextTaskTitle}` : '모든 작업을 끝냈어요';
+  const percent = p.totalCount ? Math.round((p.doneCount / p.totalCount) * 100) : 0;
+  return { note, percent, late: p.overdueCount > 0 };
+}
+
+/** 프로젝트 목록 (Figma 04): 진행중/완료 필터, 마감 가까운 순 카드 — 서버가 정렬·페이지네이션 */
 export default function ProjectsScreen() {
   const router = useRouter();
   const { colors, radius } = useAppTheme();
-  const { state, today } = useMockStore();
+  const today = useToday();
   const [filter, setFilter] = useState<Filter>('active');
-  const list = selectProjects(state, filter);
+  const query = useProjectList(filter);
+  const list = query.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = query.data?.pages[0]?.totalElements ?? 0;
 
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.header}>
-        <AppText variant="mono" tone="soft">{`프로젝트 ${state.projects.length}개`}</AppText>
+        <AppText variant="mono" tone="soft">{`프로젝트 ${total}개`}</AppText>
         <AppText variant="title">프로젝트</AppText>
       </View>
 
@@ -51,7 +63,9 @@ export default function ProjectsScreen() {
         </AppText>
       </View>
 
-      {list.length === 0 ? (
+      {query.isPending ? <Loading /> : null}
+      {query.isError ? <LoadError error={query.error} onRetry={() => query.refetch()} /> : null}
+      {query.isSuccess && list.length === 0 ? (
         <View style={[styles.empty, { borderColor: colors.control, borderRadius: radius.card }]}>
           <AppText variant="small" tone="soft" style={styles.center}>
             {'아직 완료한 프로젝트가 없어요.\n하나씩 엮어가는 중!'}
@@ -62,7 +76,7 @@ export default function ProjectsScreen() {
       <View style={styles.list}>
         {list.map((p) => {
           const palette = projectPaletteFor(p.color);
-          const s = selectProjectSummary(state, p.id, today);
+          const s = { ...describe(p), done: p.doneCount, total: p.totalCount };
           const dday = p.deadline ? dDayLabel(p.deadline, today) : '상시';
           return (
             <Pressable
@@ -95,6 +109,7 @@ export default function ProjectsScreen() {
           );
         })}
       </View>
+      {query.hasNextPage ? <Button label="더 보기" variant="outline" onPress={() => query.fetchNextPage()} disabled={query.isFetchingNextPage} /> : null}
     </Screen>
   );
 }

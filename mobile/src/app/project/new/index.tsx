@@ -4,6 +4,9 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { addLink, deleteAttachment, uploadAttachment } from '@/api/attachments';
+import { errorMessage } from '@/api/errors';
+import type { Attachment } from '@/api/types';
 import { AppText } from '@/components/AppText';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
@@ -16,30 +19,36 @@ import { TextField } from '@/components/TextField';
 import { useToast } from '@/components/Toast';
 import { dDayLabel } from '@/lib/date';
 import { fieldErrors, isValidDateKey, linkSchema, projectBasicSchema } from '@/lib/validation';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { createId, suggestProjectColor } from '@/mocks/store';
-import type { Attachment } from '@/mocks/types';
+import { useSchedule } from '@/queries/schedule';
+import { useToday } from '@/queries/use-today';
+import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
-import type { ProjectColorKey } from '@/theme/colors';
+import { projectColorOrder, type ProjectColorKey } from '@/theme/colors';
 
 const KIND_ICON: Record<Attachment['kind'], (p: IconProps) => React.ReactNode> = { link: IconLink, file: IconFile, image: IconImage };
 
 /**
  * 프로젝트 등록 1/3: 기본 정보 (Figma 02-b-i) + 프로젝트 색(사용자 결정 I — Figma에 없음).
- * 참고자료는 앱에서 고르고 목록으로 보여주는 데까지만 구현했다 — AI로 보내는 것은 백엔드 연동 때(사용자 결정 F).
+ * 참고자료는 고르는 즉시 서버에 올리고(형식·10MB·사진 위치정보는 서버가 검사), 등록할 때 id로 연결한다.
+ * AI에게 첨부 내용을 보내는 것은 아직이다(사용자 결정 F — 이번엔 앱·저장까지).
  */
 export default function NewProjectScreen() {
   const router = useRouter();
   const toast = useToast();
   const { colors, radius } = useAppTheme();
-  const { state, dispatch, today } = useMockStore();
+  const { dispatch } = useDraft();
+  const today = useToday();
+  const usedColors = useSchedule().data?.projects.map((p) => p.color);
   const [name, setName] = useState('');
   const [deadline, setDeadline] = useState('');
   const [description, setDescription] = useState('');
-  const [color, setColor] = useState<ProjectColorKey>(() => suggestProjectColor(state));
+  const [picked, setPicked] = useState<ProjectColorKey | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [linkOpen, setLinkOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // 기본 색: 진행중 프로젝트가 아직 쓰지 않은 색 — 사용자가 고르면 그 색
+  const used = usedColors ?? [];
+  const color = picked ?? projectColorOrder.find((c) => !used.includes(c)) ?? projectColorOrder[used.length % projectColorOrder.length];
 
   function next() {
     const result = projectBasicSchema.safeParse({ name, description, deadline });
@@ -47,32 +56,45 @@ export default function NewProjectScreen() {
       setErrors(fieldErrors(result.error));
       return;
     }
-    dispatch({ type: 'startDraft', ...result.data, color, attachments });
+    dispatch({ type: 'start', ...result.data, color, attachments });
     router.push('/project/new/chat');
   }
 
-  const add = (a: Omit<Attachment, 'id'>) => setAttachments((list) => [...list, { id: createId('at'), ...a }]);
-
-  async function pickFile() {
+  /** 서버에 올린 뒤 목록에 추가 — 실패하면 서버가 알려 준 이유(형식·크기)를 보여준다 */
+  async function upload(run: () => Promise<Attachment>) {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-      if (result.canceled) return;
-      const [asset] = result.assets;
-      add({ kind: 'file', name: asset.name, uri: asset.uri });
-    } catch {
-      toast('파일을 불러오지 못했어요');
+      const saved = await run();
+      setAttachments((list) => [...list, saved]);
+    } catch (e) {
+      toast(errorMessage(e));
     }
   }
 
+  async function pickFile() {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true }).catch(() => null);
+    if (!result || result.canceled) return;
+    const [asset] = result.assets;
+    await upload(() => uploadAttachment({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType }));
+  }
+
   async function pickImage() {
+    // 시스템 사진 선택기라 권한이 필요 없다. HEIC는 호환 형식(JPEG)으로 받는다 — 서버가 JPEG의 위치정보(EXIF)를 지운다(§3-9).
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      exif: false,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    }).catch(() => null);
+    if (!result || result.canceled) return;
+    const [asset] = result.assets;
+    await upload(() => uploadAttachment({ uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType }));
+  }
+
+  async function remove(a: Attachment) {
     try {
-      // 시스템 사진 선택기를 쓰므로 권한이 필요 없다. 위치 등 EXIF는 받지 않는다(§3-9).
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], exif: false });
-      if (result.canceled) return;
-      const [asset] = result.assets;
-      add({ kind: 'image', name: asset.fileName ?? '사진', uri: asset.uri });
-    } catch {
-      toast('사진을 불러오지 못했어요');
+      await deleteAttachment(a.id);
+      setAttachments((list) => list.filter((x) => x.id !== a.id));
+    } catch (e) {
+      toast(errorMessage(e));
     }
   }
 
@@ -95,9 +117,9 @@ export default function NewProjectScreen() {
         linkOpen ? (
           <LinkSheet
             onClose={() => setLinkOpen(false)}
-            onAdd={(url) => {
-              add({ kind: 'link', name: url, uri: url });
+            onAdd={async (url) => {
               setLinkOpen(false);
+              await upload(() => addLink(url));
             }}
           />
         ) : null
@@ -127,7 +149,11 @@ export default function NewProjectScreen() {
         <AppText variant="fieldLabel" tone="soft">
           색
         </AppText>
-        <ColorPicker label="프로젝트 색" value={color} onChange={setColor} />
+        <ColorPicker
+          label="프로젝트 색"
+          value={color}
+          onChange={setPicked}
+        />
       </View>
       <View style={styles.group}>
         <AppText variant="fieldLabel" tone="soft">
@@ -153,7 +179,7 @@ export default function NewProjectScreen() {
                   <AppText variant="small" numberOfLines={1} style={styles.flex}>
                     {a.name}
                   </AppText>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${a.name} 첨부 삭제`} onPress={() => setAttachments((list) => list.filter((x) => x.id !== a.id))} style={styles.remove}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${a.name} 첨부 삭제`} onPress={() => remove(a)} style={styles.remove}>
                     <IconTrash size={16} color={colors.inkSoft} />
                   </Pressable>
                 </View>

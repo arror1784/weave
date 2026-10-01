@@ -11,12 +11,18 @@ import { ColorPicker } from '@/components/ColorPicker';
 import { DDay } from '@/components/DDay';
 import { Gantt } from '@/components/Gantt';
 import { IconArrowDep, IconChat } from '@/components/icons';
+import { LoadError, Loading } from '@/components/QueryStatus';
 import { Screen } from '@/components/Screen';
+import { useToast } from '@/components/Toast';
 import { TopBar } from '@/components/TopBar';
 import { dDayLabel } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectGanttRange, selectProjectSummary } from '@/mocks/store';
+import { errorMessage } from '@/api/errors';
+import { ApiError } from '@/api/client';
+import { selectGanttRange } from '@/lib/schedule';
+import { useProject, useUpdateProject } from '@/queries/projects';
+import { useToday } from '@/queries/use-today';
+import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 
@@ -31,22 +37,28 @@ export default function ProjectDetailScreen() {
   const router = useRouter();
   const { colors, radius } = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, dispatch, today } = useMockStore();
+  const toast = useToast();
+  const today = useToday();
+  const query = useProject(Number(id));
+  const updateProject = useUpdateProject();
+  const toggle = useToggleTask(() => query.data?.name ?? '');
   const [tab, setTab] = useState<Tab>('tasks');
   const [colorOpen, setColorOpen] = useState(false);
-  const project = state.projects.find((p) => p.id === id);
+  const project = query.data;
 
   if (!project) {
+    const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
       <Screen header={<TopBar title="" onBack={() => router.back()} />} contentStyle={styles.pad}>
-        <AppText>프로젝트를 찾을 수 없어요.</AppText>
+        {query.isPending ? <Loading /> : notFound ? <AppText>프로젝트를 찾을 수 없어요.</AppText> : <LoadError error={query.error} onRetry={() => query.refetch()} />}
       </Screen>
     );
   }
 
   const palette = projectPaletteFor(project.color);
-  const tasks = state.tasks.filter((t) => t.projectId === project.id);
-  const summary = selectProjectSummary(state, project.id, today);
+  const tasks = project.tasks;
+  const doneCount = tasks.filter((t) => t.done).length;
+  const summary = { done: doneCount, total: tasks.length, percent: tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0 };
 
   return (
     <Screen
@@ -101,8 +113,8 @@ export default function ProjectDetailScreen() {
               label="프로젝트 색 목록"
               value={project.color}
               onChange={(color) => {
-                dispatch({ type: 'setProjectColor', projectId: project.id, color });
                 setColorOpen(false);
+                updateProject.mutate({ id: project.id, changes: { color } }, { onError: (e) => toast(errorMessage(e)) });
               }}
             />
           </BottomSheet>
@@ -112,11 +124,11 @@ export default function ProjectDetailScreen() {
         <>
           <View style={styles.list}>
             {tasks.map((t) => {
-              const dep = tasks.find((x) => x.id === t.dependsOn);
+              const dep = tasks.find((x) => x.id === t.dependsOnId);
               const blocked = dep && !dep.done;
               return (
                 <View key={t.id} style={[styles.taskRow, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.card }]}>
-                  <Checkbox checked={t.done} onToggle={() => dispatch({ type: 'toggleTask', taskId: t.id })} label={`${t.title} 완료`} color={palette.dot} />
+                  <Checkbox checked={t.done} onToggle={() => toggle(t)} label={`${t.title} 완료`} color={palette.dot} />
                   <View accessible accessibilityLabel={`${t.title}, ${t.estimatedHours ?? 0}시간${dep ? `, 선행 ${dep.title}${blocked ? ' 필요' : ''}` : ''}`} style={styles.taskBody}>
                     <View style={styles.flex}>
                       <View style={styles.inline}>
