@@ -23,6 +23,8 @@ dependencies {
 
     implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.security)
+    // 자체 발급 JWT(HS256) 검증 — Bearer 헤더 인증
+    implementation(libs.spring.boot.starter.security.oauth2.resource.server)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.flyway)
@@ -31,6 +33,10 @@ dependencies {
     implementation(libs.jackson.module.kotlin)
     implementation(libs.kotlin.reflect)
     implementation(libs.springdoc.openapi.webmvc.ui)
+    // Claude API 공식 SDK (client/ClaudeClient에서만 사용)
+    implementation(libs.anthropic.java)
+    // 업로드 사진의 위치정보(GPS) 확인 — HEIC처럼 직접 지우기 어려운 형식에 사용
+    implementation(libs.metadata.extractor)
     runtimeOnly(libs.postgresql)
     developmentOnly(libs.spring.boot.docker.compose)
 
