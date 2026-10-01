@@ -25,7 +25,7 @@ describe('프로젝트 완료 모달', () => {
 
   it('아직이라고 하면 방금 체크한 마지막 작업의 체크를 풀고(완료 취소) 닫는다 — 다시 체크하면 또 묻는다', async () => {
     api.setTaskDone.mockResolvedValueOnce({
-      task: { id: 105, projectId: 1, title: '발표자료 제작', estimatedHours: 2, dependsOnId: null, scheduledDate: null, spanDays: 1, dueDate: null, done: false, prerequisite: false, delayedFrom: null },
+      task: { id: 105, projectId: 1, title: '발표자료 제작', description: '', estimatedHours: 2, dependsOnId: null, scheduledDate: null, spanDays: 1, dueDate: null, done: false, prerequisite: false, delayedFrom: null },
       projectAllDone: false,
     });
     await renderWithProviders(<ProjectCompleteDialog />, { completion: pending });

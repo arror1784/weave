@@ -1,23 +1,27 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Footer } from '@/components/Footer';
-import { IconArrowDep, IconPlus, IconTrash } from '@/components/icons';
+import { IconArrowDep, IconPlus, IconSparkle, IconTrash } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
 import { useToast } from '@/components/Toast';
+import { sendChat, type ChatTurn } from '@/api/chat';
 import { errorMessage } from '@/api/errors';
 import { formatHours, withParticle } from '@/lib/korean';
 import { useCreateProject } from '@/queries/projects';
-import { newKey } from '@/state/draft';
+import { formatShortDate } from '@/lib/date';
+import { assistantTurn, chatProject, newKey, toChatTasks } from '@/state/draft';
 import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
 /**
- * 프로젝트 등록 3/3: AI가 제안한 작업 검토 (Figma 02-b-iii) — 이름·시간 수정, 삭제, 선행 연결, 직접 추가.
+ * 프로젝트 등록 3/3: AI가 제안한 작업 검토 (Figma 02-b-iii) — 이름·시간 수정, 삭제, 선행 연결, 직접 추가, 세부 설명 보기.
+ * 직접 고친 목록을 "AI에게 다시 정리 요청"으로 보내 다시 제안받을 수 있다. "등록 완료"가 확정(사용자 결정 2026-10-01).
  * 작업을 고칠 수 있는 곳은 여기뿐이다 — 등록한 뒤에는 고칠 수 없다(사용자 결정 B).
  */
 export default function ReviewScreen() {
@@ -26,6 +30,8 @@ export default function ReviewScreen() {
   const { colors, radius, typography } = useAppTheme();
   const { draft, dispatch } = useDraft();
   const create = useCreateProject();
+  const [open, setOpen] = useState<string[]>([]);
+  const [revising, setRevising] = useState(false);
 
   if (!draft) {
     return (
@@ -41,8 +47,10 @@ export default function ReviewScreen() {
   function confirm() {
     const d = draft!;
     // 서버가 임시 일정 알고리즘으로 작업 날짜를 배정한다(backend Scheduler)
+    // 작업 마감일은 서버가 역산한다 — AI가 준 마감일(aiDueDate)은 참고용이라 보내지 않는다(사용자 결정)
+    const tasks = d.tasks.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite }));
     create.mutate(
-      { name: d.name, description: d.description, deadline: d.deadline, color: d.color, tasks: d.tasks, attachmentIds: d.attachments.map((a) => a.id) },
+      { name: d.name, description: d.description, deadline: d.deadline, color: d.color, tasks, attachmentIds: d.attachments.map((a) => a.id) },
       {
         onSuccess: ({ project, lateCount }) => {
           toast(`${withParticle(d.name, '이', '가')} 등록됐어요${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
@@ -53,6 +61,23 @@ export default function ReviewScreen() {
         onError: (e) => toast(errorMessage(e)),
       },
     );
+  }
+
+  /** 직접 고친 목록을 지금까지의 대화와 함께 AI에게 보내 다시 정리받는다 */
+  async function revise() {
+    const d = draft!;
+    const history: ChatTurn[] = [...d.chat, { role: 'user', text: '', tasks: toChatTasks(d.tasks) }];
+    setRevising(true);
+    try {
+      const r = await sendChat(chatProject(d), history, d.attachments.map((a) => a.id));
+      dispatch({ type: 'setChat', chat: [...history, assistantTurn(r)] });
+      if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
+      toast(r.message);
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setRevising(false);
+    }
   }
 
   return (
@@ -125,12 +150,34 @@ export default function ReviewScreen() {
                   </Pressable>
                 ) : null}
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${n}번 작업 설명 ${open.includes(t.key) ? '접기' : '보기'}`}
+                onPress={() => setOpen((o) => (o.includes(t.key) ? o.filter((k) => k !== t.key) : [...o, t.key]))}
+                style={styles.more}>
+                <AppText variant="caption" color={colors.thread}>
+                  {open.includes(t.key) ? '설명 접기' : '설명 보기'}
+                </AppText>
+              </Pressable>
+              {open.includes(t.key) ? (
+                <View style={styles.detail}>
+                  <AppText variant="small" tone="soft">
+                    {t.description || '설명이 없어요.'}
+                  </AppText>
+                  {t.aiDueDate ? (
+                    <AppText variant="caption" tone="soft">
+                      {`AI 제안 마감 ${formatShortDate(t.aiDueDate)} (참고)`}
+                    </AppText>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           );
         })}
       </View>
 
       <Button label="작업 직접 추가" variant="dashed" onPress={() => dispatch({ type: 'addTask', key: newKey('k') })} icon={(c) => <IconPlus size={16} color={c} />} />
+      <Button label="AI에게 다시 정리 요청" variant="soft" onPress={revise} disabled={revising || tasks.length === 0} icon={(c) => <IconSparkle size={16} color={c} />} />
     </Screen>
   );
 }
@@ -151,4 +198,6 @@ const styles = StyleSheet.create({
   preTag: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4 },
   depButton: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, maxWidth: '55%', minHeight: 36 },
   depText: { flexShrink: 1 },
+  more: { alignSelf: 'flex-start', paddingLeft: 26, minHeight: 32, justifyContent: 'center' },
+  detail: { paddingLeft: 26, gap: 4 },
 });

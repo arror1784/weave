@@ -14,6 +14,7 @@ export function sampleSchedule(today: DateKey): Schedule {
     done: false,
     prerequisite: false,
     delayedFrom: null,
+    description: '',
     ...t,
   });
   const projects: Project[] = [

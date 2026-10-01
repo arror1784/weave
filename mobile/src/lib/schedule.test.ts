@@ -16,6 +16,7 @@ const task = (t: Partial<Task> & { id: number }): Task => ({
   done: false,
   prerequisite: false,
   delayedFrom: null,
+  description: '',
   ...t,
 });
 

@@ -55,6 +55,13 @@ describe('프로젝트 상세', () => {
     await waitFor(() => expect(completionRef.current).toEqual({ projectId: 1, name: '임베디드시스템 과제', taskId: 105 }));
   });
 
+  it('작업을 누르면 세부 설명을 펼쳐 보여준다', async () => {
+    api.getProject.mockResolvedValue({ ...embedded(), tasks: embedded().tasks.map((t) => (t.id === 102 ? { ...t, description: '블록도와 시퀀스 다이어그램' } : t)) });
+    await renderWithProviders(<ProjectDetailScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: /^설계 문서 작성, 3시간/ }));
+    expect(screen.getByText('블록도와 시퀀스 다이어그램')).toBeOnTheScreen();
+  });
+
   it('등록된 작업은 고칠 수 없다: 작업 수정·작업 추가가 없다 (완료 체크만 가능)', async () => {
     await renderWithProviders(<ProjectDetailScreen />);
     await screen.findByRole('header', { name: '임베디드시스템 과제' });

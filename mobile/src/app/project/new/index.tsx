@@ -42,6 +42,8 @@ export default function NewProjectScreen() {
   const [name, setName] = useState('');
   const [deadline, setDeadline] = useState('');
   const [description, setDescription] = useState('');
+  const [deliverable, setDeliverable] = useState('');
+  const [progress, setProgress] = useState('');
   const [picked, setPicked] = useState<ProjectColorKey | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -51,7 +53,7 @@ export default function NewProjectScreen() {
   const color = picked ?? projectColorOrder.find((c) => !used.includes(c)) ?? projectColorOrder[used.length % projectColorOrder.length];
 
   function next() {
-    const result = projectBasicSchema.safeParse({ name, description, deadline });
+    const result = projectBasicSchema.safeParse({ name, description, deadline, deliverable, progress });
     if (!result.success) {
       setErrors(fieldErrors(result.error));
       return;
@@ -145,6 +147,9 @@ export default function NewProjectScreen() {
         }
       />
       <TextField label="설명 · 목표" placeholder="무엇을, 누구와, 어디까지 하는지 적어 주세요" value={description} onChangeText={setDescription} multiline />
+      {/* AI 프롬프트의 시작 데이터 — 비워 두면 챗봇이 묻는다 (사용자 결정 2026-10-01, Figma에 없음) */}
+      <TextField label="결과물 형태" placeholder="예: 보고서, 발표자료, 앱" value={deliverable} onChangeText={setDeliverable} />
+      <TextField label="기 진행사항" placeholder="이미 해 둔 작업이 있다면 적어 주세요" value={progress} onChangeText={setProgress} multiline />
       <View style={styles.group}>
         <AppText variant="fieldLabel" tone="soft">
           색
