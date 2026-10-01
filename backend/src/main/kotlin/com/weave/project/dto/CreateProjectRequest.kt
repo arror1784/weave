@@ -29,7 +29,7 @@ data class CreateProjectRequest(
     val attachmentIds: List<Long> = emptyList(),
 ) {
     companion object {
-        /** 프로젝트 색 8가지 — 앱 src/theme/colors.ts와 같다 */
-        const val COLOR_PATTERN = "teal|magenta|violet|gray|blue|green|amber|brown"
+        /** 프로젝트 색 7가지(회색은 뺐다 — 사용자 결정 2026-10-01) — 앱 src/theme/colors.ts와 같다 */
+        const val COLOR_PATTERN = "teal|magenta|violet|blue|green|amber|brown"
     }
 }

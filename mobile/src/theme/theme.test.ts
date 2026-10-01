@@ -1,6 +1,6 @@
 import { contrastRatio } from '@/lib/contrast';
 
-import { colors, projectPalettes, projectPaletteFor } from './colors';
+import { colors, projectColorOrder, projectPalettes, projectPaletteFor } from './colors';
 
 // Figma(Weave Make 디자인) 토큰 기준. 대비가 모자란 색은 글자용 변형(…Text)을 따로 둔다 — §5.2-5.
 describe('명도 대비 (§5.2-5)', () => {
@@ -43,6 +43,11 @@ describe('명도 대비 (§5.2-5)', () => {
 });
 
 describe('projectPaletteFor', () => {
+  it('프로젝트 색은 7가지 — 회색은 뺐다 (사용자 결정 2026-10-01)', () => {
+    expect(projectColorOrder).toEqual(['teal', 'magenta', 'violet', 'blue', 'green', 'amber', 'brown']);
+    expect(projectPalettes).toHaveLength(7);
+  });
+
   it('프로젝트에 지정된 색 키로 팔레트를 고른다', () => {
     expect(projectPaletteFor('magenta').dot).toBe('#b23a7a');
   });

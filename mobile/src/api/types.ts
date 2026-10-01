@@ -3,7 +3,7 @@ import { z } from 'zod';
 // 서버 응답은 경계에서 Zod로 검증한다(mobile/CLAUDE.md §2-5). 모양은 백엔드 DTO와 같다(camelCase).
 
 const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'gray', 'blue', 'green', 'amber', 'brown']);
+export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'blue', 'green', 'amber', 'brown']);
 
 export const userSchema = z.object({ id: z.number(), email: z.string(), dailyAvailableHours: z.number() });
 export const tokenSchema = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), user: userSchema });

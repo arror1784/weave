@@ -176,6 +176,8 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
             valid + ("name" to " "),
             valid + ("tasks" to emptyList<Any>()),
             valid + ("color" to "red"),
+            // 회색은 뺐다(사용자 결정 2026-10-01)
+            valid + ("color" to "gray"),
             valid + ("tasks" to listOf(task("a", "t", 1.0, dependsOn = "zzz"))),
             valid + ("deadline" to "10월 9일"),
             valid + ("tasks" to listOf(task("a", "t", 0.0))),
@@ -234,6 +236,7 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
             }
         }
         patch(mapOf("color" to "blue")).andExpect { status { isOk() }; jsonPath("$.color") { value("blue") } }
+        patch(mapOf("color" to "gray")).andExpect { status { isBadRequest() } }
         patch(mapOf("status" to "done")).andExpect { status { isOk() }; jsonPath("$.status") { value("done") } }
         patch(mapOf("status" to "active")).andExpect { status { isBadRequest() } }
     }
