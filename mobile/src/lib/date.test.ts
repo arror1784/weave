@@ -1,4 +1,4 @@
-import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, toDateKey, todayKey, weekDays, weekdayLabel } from './date';
+import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, startOfMonthShift, toDateKey, todayKey, weekDays, weekdayLabel } from './date';
 
 describe('date', () => {
   it('Date를 로컬 기준 YYYY-MM-DD 키로 바꾼다', () => {
@@ -49,5 +49,12 @@ describe('date', () => {
     expect(todayKey(new Date(2026, 9, 1, 5, 59))).toBe('2026-09-30');
     expect(todayKey(new Date(2026, 9, 1, 6, 0))).toBe('2026-10-01');
     expect(todayKey(new Date(2026, 9, 1, 23, 59))).toBe('2026-10-01');
+  });
+
+  it('달 이동: 그 달 1일을 기준으로 앞뒤 달의 1일을 준다 (연도 넘어감 포함)', () => {
+    expect(startOfMonthShift('2026-09-30', 1)).toBe('2026-10-01');
+    expect(startOfMonthShift('2026-12-15', 1)).toBe('2027-01-01');
+    expect(startOfMonthShift('2026-01-31', -1)).toBe('2025-12-01');
+    expect(startOfMonthShift('2026-09-30', 0)).toBe('2026-09-01');
   });
 });
