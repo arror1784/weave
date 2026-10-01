@@ -22,4 +22,8 @@ data class ChatProjectInfo(
     /** 기 진행사항 (이미 해 둔 작업) */
     @field:Size(max = 2000)
     val progress: String = "",
+
+    /** "AI에게 재요청"일 때 이미 끝낸 작업 제목 — 다시 제안하지 않도록 알린다. 새 등록이면 비어 있다 */
+    @field:Size(max = 60)
+    val completedTasks: List<@Size(max = 200) String> = emptyList(),
 )

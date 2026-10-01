@@ -12,11 +12,13 @@ data class ProjectDetailResponse(
     val deadline: LocalDate?,
     val status: String,
     val color: String,
+    val deliverable: String,
+    val progress: String,
     val tasks: List<TaskResponse>,
     val attachments: List<AttachmentResponse>,
 ) {
     companion object {
         fun of(p: Project, tasks: List<Task>, attachments: List<AttachmentResponse>) =
-            ProjectDetailResponse(p.id!!, p.name, p.description, p.deadline, p.status, p.color, tasks.map(TaskResponse::of), attachments)
+            ProjectDetailResponse(p.id!!, p.name, p.description, p.deadline, p.status, p.color, p.deliverable, p.progress, tasks.map(TaskResponse::of), attachments)
     }
 }

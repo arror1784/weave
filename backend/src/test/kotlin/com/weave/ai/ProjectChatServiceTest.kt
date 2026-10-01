@@ -131,4 +131,13 @@ class ProjectChatServiceTest : FunSpec({
         system shouldContain "propose_tasks"
         system shouldContain "6시간"
     }
+
+    test("재요청: 이미 끝낸 작업을 소개에 알려 다시 제안하지 않게 한다 — 새 프로젝트 등록이 아니라고 밝힌다") {
+        val turns = slot<List<AiTurn>>()
+        every { ai.converse(any(), capture(turns), any(), any()) } returns AiResult("남은 일정은요?", null)
+        service.chat(1L, ProjectChatRequest(info.copy(completedTasks = listOf("인터럽트 개념 학습", "회로도 검토")), emptyList()))
+        val intro = turns.captured.single().text
+        intro shouldContain "이미 등록한 프로젝트의 남은 작업을 다시 나눌게요."
+        intro shouldContain "이미 끝낸 작업: 인터럽트 개념 학습, 회로도 검토"
+    }
 })

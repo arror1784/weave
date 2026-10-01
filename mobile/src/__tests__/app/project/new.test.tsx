@@ -8,12 +8,13 @@ import { ApiError } from '@/api/client';
 import * as projectsApi from '@/api/projects';
 import type { ProposedTask } from '@/api/types';
 import ChatScreen from '@/app/project/new/chat';
+import { colors } from '@/theme/colors';
 import NewProjectScreen from '@/app/project/new/index';
 import ReviewScreen from '@/app/project/new/review';
 import type { Draft } from '@/state/draft';
 import { sampleSchedule } from '@/test-utils/fixtures';
 import { draftRef, renderWithProviders, TEST_TODAY } from '@/test-utils/render';
-import { mockRouter, resetRouterMock } from '@/test-utils/router';
+import { mockParams, mockRouter, resetRouterMock } from '@/test-utils/router';
 
 jest.mock('@/api/projects');
 jest.mock('@/api/attachments');
@@ -140,6 +141,8 @@ describe('등록 1/3 기본 정보', () => {
     expect(attachments.uploadAttachment).toHaveBeenCalledTimes(2);
     await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
     expect(await screen.findByText('올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.')).toBeOnTheScreen();
+    // 오류 알림은 완료 알림(검은 바탕·체크)과 구분된다
+    expect(screen.getByTestId('toast')).toHaveStyle({ backgroundColor: colors.dangerText });
 
     await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
@@ -327,7 +330,7 @@ describe('등록 3/3 작업 검토', () => {
 
   it('등록 완료하면 서버에 초안(작업·색·첨부 id)을 보내고, 알림 후 새 프로젝트 상세로 간다', async () => {
     const s = sampleSchedule(TEST_TODAY);
-    projects.createProject.mockResolvedValueOnce({ project: { ...s.projects[0], id: 9, tasks: [], attachments: [] }, lateCount: 1 });
+    projects.createProject.mockResolvedValueOnce({ project: { ...s.projects[0], id: 9, deliverable: '', progress: '', tasks: [], attachments: [] }, lateCount: 1 });
     await renderWithProviders(<ReviewScreen />, { draft: { ...withTasks, attachments: [{ id: 21, kind: 'file', name: 'spec.pdf' }] } });
     await fireEvent.press(screen.getByRole('button', { name: '등록 완료' }));
     expect(projects.createProject).toHaveBeenCalledWith({
@@ -335,6 +338,8 @@ describe('등록 3/3 작업 검토', () => {
       description: 'STM32',
       deadline: '2026-10-09',
       color: 'violet',
+      deliverable: '보고서',
+      progress: '',
       tasks: proposed.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite })),
       attachmentIds: [21],
     });
@@ -352,5 +357,66 @@ describe('등록 3/3 작업 검토', () => {
     expect(await screen.findByText('입력값을 확인해 주세요.')).toBeOnTheScreen();
     expect(mockRouter.navigate).not.toHaveBeenCalled();
     expect(draftRef.current?.tasks).toHaveLength(4);
+  });
+});
+
+describe('AI에게 재요청 (사용자 결정 2026-10-02 — 기존 프로젝트의 미완료 작업을 다시 나눈다)', () => {
+  const s = sampleSchedule(TEST_TODAY);
+  const existing = {
+    ...s.projects[0],
+    id: 1,
+    name: '임베디드AC과제 중간발표',
+    description: '중간발표와 결과물 제출',
+    deadline: '2026-10-11',
+    color: 'blue' as const,
+    deliverable: '발표자료, 보고서v2, 시연 영상',
+    progress: '주제발표 진행',
+    tasks: [
+      { ...s.tasks[0], id: 101, projectId: 1, title: '주제발표 자료 정리', done: true },
+      { ...s.tasks[1], id: 102, projectId: 1, title: '시연 영상 촬영', done: false },
+    ],
+    attachments: [{ id: 31, kind: 'file' as const, name: '주제발표-보고서-v1.pdf' }],
+  };
+
+  it('기본 정보·색·첨부를 기존 프로젝트에서 채워 두고, 다음을 누르면 초안에 프로젝트 id와 끝낸 작업을 담는다', async () => {
+    mockParams.current = { projectId: '1' };
+    projects.getProject.mockResolvedValue(existing);
+    await renderWithProviders(<NewProjectScreen />);
+    expect(await screen.findByDisplayValue('임베디드AC과제 중간발표')).toBeOnTheScreen();
+    expect(projects.getProject).toHaveBeenCalledWith(1);
+    expect(screen.getByDisplayValue('중간발표와 결과물 제출')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('발표자료, 보고서v2, 시연 영상')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('주제발표 진행')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '마감일, 10월 11일 일요일' })).toBeOnTheScreen();
+    expect(screen.getByText('주제발표-보고서-v1.pdf')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    expect(draftRef.current).toMatchObject({
+      projectId: 1,
+      completedTasks: ['주제발표 자료 정리'],
+      name: '임베디드AC과제 중간발표',
+      deadline: '2026-10-11',
+      color: 'blue',
+      deliverable: '발표자료, 보고서v2, 시연 영상',
+      progress: '주제발표 진행',
+      attachments: [{ id: 31 }],
+    });
+    expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
+  });
+
+  it('챗봇에 끝낸 작업을 함께 보내 다시 제안하지 않게 한다', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '남은 기간은요?' });
+    await renderWithProviders(<ChatScreen />, { draft: { ...draft, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
+    expect(await screen.findByText('남은 기간은요?')).toBeOnTheScreen();
+    expect(chat.sendChat).toHaveBeenCalledWith(expect.objectContaining({ completedTasks: ['주제발표 자료 정리'] }), [], []);
+  });
+
+  it('등록 완료하면 새로 만들지 않고 기존 프로젝트의 작업을 바꾼 뒤 그 프로젝트 상세로 간다', async () => {
+    projects.replaceProjectTasks.mockResolvedValueOnce({ project: existing, lateCount: 0 });
+    await renderWithProviders(<ReviewScreen />, { draft: { ...draft, tasks: draftTasks, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
+    await fireEvent.press(screen.getByRole('button', { name: '등록 완료' }));
+    expect(projects.createProject).not.toHaveBeenCalled();
+    expect(projects.replaceProjectTasks).toHaveBeenCalledWith(1, expect.objectContaining({ name: '임베디드시스템 과제', deliverable: '보고서', tasks: expect.any(Array), attachmentIds: [] }));
+    expect(await screen.findByText('임베디드시스템 과제의 작업을 다시 나눴어요')).toBeOnTheScreen();
+    expect(mockRouter.navigate).toHaveBeenCalledWith('/projects/1', { withAnchor: true });
   });
 });

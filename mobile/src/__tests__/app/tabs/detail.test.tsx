@@ -18,7 +18,7 @@ const attachments = jest.mocked(attachmentsApi);
 
 function embedded(): ProjectDetail {
   const s = sampleSchedule(TEST_TODAY);
-  return { ...s.projects[0], tasks: s.tasks.filter((t) => t.projectId === 1), attachments: [] };
+  return { ...s.projects[0], deliverable: '', progress: '', tasks: s.tasks.filter((t) => t.projectId === 1), attachments: [] };
 }
 
 beforeEach(() => {
@@ -80,10 +80,17 @@ describe('프로젝트 상세', () => {
     expect(screen.queryByLabelText('프로젝트 색')).toBeNull();
   });
 
-  it('AI에게 재요청하면 등록 흐름으로 간다', async () => {
+  it('AI에게 재요청하면 이 프로젝트의 정보를 가지고 등록 흐름으로 간다 (사용자 결정 2026-10-02)', async () => {
     await renderWithProviders(<ProjectDetailScreen />);
     await fireEvent.press(await screen.findByRole('button', { name: 'AI에게 재요청' }));
-    expect(mockRouter.push).toHaveBeenCalledWith('/project/new');
+    expect(mockRouter.push).toHaveBeenCalledWith('/project/new?projectId=1');
+  });
+
+  it('완료한 프로젝트에는 AI에게 재요청 버튼이 없다 (완료한 프로젝트는 되돌리지 않는다)', async () => {
+    api.getProject.mockResolvedValue({ ...embedded(), status: 'done' });
+    await renderWithProviders(<ProjectDetailScreen />);
+    expect(await screen.findByRole('header', { name: '임베디드시스템 과제' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'AI에게 재요청' })).toBeNull();
   });
 
   it('일정 탭: 간트 막대와 밀린 작업이 뒤 작업에 주는 영향을 알려준다', async () => {

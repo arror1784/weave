@@ -49,7 +49,13 @@ export const attachmentSchema = z.object({
   size: z.number().optional(),
 });
 
-export const projectDetailSchema = projectBriefSchema.extend({ tasks: z.array(taskSchema), attachments: z.array(attachmentSchema) });
+export const projectDetailSchema = projectBriefSchema.extend({
+  /** 결과물 형태·기 진행사항 — "AI에게 재요청" 때 다시 채운다. 2026-10-02 전에 등록한 프로젝트는 빈 값 */
+  deliverable: z.string().default(''),
+  progress: z.string().default(''),
+  tasks: z.array(taskSchema),
+  attachments: z.array(attachmentSchema),
+});
 export const createProjectResponseSchema = z.object({ project: projectDetailSchema, lateCount: z.number() });
 
 export const projectSummarySchema = projectBriefSchema.extend({

@@ -66,7 +66,7 @@ export default function ProjectDetailScreen() {
       if (a.kind === 'link' && a.url) await Linking.openURL(a.url);
       else await downloadAttachment(a);
     } catch (e) {
-      toast(errorMessage(e));
+      toast(errorMessage(e), 'error');
     }
   }
 
@@ -82,7 +82,7 @@ export default function ProjectDetailScreen() {
               router.back();
               toast(`${withParticle(target.name, '을', '를')} 삭제했어요`);
             },
-            onError: (e) => toast(errorMessage(e)),
+            onError: (e) => toast(errorMessage(e), 'error'),
           }),
       },
     ]);
@@ -147,7 +147,7 @@ export default function ProjectDetailScreen() {
               value={project.color}
               onChange={(color) => {
                 setColorOpen(false);
-                updateProject.mutate({ id: project.id, changes: { color } }, { onError: (e) => toast(errorMessage(e)) });
+                updateProject.mutate({ id: project.id, changes: { color } }, { onError: (e) => toast(errorMessage(e), 'error') });
               }}
             />
           </BottomSheet>
@@ -193,7 +193,10 @@ export default function ProjectDetailScreen() {
               );
             })}
           </View>
-          <Button label="AI에게 재요청" variant="soft" onPress={() => router.push('/project/new')} icon={(c) => <IconChat size={16} color={c} />} />
+          {/* 재요청은 기본 정보를 채운 등록 흐름으로 — 확정하면 이 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02). 완료한 프로젝트는 되돌리지 않으므로 없다 */}
+          {project.status === 'active' ? (
+            <Button label="AI에게 재요청" variant="soft" onPress={() => router.push(`/project/new?projectId=${project.id}`)} icon={(c) => <IconChat size={16} color={c} />} />
+          ) : null}
           {project.attachments.length > 0 ? (
             <View style={styles.attachments}>
               <AppText variant="label">참고자료</AppText>

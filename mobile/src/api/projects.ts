@@ -14,6 +14,8 @@ export type NewProject = {
   description: string;
   deadline: string | null;
   color: Project['color'];
+  deliverable: string;
+  progress: string;
   tasks: { key: string; title: string; estimatedHours: number; dependsOnKey: string | null; prerequisite: boolean }[];
   attachmentIds: number[];
 };
@@ -31,6 +33,10 @@ export const getProject = (id: number) => request(`/api/v1/projects/${id}`, proj
 
 /** 등록 — 서버가 임시 일정 알고리즘으로 작업 날짜를 정한다 */
 export const createProject = (project: NewProject) => request('/api/v1/projects', createProjectResponseSchema, { method: 'POST', body: project });
+
+/** "AI에게 재요청" 확정 — 기본 정보와 미완료 작업을 바꾼다(완료한 작업은 서버가 남긴다) */
+export const replaceProjectTasks = (id: number, project: NewProject) =>
+  request(`/api/v1/projects/${id}`, createProjectResponseSchema, { method: 'PUT', body: project });
 
 export const updateProject = (id: number, changes: { color?: Project['color']; status?: 'done' }) =>
   request(`/api/v1/projects/${id}`, projectDetailSchema, { method: 'PATCH', body: changes });

@@ -7,6 +7,7 @@ import com.weave.global.web.PageResponse
 import com.weave.project.domain.Project
 import com.weave.project.domain.Task
 import com.weave.project.dto.CreateProjectRequest
+import com.weave.project.dto.CreateTaskRequest
 import com.weave.project.dto.CreateProjectResponse
 import com.weave.project.dto.ProjectDetailResponse
 import com.weave.project.dto.ProjectSummaryResponse
@@ -43,18 +44,52 @@ class ProjectService(
         overdueRoller.roll(userId)
         val today = todayProvider.today()
 
-        val project = projectRepository.save(Project(userId, request.name.trim(), request.description.trim(), request.deadline, request.color))
-        val saved = request.tasks.mapIndexed { i, t ->
-            t.key to taskRepository.save(Task(project.id!!, i, t.title.trim(), t.description.trim(), t.estimatedHours, null, 1, null, t.prerequisite))
-        }.toMap()
-        request.tasks.forEach { t -> t.dependsOnKey?.let { saved.getValue(t.key).dependsOnId = saved.getValue(it).id } }
+        val project = projectRepository.save(Project(userId, request.name.trim(), request.description.trim(), request.deadline, request.color, request.deliverable.trim(), request.progress.trim()))
+        val saved = saveTasks(project.id!!, request.tasks, firstPosition = 0)
 
         val placements = replanner.replan(userId, today, user.dailyAvailableHours, includeDelayed = false)
         attachmentLinker.link(userId, request.attachmentIds, project.id!!)
 
-        val tasks = saved.values.sortedBy { it.position }
+        val tasks = saved.sortedBy { it.position }
         val lateCount = tasks.count { placements[it.id!!]?.late == true }
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(project.id!!)), lateCount)
+    }
+
+    /**
+     * "AI에게 재요청" 확정(사용자 결정 2026-10-02): 기본 정보를 바꾸고, 완료한 작업은 남긴 채 미완료 작업만 새 작업으로 바꾼다.
+     * 첨부는 요청 목록대로 맞추고(새 첨부 연결·뺀 첨부 삭제), 등록 때처럼 진행중 프로젝트 전체를 오늘부터 다시 배치한다.
+     * 완료한 프로젝트는 되돌리지 않으므로(사용자 결정) 재요청할 수 없다.
+     */
+    @Transactional
+    fun replaceTasks(userId: Long, projectId: Long, request: CreateProjectRequest): CreateProjectResponse {
+        validateTasks(request)
+        val project = owned(userId, projectId)
+        if (project.status == Project.DONE) throw ApiException(HttpStatus.CONFLICT, "PROJECT_DONE", "완료한 프로젝트는 다시 나눌 수 없어요.")
+        val user = userService.find(userId)
+        overdueRoller.roll(userId)
+        val today = todayProvider.today()
+
+        project.updateInfo(request.name.trim(), request.description.trim(), request.deadline, request.color, request.deliverable.trim(), request.progress.trim())
+        val (kept, removed) = taskRepository.findByProjectIdOrderByPosition(projectId).partition { it.done }
+        val removedIds = removed.map { it.id!! }.toSet()
+        kept.filter { it.dependsOnId in removedIds }.forEach { it.dependsOnId = null }
+        taskRepository.deleteAll(removed)
+        val saved = saveTasks(projectId, request.tasks, firstPosition = (kept.maxOfOrNull { it.position } ?: -1) + 1)
+        attachmentLinker.sync(userId, request.attachmentIds, projectId)
+
+        val placements = replanner.replan(userId, today, user.dailyAvailableHours, includeDelayed = false)
+        val tasks = (kept + saved).sortedBy { it.position }
+        val lateCount = saved.count { placements[it.id!!]?.late == true }
+        return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(projectId)), lateCount)
+    }
+
+    /** 작업을 저장하고 선행 작업을 key로 잇는다 — id는 저장 후에야 생기므로 두 번에 나눈다 */
+    private fun saveTasks(projectId: Long, requests: List<CreateTaskRequest>, firstPosition: Int): List<Task> {
+        val saved = requests.mapIndexed { i, t ->
+            t.key to taskRepository.save(Task(projectId, firstPosition + i, t.title.trim(), t.description.trim(), t.estimatedHours, null, 1, null, t.prerequisite))
+        }.toMap()
+        requests.forEach { t -> t.dependsOnKey?.let { saved.getValue(t.key).dependsOnId = saved.getValue(it).id } }
+        return saved.values.toList()
     }
 
     @Transactional(readOnly = true)
