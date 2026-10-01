@@ -12,7 +12,7 @@ import { useToast } from '@/components/Toast';
 import { sendChat, type ChatTurn } from '@/api/chat';
 import { errorMessage } from '@/api/errors';
 import { formatHours, withParticle } from '@/lib/korean';
-import { useCreateProject } from '@/queries/projects';
+import { useCreateProject, useReplaceProjectTasks } from '@/queries/projects';
 import { formatShortDate } from '@/lib/date';
 import { assistantTurn, canMoveTask, chatProject, newKey, toChatTasks } from '@/state/draft';
 import { useDraft } from '@/state/DraftProvider';
@@ -31,6 +31,7 @@ export default function ReviewScreen() {
   const { colors, radius, typography } = useAppTheme();
   const { draft, dispatch } = useDraft();
   const create = useCreateProject();
+  const replace = useReplaceProjectTasks(draft?.projectId);
   const [open, setOpen] = useState<string[]>([]);
   const [revising, setRevising] = useState(false);
 
@@ -50,16 +51,21 @@ export default function ReviewScreen() {
     // 서버가 임시 일정 알고리즘으로 작업 날짜를 배정한다(backend Scheduler)
     // 작업 마감일은 서버가 역산한다 — AI가 준 마감일(aiDueDate)은 참고용이라 보내지 않는다(사용자 결정)
     const tasks = d.tasks.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite }));
-    create.mutate(
-      { name: d.name, description: d.description, deadline: d.deadline, color: d.color, tasks, attachmentIds: d.attachments.map((a) => a.id) },
+    const body = { name: d.name, description: d.description, deadline: d.deadline, color: d.color, deliverable: d.deliverable, progress: d.progress, tasks, attachmentIds: d.attachments.map((a) => a.id) };
+    // 재요청이면 새로 만들지 않고 기존 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02)
+    const replanning = d.projectId !== undefined;
+    const save = replanning ? replace : create;
+    save.mutate(
+      body,
       {
         onSuccess: ({ project, lateCount }) => {
-          toast(`${withParticle(d.name, '이', '가')} 등록됐어요${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
+          const done = replanning ? `${d.name}의 작업을 다시 나눴어요` : `${withParticle(d.name, '이', '가')} 등록됐어요`;
+          toast(`${done}${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
           router.dismissAll();
           router.navigate(`/projects/${project.id}`, { withAnchor: true });
           dispatch({ type: 'reset' });
         },
-        onError: (e) => toast(errorMessage(e)),
+        onError: (e) => toast(errorMessage(e), 'error'),
       },
     );
   }
@@ -75,7 +81,7 @@ export default function ReviewScreen() {
       if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
       toast(r.message);
     } catch (e) {
-      toast(errorMessage(e));
+      toast(errorMessage(e), 'error');
     } finally {
       setRevising(false);
     }
@@ -86,7 +92,7 @@ export default function ReviewScreen() {
       header={<StepHeader step={3} title="작업 검토" onBack={() => router.back()} />}
       footer={
         <Footer>
-          <Button label="등록 완료" onPress={confirm} disabled={create.isPending} />
+          <Button label="등록 완료" onPress={confirm} disabled={create.isPending || replace.isPending} />
         </Footer>
       }
       contentStyle={styles.content}>
@@ -112,7 +118,10 @@ export default function ReviewScreen() {
                 <TextInput
                   accessibilityLabel={`${n}번 작업 이름`}
                   value={t.title}
-                  onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title } })}
+                  // 긴 이름도 전부 보이게 줄바꿈한다(사용자 결정 2026-10-01). 엔터는 줄을 바꾸지 않고 입력을 마친다
+                  multiline
+                  submitBehavior="blurAndSubmit"
+                  onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title: title.replace(/\n/g, ' ') } })}
                   style={[typography.body, styles.nameInput, { color: colors.ink }]}
                 />
                 {([-1, 1] as const).map((offset) => {

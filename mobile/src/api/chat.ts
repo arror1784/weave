@@ -5,7 +5,15 @@ import { chatResponseSchema } from './types';
 export type ChatTask = { title: string; description: string; estimatedHours: number; dependsOnTitle: string | null; prerequisite: boolean };
 /** assumptions는 화면 표시용 — 서버로는 보내지 않는다 */
 export type ChatTurn = { role: 'user' | 'assistant'; text: string; tasks?: ChatTask[]; assumptions?: string[] };
-export type ChatProject = { name: string; description: string; deadline: string | null; deliverable: string; progress: string };
+export type ChatProject = {
+  name: string;
+  description: string;
+  deadline: string | null;
+  deliverable: string;
+  progress: string;
+  /** "AI에게 재요청"일 때 이미 끝낸 작업 제목 */
+  completedTasks?: string[];
+};
 
 /**
  * 등록 2단계 AI 챗봇 — 서버가 Claude API를 부른다(앱은 AI API를 직접 부르지 않는다, §3-11).

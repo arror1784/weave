@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { addLink, deleteAttachment, uploadAttachment } from '@/api/attachments';
@@ -11,14 +11,16 @@ import { AppText } from '@/components/AppText';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { ColorPicker } from '@/components/ColorPicker';
+import { DateField, DatePickerSheet } from '@/components/DatePicker';
 import { Footer } from '@/components/Footer';
 import { IconFile, IconImage, IconLink, IconTrash, type IconProps } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
 import { TextField } from '@/components/TextField';
 import { useToast } from '@/components/Toast';
-import { dDayLabel } from '@/lib/date';
-import { fieldErrors, isValidDateKey, linkSchema, projectBasicSchema } from '@/lib/validation';
+import { dDayLabel, type DateKey } from '@/lib/date';
+import { fieldErrors, linkSchema, projectBasicSchema } from '@/lib/validation';
+import { useProject } from '@/queries/projects';
 import { useSchedule } from '@/queries/schedule';
 import { useToday } from '@/queries/use-today';
 import { useDraft } from '@/state/DraftProvider';
@@ -40,25 +42,42 @@ export default function NewProjectScreen() {
   const today = useToday();
   const usedColors = useSchedule().data?.projects.map((p) => p.color);
   const [name, setName] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState<DateKey | null>(null);
   const [description, setDescription] = useState('');
   const [deliverable, setDeliverable] = useState('');
   const [progress, setProgress] = useState('');
   const [picked, setPicked] = useState<ProjectColorKey | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // "AI에게 재요청"(사용자 결정 2026-10-02): 기존 프로젝트의 기본 정보·색·첨부를 채워 두고, 확정하면 그 프로젝트의 미완료 작업을 바꾼다
+  const projectId = Number(useLocalSearchParams<{ projectId?: string }>().projectId);
+  const existing = useProject(projectId).data;
+  const filled = useRef(false);
+  useEffect(() => {
+    if (!existing || filled.current) return;
+    filled.current = true;
+    setName(existing.name);
+    setDeadline(existing.deadline);
+    setDescription(existing.description);
+    setDeliverable(existing.deliverable);
+    setProgress(existing.progress);
+    setPicked(existing.color);
+    setAttachments(existing.attachments);
+  }, [existing]);
   // 기본 색: 진행중 프로젝트가 아직 쓰지 않은 색 — 사용자가 고르면 그 색
   const used = usedColors ?? [];
   const color = picked ?? projectColorOrder.find((c) => !used.includes(c)) ?? projectColorOrder[used.length % projectColorOrder.length];
 
   function next() {
-    const result = projectBasicSchema.safeParse({ name, description, deadline, deliverable, progress });
+    const result = projectBasicSchema.safeParse({ name, description, deadline: deadline ?? '', deliverable, progress });
     if (!result.success) {
       setErrors(fieldErrors(result.error));
       return;
     }
-    dispatch({ type: 'start', ...result.data, color, attachments });
+    const replan = existing ? { projectId: existing.id, completedTasks: existing.tasks.filter((t) => t.done).map((t) => t.title) } : {};
+    dispatch({ type: 'start', ...result.data, color, attachments, ...replan });
     router.push('/project/new/chat');
   }
 
@@ -68,7 +87,7 @@ export default function NewProjectScreen() {
       const saved = await run();
       setAttachments((list) => [...list, saved]);
     } catch (e) {
-      toast(errorMessage(e));
+      toast(errorMessage(e), 'error');
     }
   }
 
@@ -96,7 +115,7 @@ export default function NewProjectScreen() {
       await deleteAttachment(a.id);
       setAttachments((list) => list.filter((x) => x.id !== a.id));
     } catch (e) {
-      toast(errorMessage(e));
+      toast(errorMessage(e), 'error');
     }
   }
 
@@ -124,20 +143,34 @@ export default function NewProjectScreen() {
               await upload(() => addLink(url));
             }}
           />
+        ) : dateOpen ? (
+          <DatePickerSheet
+            title="마감일"
+            value={deadline}
+            min={today}
+            onSelect={(d) => {
+              setDeadline(d);
+              setDateOpen(false);
+            }}
+            clearLabel="마감 없음 (상시)"
+            onClear={() => {
+              setDeadline(null);
+              setDateOpen(false);
+            }}
+            onClose={() => setDateOpen(false)}
+          />
         ) : null
       }
       contentStyle={styles.content}>
       <TextField label="프로젝트명" placeholder="예: 임베디드시스템 과제" value={name} onChangeText={setName} error={errors.name} />
-      <TextField
+      {/* 마감일은 달력에서 고른다(사용자 결정 2026-10-01 — Figma는 날짜 입력칸). 비우면 마감 없음(상시) */}
+      <DateField
         label="마감일"
-        placeholder="2026-10-09"
         value={deadline}
-        onChangeText={setDeadline}
-        error={errors.deadline}
-        keyboardType="numbers-and-punctuation"
-        mono
+        emptyText="선택 안 함 (상시)"
+        onPress={() => setDateOpen(true)}
         accessory={
-          isValidDateKey(deadline) ? (
+          deadline ? (
             <View style={[styles.dday, { backgroundColor: colors.threadSoft }]}>
               <AppText variant="monoBold" color={colors.thread}>
                 {dDayLabel(deadline, today)}

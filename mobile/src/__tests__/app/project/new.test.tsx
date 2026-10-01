@@ -8,12 +8,13 @@ import { ApiError } from '@/api/client';
 import * as projectsApi from '@/api/projects';
 import type { ProposedTask } from '@/api/types';
 import ChatScreen from '@/app/project/new/chat';
+import { colors } from '@/theme/colors';
 import NewProjectScreen from '@/app/project/new/index';
 import ReviewScreen from '@/app/project/new/review';
 import type { Draft } from '@/state/draft';
 import { sampleSchedule } from '@/test-utils/fixtures';
 import { draftRef, renderWithProviders, TEST_TODAY } from '@/test-utils/render';
-import { mockRouter, resetRouterMock } from '@/test-utils/router';
+import { mockParams, mockRouter, resetRouterMock } from '@/test-utils/router';
 
 jest.mock('@/api/projects');
 jest.mock('@/api/attachments');
@@ -28,7 +29,7 @@ beforeEach(() => {
   projects.getSchedule.mockResolvedValue(sampleSchedule(TEST_TODAY));
 });
 
-const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '', color: 'gray', attachments: [], chat: [], tasks: [] };
+const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '', color: 'violet', attachments: [], chat: [], tasks: [] };
 const proposed: ProposedTask[] = [
   { key: 'k1', title: '관련 개념 학습 (인터럽트)', description: 'NVIC·EXTI 개념 정리, 예제 1개 실행', estimatedHours: 2, dependsOnKey: null, prerequisite: true, aiDueDate: '2026-10-03' },
   { key: 'k2', title: '설계 문서 작성', description: '블록도와 시퀀스', estimatedHours: 3, dependsOnKey: 'k1', prerequisite: false, aiDueDate: '2026-10-05' },
@@ -41,23 +42,29 @@ describe('등록 1/3 기본 정보', () => {
   it('단계 표시와 입력칸을 보여준다', async () => {
     await renderWithProviders(<NewProjectScreen />);
     expect(screen.getByText('1 / 3')).toBeOnTheScreen();
-    for (const label of ['프로젝트명', '마감일', '설명 · 목표', '결과물 형태', '기 진행사항']) expect(screen.getByLabelText(label)).toBeOnTheScreen();
+    for (const label of ['프로젝트명', '설명 · 목표', '결과물 형태', '기 진행사항']) expect(screen.getByLabelText(label)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' })).toBeOnTheScreen();
   });
 
-  it('프로젝트명이 없거나 마감일 형식이 틀리면 다음으로 가지 않는다', async () => {
+  it('프로젝트명이 없으면 다음으로 가지 않는다', async () => {
     await renderWithProviders(<NewProjectScreen />);
-    await fireEvent.changeText(screen.getByLabelText('마감일'), '10월 9일');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
     expect(screen.getByText('프로젝트명을 입력해 주세요.')).toBeOnTheScreen();
-    expect(screen.getByText('2026-10-09처럼 입력해 주세요.')).toBeOnTheScreen();
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  it('마감일을 입력하면 D-day를 보여주고, 다음을 누르면 초안을 만들고 챗봇으로 간다', async () => {
+  it('마감일은 달력에서 고른다 — 고르면 D-day를 보여주고, 다음을 누르면 초안을 만들고 챗봇으로 간다 (사용자 결정 2026-10-01)', async () => {
     await renderWithProviders(<NewProjectScreen />);
     await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '임베디드시스템 과제');
-    await fireEvent.changeText(screen.getByLabelText('마감일'), '2026-10-09');
-    expect(await screen.findByText('D-9')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' }));
+    // 오늘(9/30)이 있는 달부터 열린다
+    expect(screen.getByRole('header', { name: '2026년 9월' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '다음 달' }));
+    expect(screen.getByRole('header', { name: '2026년 10월' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '10월 9일 금요일' }));
+    expect(screen.queryByRole('header', { name: '2026년 10월' })).toBeNull();
+    expect(screen.getByRole('button', { name: '마감일, 10월 9일 금요일' })).toBeOnTheScreen();
+    expect(screen.getByText('D-9')).toBeOnTheScreen();
     await fireEvent.changeText(screen.getByLabelText('설명 · 목표'), '3인 팀플');
     await fireEvent.changeText(screen.getByLabelText('결과물 형태'), '보고서, 발표자료');
     await fireEvent.changeText(screen.getByLabelText('기 진행사항'), '회로 구성 끝');
@@ -66,14 +73,36 @@ describe('등록 1/3 기본 정보', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
   });
 
+  it('달력: 오늘보다 앞선 날은 고를 수 없고, 이번 달보다 앞으로는 넘기지 않는다', async () => {
+    await renderWithProviders(<NewProjectScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' }));
+    expect(screen.getByRole('button', { name: '9월 29일 화요일' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '9월 30일 수요일, 오늘' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이전 달' })).toBeDisabled();
+  });
+
+  it('고른 마감일을 지우면 마감 없음(상시)으로 등록된다', async () => {
+    await renderWithProviders(<NewProjectScreen />);
+    await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '알고리즘 스터디');
+    await fireEvent.press(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' }));
+    await fireEvent.press(screen.getByRole('button', { name: '9월 30일 수요일, 오늘' }));
+    await fireEvent.press(screen.getByRole('button', { name: '마감일, 9월 30일 수요일' }));
+    await fireEvent.press(screen.getByRole('button', { name: '마감 없음 (상시)' }));
+    expect(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    expect(draftRef.current).toMatchObject({ name: '알고리즘 스터디', deadline: null });
+  });
+
   it('프로젝트 색을 고른다 — 기본은 진행중 프로젝트가 아직 쓰지 않은 색', async () => {
     await renderWithProviders(<NewProjectScreen />);
     const group = screen.getByLabelText('프로젝트 색');
-    await waitFor(() => expect(within(group).getByRole('radio', { name: '회색' })).toBeSelected());
-    await fireEvent.press(within(group).getByRole('radio', { name: '파랑' }));
+    // 진행중 프로젝트가 청록·자홍·보라를 써서 다음 색인 파랑(회색은 뺐다 — 사용자 결정 2026-10-01)
+    await waitFor(() => expect(within(group).getByRole('radio', { name: '파랑' })).toBeSelected());
+    expect(within(group).queryByRole('radio', { name: '회색' })).toBeNull();
+    await fireEvent.press(within(group).getByRole('radio', { name: '초록' }));
     await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
-    expect(draftRef.current?.color).toBe('blue');
+    expect(draftRef.current?.color).toBe('green');
   });
 
   it('링크 첨부: 형식이 틀리면 오류, 맞으면 서버에 저장하고 목록에 추가, 지우면 서버에서도 지운다', async () => {
@@ -102,7 +131,7 @@ describe('등록 1/3 기본 정보', () => {
     attachments.uploadAttachment
       .mockResolvedValueOnce({ id: 21, kind: 'file', name: '명세서.pdf', contentType: 'application/pdf', size: 10 })
       .mockResolvedValueOnce({ id: 22, kind: 'image', name: 'capture.jpg', contentType: 'image/jpeg', size: 10 })
-      .mockRejectedValueOnce(new ApiError(400, 'UNSUPPORTED_FILE', 'PDF·이미지·Office·한글·txt 파일만 올릴 수 있어요.'));
+      .mockRejectedValueOnce(new ApiError(400, 'UNSUPPORTED_FILE', '올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.'));
     await renderWithProviders(<NewProjectScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
     await fireEvent.press(screen.getByRole('button', { name: '캡처 첨부' }));
@@ -111,7 +140,9 @@ describe('등록 1/3 기본 정보', () => {
     expect(await screen.findByText('capture.jpg')).toBeOnTheScreen();
     expect(attachments.uploadAttachment).toHaveBeenCalledTimes(2);
     await fireEvent.press(screen.getByRole('button', { name: '파일 첨부' }));
-    expect(await screen.findByText('PDF·이미지·Office·한글·txt 파일만 올릴 수 있어요.')).toBeOnTheScreen();
+    expect(await screen.findByText('올릴 수 없는 파일 형식이에요. 실행 파일·영상은 받지 않아요.')).toBeOnTheScreen();
+    // 오류 알림은 완료 알림(검은 바탕·체크)과 구분된다
+    expect(screen.getByTestId('toast')).toHaveStyle({ backgroundColor: colors.dangerText });
 
     await fireEvent.changeText(screen.getByLabelText('프로젝트명'), '캡스톤');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
@@ -175,6 +206,47 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/review');
   });
 
+  it('AI가 답을 쓰는 동안 무엇을 하는 중인지 보여주고 입력을 막는다 (사용자 결정 2026-10-01)', async () => {
+    let answer!: (r: { type: 'question'; message: string }) => void;
+    chat.sendChat.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    await renderWithProviders(<ChatScreen />, { draft });
+    // 첫 질문을 기다리는 중
+    expect(await screen.findByText('프로젝트 정보를 읽고 첫 질문을 준비하고 있어요…')).toBeOnTheScreen();
+    expect(screen.getByLabelText('AI가 답을 준비하는 중')).toBeOnTheScreen();
+    expect(screen.getByLabelText('답변 입력')).toHaveProp('editable', false);
+    await act(async () => answer({ type: 'question', message: '팀원은 몇 명인가요?' }));
+    expect(await screen.findByText('팀원은 몇 명인가요?')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('AI가 답을 준비하는 중')).toBeNull();
+    expect(screen.getByLabelText('답변 입력')).toHaveProp('editable', true);
+
+    // 답을 보내면 다시 기다리는 중
+    chat.sendChat.mockReturnValueOnce(new Promise(() => {}));
+    await fireEvent.changeText(screen.getByLabelText('답변 입력'), '3명');
+    await fireEvent.press(screen.getByRole('button', { name: '보내기' }));
+    expect(screen.getByText('답변을 바탕으로 생각하고 있어요…')).toBeOnTheScreen();
+  });
+
+  it('AI 답의 **굵게** 표시를 기호 없이 굵은 글자로 보여준다', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '1. **마감 기한**은 언제인가요?' });
+    await renderWithProviders(<ChatScreen />, { draft });
+    const bold = await screen.findByText('마감 기한');
+    expect(bold).toHaveStyle({ fontFamily: 'Pretendard-Bold' });
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+    expect(screen.getByLabelText('도우미: 1. 마감 기한은 언제인가요?')).toBeOnTheScreen();
+  });
+
+  it('지금 단계를 한 줄로 알려준다 — 질문에 답하는 중', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '팀원은 몇 명인가요?' });
+    await renderWithProviders(<ChatScreen />, { draft });
+    expect(await screen.findByText('팀원은 몇 명인가요?')).toBeOnTheScreen();
+    expect(screen.getByText('질문에 답하면 AI가 작업 목록을 제안해요.')).toBeOnTheScreen();
+  });
+
+  it('지금 단계를 한 줄로 알려준다 — 작업 목록을 받은 뒤', async () => {
+    await renderWithProviders(<ChatScreen />, { draft: { ...draft, chat: [{ role: 'assistant', text: '정리했어요.' }], tasks: draftTasks } });
+    expect(screen.getByText('작업 목록을 받았어요. 고칠 점을 말하거나 검토로 넘어가세요.')).toBeOnTheScreen();
+  });
+
   it('빈 답변은 보낼 수 없고, AI가 응답하지 않으면 다시 시도할 수 있다', async () => {
     chat.sendChat
       .mockRejectedValueOnce(new ApiError(503, 'AI_UNAVAILABLE', 'AI가 잠시 응답하지 않아요. 다시 시도해 주세요.'))
@@ -196,6 +268,13 @@ describe('등록 3/3 작업 검토', () => {
     expect(screen.getByText('총 11h')).toBeOnTheScreen();
     expect(screen.getByText('선행 학습')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: '선행 연결 해제: 관련 개념 학습 완료 후' })).toBeOnTheScreen();
+  });
+
+  it('작업 이름은 길어도 줄바꿈해서 전부 보인다 (사용자 결정 2026-10-01)', async () => {
+    await renderWithProviders(<ReviewScreen />, { draft: withTasks });
+    const name = screen.getByLabelText('1번 작업 이름');
+    expect(name.props.multiline).toBe(true);
+    expect(name.props.numberOfLines).toBeUndefined();
   });
 
   it('작업을 누르면 세부 설명과 AI가 역산한 마감일(참고)을 펼쳐 보여준다', async () => {
@@ -251,14 +330,16 @@ describe('등록 3/3 작업 검토', () => {
 
   it('등록 완료하면 서버에 초안(작업·색·첨부 id)을 보내고, 알림 후 새 프로젝트 상세로 간다', async () => {
     const s = sampleSchedule(TEST_TODAY);
-    projects.createProject.mockResolvedValueOnce({ project: { ...s.projects[0], id: 9, tasks: [], attachments: [] }, lateCount: 1 });
+    projects.createProject.mockResolvedValueOnce({ project: { ...s.projects[0], id: 9, deliverable: '', progress: '', tasks: [], attachments: [] }, lateCount: 1 });
     await renderWithProviders(<ReviewScreen />, { draft: { ...withTasks, attachments: [{ id: 21, kind: 'file', name: 'spec.pdf' }] } });
     await fireEvent.press(screen.getByRole('button', { name: '등록 완료' }));
     expect(projects.createProject).toHaveBeenCalledWith({
       name: '임베디드시스템 과제',
       description: 'STM32',
       deadline: '2026-10-09',
-      color: 'gray',
+      color: 'violet',
+      deliverable: '보고서',
+      progress: '',
       tasks: proposed.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite })),
       attachmentIds: [21],
     });
@@ -276,5 +357,66 @@ describe('등록 3/3 작업 검토', () => {
     expect(await screen.findByText('입력값을 확인해 주세요.')).toBeOnTheScreen();
     expect(mockRouter.navigate).not.toHaveBeenCalled();
     expect(draftRef.current?.tasks).toHaveLength(4);
+  });
+});
+
+describe('AI에게 재요청 (사용자 결정 2026-10-02 — 기존 프로젝트의 미완료 작업을 다시 나눈다)', () => {
+  const s = sampleSchedule(TEST_TODAY);
+  const existing = {
+    ...s.projects[0],
+    id: 1,
+    name: '임베디드AC과제 중간발표',
+    description: '중간발표와 결과물 제출',
+    deadline: '2026-10-11',
+    color: 'blue' as const,
+    deliverable: '발표자료, 보고서v2, 시연 영상',
+    progress: '주제발표 진행',
+    tasks: [
+      { ...s.tasks[0], id: 101, projectId: 1, title: '주제발표 자료 정리', done: true },
+      { ...s.tasks[1], id: 102, projectId: 1, title: '시연 영상 촬영', done: false },
+    ],
+    attachments: [{ id: 31, kind: 'file' as const, name: '주제발표-보고서-v1.pdf' }],
+  };
+
+  it('기본 정보·색·첨부를 기존 프로젝트에서 채워 두고, 다음을 누르면 초안에 프로젝트 id와 끝낸 작업을 담는다', async () => {
+    mockParams.current = { projectId: '1' };
+    projects.getProject.mockResolvedValue(existing);
+    await renderWithProviders(<NewProjectScreen />);
+    expect(await screen.findByDisplayValue('임베디드AC과제 중간발표')).toBeOnTheScreen();
+    expect(projects.getProject).toHaveBeenCalledWith(1);
+    expect(screen.getByDisplayValue('중간발표와 결과물 제출')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('발표자료, 보고서v2, 시연 영상')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('주제발표 진행')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '마감일, 10월 11일 일요일' })).toBeOnTheScreen();
+    expect(screen.getByText('주제발표-보고서-v1.pdf')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    expect(draftRef.current).toMatchObject({
+      projectId: 1,
+      completedTasks: ['주제발표 자료 정리'],
+      name: '임베디드AC과제 중간발표',
+      deadline: '2026-10-11',
+      color: 'blue',
+      deliverable: '발표자료, 보고서v2, 시연 영상',
+      progress: '주제발표 진행',
+      attachments: [{ id: 31 }],
+    });
+    expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
+  });
+
+  it('챗봇에 끝낸 작업을 함께 보내 다시 제안하지 않게 한다', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '남은 기간은요?' });
+    await renderWithProviders(<ChatScreen />, { draft: { ...draft, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
+    expect(await screen.findByText('남은 기간은요?')).toBeOnTheScreen();
+    expect(chat.sendChat).toHaveBeenCalledWith(expect.objectContaining({ completedTasks: ['주제발표 자료 정리'] }), [], []);
+  });
+
+  it('등록 완료하면 새로 만들지 않고 기존 프로젝트의 작업을 바꾼 뒤 그 프로젝트 상세로 간다', async () => {
+    projects.replaceProjectTasks.mockResolvedValueOnce({ project: existing, lateCount: 0 });
+    await renderWithProviders(<ReviewScreen />, { draft: { ...draft, tasks: draftTasks, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
+    await fireEvent.press(screen.getByRole('button', { name: '등록 완료' }));
+    expect(projects.createProject).not.toHaveBeenCalled();
+    expect(projects.replaceProjectTasks).toHaveBeenCalledWith(1, expect.objectContaining({ name: '임베디드시스템 과제', deliverable: '보고서', tasks: expect.any(Array), attachmentIds: [] }));
+    expect(await screen.findByText('임베디드시스템 과제의 작업을 다시 나눴어요')).toBeOnTheScreen();
+    expect(mockRouter.navigate).toHaveBeenCalledWith('/projects/1', { withAnchor: true });
   });
 });

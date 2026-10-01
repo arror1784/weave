@@ -13,7 +13,7 @@ beforeEach(() => jest.clearAllMocks());
 
 describe('프로젝트 완료 모달', () => {
   it('마지막 작업을 끝낸 프로젝트가 있으면 완료 여부를 묻고, 완료하면 서버에 완료로 바꾼다', async () => {
-    api.updateProject.mockResolvedValueOnce({ id: 1, name: '임베디드시스템 과제', description: '', deadline: null, status: 'done', color: 'teal', tasks: [], attachments: [] });
+    api.updateProject.mockResolvedValueOnce({ id: 1, name: '임베디드시스템 과제', description: '', deadline: null, status: 'done', color: 'teal', deliverable: '', progress: '', tasks: [], attachments: [] });
     await renderWithProviders(<ProjectCompleteDialog />, { completion: pending });
     expect(screen.getByRole('header', { name: '프로젝트가 완료되었습니까?' })).toBeOnTheScreen();
     expect(screen.getByText('임베디드시스템 과제의 작업을 모두 끝냈어요.')).toBeOnTheScreen();

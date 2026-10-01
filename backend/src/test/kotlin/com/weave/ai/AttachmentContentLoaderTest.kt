@@ -11,6 +11,8 @@ import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.apache.poi.hslf.usermodel.HSLFSlideShow
+import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -71,6 +73,40 @@ class AttachmentContentLoaderTest(private val mockMvc: MockMvc, objectMapper: Ob
         loaded[2].shouldBeInstanceOf<AiAttachment.Text>().text shouldBe "UART는 알고 인터럽트는 처음"
         loaded[3].shouldBeInstanceOf<AiAttachment.Text>().text shouldContain "보고서와 발표자료를 맡는다"
         loaded[4].shouldBeInstanceOf<AiAttachment.Text>().text shouldContain "https://example.com/spec"
+    }
+
+    test("넓힌 형식: md·코드는 글자로, gif·webp는 사진으로, 옛 Office(xls·ppt)는 글자를 뽑아서, zip·음성은 볼 수 없다고 알린다") {
+        val tokens = api.signup("l-${UUID.randomUUID()}@example.com")
+        val userId = tokens["user"]["id"].asLong()
+        val xls = HSSFWorkbook().use { wb ->
+            wb.createSheet("일정").createRow(0).createCell(0).setCellValue("중간발표 10월 9일")
+            ByteArrayOutputStream().also(wb::write).toByteArray()
+        }
+        val ppt = HSLFSlideShow().use { show ->
+            show.createSlide().addTitle().setText("최종 발표 목차")
+            ByteArrayOutputStream().also(show::write).toByteArray()
+        }
+        val ids = listOf(
+            upload(tokens, "회의록.md", "# 역할\n- 발표: 나".toByteArray()),
+            upload(tokens, "Main.kt", "fun main() = println(1)".toByteArray()),
+            upload(tokens, "움짤.gif", TestImages.gif()),
+            upload(tokens, "사진.webp", TestImages.webpWithExif()),
+            upload(tokens, "표.xls", xls),
+            upload(tokens, "발표.ppt", ppt),
+            upload(tokens, "소스.zip", byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0, 0)),
+            upload(tokens, "녹음.mp3", "ID3".toByteArray() + byteArrayOf(4, 0, 0)),
+        )
+
+        val loaded = loader.load(userId, ids)
+
+        loaded[0].shouldBeInstanceOf<AiAttachment.Text>().text shouldBe "# 역할\n- 발표: 나"
+        loaded[1].shouldBeInstanceOf<AiAttachment.Text>().text shouldBe "fun main() = println(1)"
+        loaded[2].shouldBeInstanceOf<AiAttachment.Image>().mediaType shouldBe "image/gif"
+        loaded[3].shouldBeInstanceOf<AiAttachment.Image>().mediaType shouldBe "image/webp"
+        loaded[4].shouldBeInstanceOf<AiAttachment.Text>().text shouldContain "중간발표 10월 9일"
+        loaded[5].shouldBeInstanceOf<AiAttachment.Text>().text shouldContain "최종 발표 목차"
+        loaded[6].shouldBeInstanceOf<AiAttachment.Text>().text shouldBe "(압축 파일은 AI가 볼 수 없어요)"
+        loaded[7].shouldBeInstanceOf<AiAttachment.Text>().text shouldBe "(음성 파일은 AI가 들을 수 없어요)"
     }
 
     test("남의 첨부 id는 넣지 않는다") {

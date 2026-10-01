@@ -8,8 +8,11 @@ import { attachmentSchema, type Attachment } from './types';
 /** 파일·사진 올리기 (서버가 형식·10MB·사진 위치정보를 검사) */
 export function uploadAttachment(file: { uri: string; name: string; mimeType?: string | null }) {
   const form = new FormData();
-  // React Native의 FormData는 { uri, name, type } 객체로 파일을 보낸다
-  form.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/octet-stream' } as unknown as Blob);
+  // Expo의 fetch(SDK 57이 전역 fetch를 바꿔 둔다)는 React Native식 { uri } 파일을 보내지 못한다 —
+  // "Unsupported FormDataPart implementation"으로 요청 전에 실패했다. 파일 내용은 bytes()로 읽어 보낸다.
+  // 이름은 기기 캐시 경로가 아닌 원래 파일 이름을 쓴다.
+  const part = { name: file.name, type: file.mimeType ?? 'application/octet-stream', bytes: () => new File(file.uri).bytes() };
+  form.append('file', part as unknown as Blob);
   return request('/api/v1/attachments', attachmentSchema, { method: 'POST', form });
 }
 

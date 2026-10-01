@@ -26,7 +26,7 @@ export function TodayWidget({ data, colors }: { data: TodayWidgetData; colors: C
           </FlexWidget>
         ) : null}
       </FlexWidget>
-      {data.tasks.length === 0 ? <TextWidget text="오늘 남은 일이 없어요" style={{ fontSize: 13, color: colors.inkSoft as HexColor }} /> : null}
+      {data.tasks.length === 0 ? <TextWidget text={data.emptyText} style={{ fontSize: 13, color: colors.inkSoft as HexColor }} /> : null}
       {data.tasks.map((t) => (
         <FlexWidget key={t.title} style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', flexGap: 8 }}>
           <FlexWidget style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: t.color as HexColor }} />

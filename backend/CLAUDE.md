@@ -17,7 +17,7 @@
 | Spring Security OAuth2 Resource Server | 7.1 (Boot 관리) | 서버가 직접 발급한 JWT(HS256) 검증 — 스타터 이름은 `spring-boot-starter-security-oauth2-resource-server` |
 | anthropic-java | 2.66.0 | Claude API 공식 SDK — `client/ClaudeClient`에서만 |
 | metadata-extractor | 2.21.0 | HEIC 사진의 위치정보(GPS) 확인용. JPEG·PNG 메타데이터는 직접 지운다(commons-imaging은 정식 버전이 없어 안 씀) |
-| poi-ooxml · hwplib · hwpxlib | 5.5.1 · 1.1.11 · 1.0.9 | 첨부를 AI에게 보낼 때 Office·한글에서 글자 뽑기(`ai/service/AttachmentContentLoader`). hwpxlib는 파일 경로로만 읽어서 임시 파일을 거친다 |
+| poi-ooxml · poi-scratchpad · hwplib · hwpxlib | 5.5.1 · 5.5.1 · 1.1.11 · 1.0.9 | 첨부를 AI에게 보낼 때 Office(옛 doc·ppt는 scratchpad)·한글에서 글자 뽑기(`ai/service/AttachmentContentLoader`). hwpxlib는 파일 경로로만 읽어서 임시 파일을 거친다 |
 
 ⚠ 인터넷의 옛 예제(Boot 2·3)를 복사할 때 주의: `javax.*` → `jakarta.*`, Jackson 2 → 3, `spring-boot-starter-web` → **`spring-boot-starter-webmvc`**, `@AutoConfigureMockMvc`는 `org.springframework.boot.webmvc.test.autoconfigure` 패키지, Testcontainers 2는 `org.testcontainers.postgresql.PostgreSQLContainer`, Flyway는 **`spring-boot-starter-flyway` + `flyway-database-postgresql`** 둘 다 필요.
 ⚠ `developmentOnly`는 `implementation`의 BOM을 상속하지 않는다 — 새 설정에 의존성을 넣을 땐 `springBootBom` 플랫폼도 같이 건다(`build.gradle.kts`).
@@ -57,7 +57,7 @@ backend/
     ├── main/resources/
     │   ├── application.yml
     │   │                                # AI 시스템 프롬프트는 여기 두지 않는다 — 빌드할 때 ../docs/Weave — AI 작업 분할 시스템 프롬프트.md를 prompts/project-breakdown.md로 복사(build.gradle.kts)
-    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description · V6 tasks.day_hours(날짜별 배정 시간)
+    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description · V6 tasks.day_hours(날짜별 배정 시간) · V7 회색 프로젝트 색 제거(회색 → 청록)
     └── test/kotlin/com/weave/           # main과 같은 패키지 구조
         ├── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용
         └── support/ApiTestSupport.kt       # 가입 후 토큰 받기·JSON 헬퍼 (통합 테스트는 @ActiveProfiles("test") — src/test/resources/application-test.yml)
@@ -92,4 +92,5 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /a
 - Jackson 3의 `JsonNode.map(...)`은 코틀린 컬렉션 `map`이 아니다(노드 자체를 변환) — 테스트에서 배열을 돌 땐 `asIterable().map`.
 - PostgreSQL은 준비된 문장 하나에 SQL 두 개를 못 넣는다 — `@Modifying` 네이티브 쿼리는 문장마다 메서드를 나눈다.
 - `@Email`은 앞뒤 공백이 있으면 실패한다 — 앱이 trim해서 보낸다.
+- 앱(Expo fetch)이 업로드 파일 이름을 퍼센트 인코딩해 보내고, 폰은 한글을 자모 분해(NFD)해서 준다 — `AttachmentService.displayName`이 되돌리고 합친다(NFC).
 - 요청 횟수 제한은 지금 없다(사용자 결정 — 배포 때 다시 고려). 넣을 때는 서버가 여러 대일 수 있으니 공유 저장소 기준으로, 통합 테스트는 모두 같은 IP라는 점을 고려한다.

@@ -3,7 +3,7 @@ import { z } from 'zod';
 // 서버 응답은 경계에서 Zod로 검증한다(mobile/CLAUDE.md §2-5). 모양은 백엔드 DTO와 같다(camelCase).
 
 const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'gray', 'blue', 'green', 'amber', 'brown']);
+export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'blue', 'green', 'amber', 'brown']);
 
 export const userSchema = z.object({ id: z.number(), email: z.string(), dailyAvailableHours: z.number() });
 export const tokenSchema = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), user: userSchema });
@@ -49,7 +49,13 @@ export const attachmentSchema = z.object({
   size: z.number().optional(),
 });
 
-export const projectDetailSchema = projectBriefSchema.extend({ tasks: z.array(taskSchema), attachments: z.array(attachmentSchema) });
+export const projectDetailSchema = projectBriefSchema.extend({
+  /** 결과물 형태·기 진행사항 — "AI에게 재요청" 때 다시 채운다. 2026-10-02 전에 등록한 프로젝트는 빈 값 */
+  deliverable: z.string().default(''),
+  progress: z.string().default(''),
+  tasks: z.array(taskSchema),
+  attachments: z.array(attachmentSchema),
+});
 export const createProjectResponseSchema = z.object({ project: projectDetailSchema, lateCount: z.number() });
 
 export const projectSummarySchema = projectBriefSchema.extend({

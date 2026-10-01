@@ -34,7 +34,7 @@ export default function SettingsScreen() {
 
   function saveHours(value: number) {
     const rounded = Math.round(value * 2) / 2;
-    updateHours.mutate(rounded, { onError: (e) => toast(errorMessage(e)), onSettled: () => setDragging(null) });
+    updateHours.mutate(rounded, { onError: (e) => toast(errorMessage(e), 'error'), onSettled: () => setDragging(null) });
   }
 
   /** 작업이 몰렸을 때 사용자가 원하면 다시 배치(사용자 결정 2026-10-01) — 밀린 작업도 포함, 지연 표시는 남는다 */
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
       { text: '취소', style: 'cancel' },
       {
         text: '다시 배치',
-        onPress: () => replan.mutate(undefined, { onSuccess: () => toast('작업을 다시 배치했어요'), onError: (e) => toast(errorMessage(e)) }),
+        onPress: () => replan.mutate(undefined, { onSuccess: () => toast('작업을 다시 배치했어요'), onError: (e) => toast(errorMessage(e), 'error') }),
       },
     ]);
   }
@@ -52,7 +52,7 @@ export default function SettingsScreen() {
     Alert.alert('계정 삭제', '계정과 모든 프로젝트·일정이 삭제돼요. 되돌릴 수 없어요.', [
       { text: '취소', style: 'cancel' },
       // 서버가 개인정보(계정·프로젝트·첨부 파일)를 실제로 지운다(루트 CLAUDE.md §3-17)
-      { text: '삭제', style: 'destructive', onPress: () => auth.deleteAccount().catch((e) => toast(errorMessage(e))) },
+      { text: '삭제', style: 'destructive', onPress: () => auth.deleteAccount().catch((e) => toast(errorMessage(e), 'error')) },
     ]);
   }
 

@@ -81,6 +81,12 @@ export function weekDays(key: DateKey): DateKey[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
+/** 그 달 1일에서 months만큼 옮긴 달의 1일 (달력 이전·다음 달) */
+export function startOfMonthShift(key: DateKey, months: number): DateKey {
+  const date = fromDateKey(key);
+  return toDateKey(new Date(date.getFullYear(), date.getMonth() + months, 1));
+}
+
 /** 월간 달력 칸: 월요일 시작, 그 달이 아닌 칸은 null, 길이는 7의 배수 */
 export function monthGrid(key: DateKey): (DateKey | null)[] {
   const date = fromDateKey(key);

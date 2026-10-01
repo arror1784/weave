@@ -77,6 +77,20 @@ export function selectDayLoad(data: ScheduleData, date: DateKey, { includeOverdu
   return { hours, capacity, over: hours > capacity };
 }
 
+/**
+ * 오늘 작업량(오늘 화면 카드): 오늘 몫 전부(완료 포함) + 아직 서버가 옮기기 전인 밀린 작업, 그중 완료한 시간.
+ * 작업을 다 끝내도 오늘 얼마나 했는지 남긴다 — 과부하는 총량이 가용을 넘을 때(사용자 결정 2026-10-01).
+ */
+export function selectTodayWork(data: ScheduleData, today: DateKey) {
+  const planned = data.tasks.map((t) => ({ hours: taskHoursOn(t, today), done: t.done }));
+  const overdue = data.tasks.filter((t) => isUnmoved(t, today)).map((t) => ({ hours: hoursOf(t), done: false }));
+  const all = [...planned, ...overdue];
+  const total = round(all.reduce((a, x) => a + x.hours, 0));
+  const done = round(all.filter((x) => x.done).reduce((a, x) => a + x.hours, 0));
+  const capacity = data.dailyAvailableHours;
+  return { total, done, remaining: round(total - done), capacity, over: total > capacity };
+}
+
 export type DayItem = { kind: 'task' | 'due'; projectId: number; title: string; hours: number; due: boolean; taskId?: number };
 
 /** 날짜별 항목(달력용): 그날이 기간에 들어가는 작업(하루 몫 시간) + 그날 마감인 프로젝트 */

@@ -26,6 +26,23 @@ class AttachmentLinker(
         found.forEach { it.linkTo(projectId) }
     }
 
+    /**
+     * 재요청 확정 때 프로젝트 첨부를 요청 목록대로 맞춘다: 아직 연결되지 않은 본인 첨부는 연결하고, 목록에서 뺀 첨부는 지운다.
+     * 남의 첨부나 다른 프로젝트의 첨부가 섞여 있으면 400
+     */
+    @Transactional
+    fun sync(userId: Long, ids: List<Long>, projectId: Long) {
+        val wanted = ids.toSet()
+        val found = attachmentRepository.findByIdInAndUserId(wanted, userId)
+        if (found.size != wanted.size || found.any { it.projectId != null && it.projectId != projectId }) {
+            throw ApiException(HttpStatus.BAD_REQUEST, "INVALID_ATTACHMENT", "첨부를 찾을 수 없어요. 다시 올려 주세요.")
+        }
+        found.filter { it.projectId == null }.forEach { it.linkTo(projectId) }
+        val dropped = attachmentRepository.findByProjectIdOrderById(projectId).filter { it.id !in wanted }
+        dropped.mapNotNull { it.storageKey }.forEach(fileStorage::delete)
+        attachmentRepository.deleteAll(dropped)
+    }
+
     /** 프로젝트를 지울 때 그 첨부도 지운다 — 파일은 디스크에서, 행은 소프트 삭제 */
     @Transactional
     fun deleteOfProject(projectId: Long) {

@@ -18,10 +18,25 @@ export type Draft = {
   attachments: Attachment[];
   chat: ChatTurn[];
   tasks: DraftTask[];
+  /** "AI에게 재요청" 중인 기존 프로젝트 — 있으면 등록 완료가 새로 만들지 않고 그 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02) */
+  projectId?: number;
+  /** 재요청 때 이미 끝낸 작업 제목 — AI가 다시 제안하지 않게 알린다 */
+  completedTasks?: string[];
 };
 
 export type DraftAction =
-  | { type: 'start'; name: string; description: string; deadline: DateKey | null; deliverable: string; progress: string; color: Project['color']; attachments: Attachment[] }
+  | {
+      type: 'start';
+      name: string;
+      description: string;
+      deadline: DateKey | null;
+      deliverable: string;
+      progress: string;
+      color: Project['color'];
+      attachments: Attachment[];
+      projectId?: number;
+      completedTasks?: string[];
+    }
   | { type: 'setChat'; chat: ChatTurn[] }
   | { type: 'setTasks'; tasks: DraftTask[] }
   | { type: 'updateTask'; key: string; changes: Partial<Omit<DraftTask, 'key'>> }
@@ -43,6 +58,7 @@ export function draftReducer(draft: Draft | null, action: DraftAction): Draft | 
         attachments: action.attachments,
         chat: [],
         tasks: [],
+        ...(action.projectId !== undefined ? { projectId: action.projectId, completedTasks: action.completedTasks ?? [] } : {}),
       };
     case 'reset':
       return null;
@@ -101,7 +117,8 @@ export function toChatTasks(tasks: DraftTask[]): ChatTask[] {
 
 /** 초안 → 챗봇에 보낼 프로젝트 정보 */
 export function chatProject(d: Draft) {
-  return { name: d.name, description: d.description, deadline: d.deadline, deliverable: d.deliverable, progress: d.progress };
+  const project = { name: d.name, description: d.description, deadline: d.deadline, deliverable: d.deliverable, progress: d.progress };
+  return d.completedTasks?.length ? { ...project, completedTasks: d.completedTasks } : project;
 }
 
 /** AI 응답 → 대화 기록 한 턴. 작업 제안이면 목록(선행 작업은 제목으로)과 가정을 함께 남긴다 — 다음 요청 때 그대로 다시 보낸다 */

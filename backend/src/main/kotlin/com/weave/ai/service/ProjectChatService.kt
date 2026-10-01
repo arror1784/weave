@@ -66,12 +66,13 @@ class ProjectChatService(
 
     /** 대화 시작 데이터(프롬프트의 "입력 데이터") — 비어 있는 항목은 비어 있다고 알린다 */
     private fun introduce(p: ChatProjectInfo) = buildString {
-        appendLine("새 프로젝트를 등록할게요.")
+        appendLine(if (p.completedTasks.isEmpty()) "새 프로젝트를 등록할게요." else "이미 등록한 프로젝트의 남은 작업을 다시 나눌게요.")
         appendLine("프로젝트명: ${p.name}")
         appendLine("마감 기한: ${p.deadline ?: "(입력 안 함)"}")
         appendLine("프로젝트 설명: ${p.description.ifBlank { "(입력 안 함)" }}")
         appendLine("결과물 형태: ${p.deliverable.ifBlank { "(입력 안 함)" }}")
         appendLine("기 진행사항: ${p.progress.ifBlank { "(입력 안 함)" }}")
+        if (p.completedTasks.isNotEmpty()) appendLine("이미 끝낸 작업: ${p.completedTasks.joinToString(", ")}")
         append("오늘 날짜: ${todayProvider.today()}")
     }
 

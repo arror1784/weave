@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { createProject, deleteProject, getProject, listProjects, setTaskDone, updateProject, type NewProject } from '@/api/projects';
+import { createProject, deleteProject, getProject, listProjects, replaceProjectTasks, setTaskDone, updateProject, type NewProject } from '@/api/projects';
 import type { Project } from '@/api/types';
 
 import { queryKeys } from './keys';
@@ -49,6 +49,12 @@ export function useUpdateProject() {
 export function useCreateProject() {
   const invalidate = useInvalidateProjects();
   return useMutation({ mutationFn: (project: NewProject) => createProject(project), onSuccess: () => invalidate() });
+}
+
+/** "AI에게 재요청" 확정 — 같은 프로젝트의 미완료 작업을 바꾼다 */
+export function useReplaceProjectTasks(id: number | undefined) {
+  const invalidate = useInvalidateProjects();
+  return useMutation({ mutationFn: (project: NewProject) => replaceProjectTasks(id!, project), onSuccess: () => invalidate(id) });
 }
 
 /** 삭제 — 지운 프로젝트의 상세 캐시는 버린다(다시 받으면 404) */

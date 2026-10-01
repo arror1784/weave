@@ -30,6 +30,23 @@ describe('오늘의 일정', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/overload');
   });
 
+  it('오늘 작업을 다 끝내도 오늘 작업량 카드(완료 시간 포함)는 남는다 (사용자 결정 2026-10-01)', async () => {
+    const s = sampleSchedule(TEST_TODAY);
+    api.getSchedule.mockResolvedValue({ ...s, tasks: s.tasks.map((t) => ({ ...t, done: true })) });
+    await renderWithProviders(<TodayScreen />);
+    // 오늘 몫 3.5h를 모두 끝냄 — 총량이 가용 3h를 넘어 과부하 표시는 그대로
+    expect(await screen.findByRole('button', { name: /과부하, 3.5시간 \/ 가용 3시간, 완료 3.5시간/ })).toBeOnTheScreen();
+    expect(screen.getByText(/완료 3.5h/)).toBeOnTheScreen();
+  });
+
+  it('가용 시간 안이면 과부하 대신 오늘 작업량을 보여준다', async () => {
+    api.getSchedule.mockResolvedValue({ ...sampleSchedule(TEST_TODAY), dailyAvailableHours: 8 });
+    await renderWithProviders(<TodayScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: /^오늘 작업, 7.5시간 \/ 가용 8시간, 완료 0시간/ }));
+    expect(screen.queryByText('과부하')).toBeNull();
+    expect(mockRouter.push).toHaveBeenCalledWith('/overload');
+  });
+
   it('작업 카드: 프로젝트 배지·지연 표시·D-day·소요 시간·선행 미완료 경고', async () => {
     await renderWithProviders(<TodayScreen />);
     expect(await screen.findAllByText('지연')).toHaveLength(2);

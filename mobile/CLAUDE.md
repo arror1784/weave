@@ -42,7 +42,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 
 ## 2. 필수 규칙
 
-1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 값은 **Figma(Weave Make 디자인) 토큰**을 따른다: 잉크 `#1c1d22` · 실 `#2b4c8c` · 캔버스 `#f7f7f9` · 임박 주황 · 지연 빨강 · 프로젝트 8색(Figma 4색 teal·magenta·violet·gray + 임시안 blue·green·amber·brown). 원본 색이 글자 대비(§4-5)에 모자라면 글자용 변형(`warnText`·`dangerText`)을 쓰고, `inkFaint`는 장식·비활성에만 쓴다. **밝은 테마만**(다크 모드 미지원). 글꼴: 본문 Pretendard, 숫자·날짜·시간은 JetBrains Mono(`assets/fonts`, 둘 다 OFL) — 굵기는 `fontFamily`로 고른다(Android).
+1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 값은 **Figma(Weave Make 디자인) 토큰**을 따른다: 잉크 `#1c1d22` · 실 `#2b4c8c` · 캔버스 `#f7f7f9` · 임박 주황 · 지연 빨강 · 프로젝트 7색(Figma 3색 teal·magenta·violet + 임시안 blue·green·amber·brown — Figma의 gray는 뺐다, 사용자 결정 2026-10-01). 원본 색이 글자 대비(§4-5)에 모자라면 글자용 변형(`warnText`·`dangerText`)을 쓰고, `inkFaint`는 장식·비활성에만 쓴다. **밝은 테마만**(다크 모드 미지원). 글꼴: 본문 Pretendard, 숫자·날짜·시간은 JetBrains Mono(`assets/fonts`, 둘 다 OFL) — 굵기는 `fontFamily`로 고른다(Android).
 2. **공통 컴포넌트로만 UI 제작** — `Screen` · `AppText`(+ 필요 시 `Button` · `TextField` · `ListItem` 추가). 화면에서 RN 기본 `<Text>`/`<Pressable>`/`<TextInput>`을 새로 스타일링하지 않는다.
 3. **API는 도메인 클라이언트로만** — 컴포넌트에서 `fetch` 직접 호출 금지. `src/api/<domain>.ts`(응답은 `api/types.ts`의 Zod로 검증) → `src/queries/<domain>.ts`(TanStack Query 훅). 토큰 첨부·401 시 한 번 갱신은 `api/client.ts`의 `request()` 전담 — 갱신은 공유 Promise 하나로만(동시 401에서 강제 로그아웃 방지).
 4. **서버 상태 ≠ 클라이언트 상태** — 서버 데이터는 Query 캐시, Zustand엔 UI 상태만.
@@ -59,11 +59,14 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 15. **`src/app/` 안에는 라우트 파일만 둔다 — 테스트 포함 금지** — Expo Router가 `src/app/`의 모든 파일을 라우트로 번들링한다. 화면 테스트는 `src/__tests__/app/<route>.test.tsx`에 둔다(그 외 파일은 대상 옆 `*.test.ts(x)`). (스캐폴딩 중 `src/app/index.test.tsx`가 앱 번들에 테스트 라이브러리를 끌어들여 `expo export`가 실패했다 — `npm test`는 통과했었다.)
 16. **목업 데이터는 앱 코드에 두지 않는다** — 화면은 실제 API(`src/queries/`)만 쓴다(2026-10-01 목업 제거). 테스트용 예시 데이터는 `src/test-utils/fixtures.ts`, 화면 테스트는 `jest.mock('@/api/<domain>')`으로 API를 가짜로 바꾼다. 등록 3단계가 함께 쓰는 초안은 `state/DraftProvider`(기기에만 있는 UI 상태).
 17. **앱 진입점은 `index.ts`** — `expo-router/entry`를 불러온 뒤 위젯 처리기를 등록한다(`package.json`의 `main`). 진입점을 `expo-router/entry`로 되돌리면 위젯이 동작하지 않는다.
-18. **위젯 컴포넌트(`src/widget/`)엔 `'use no memo'`** — 위젯 라이브러리가 컴포넌트를 React 렌더링 밖에서 함수로 호출하므로 React Compiler가 넣는 훅이 깨진다. 위젯은 스크린리더가 읽지 못하는 이미지로 그려지므로 `accessibilityLabel`에 요약 문장을 넣는다.
-19. **프로젝트는 고유 색으로 구분한다** — `Project.color`(8색, 사용자가 등록 때 고르고 상세에서 바꾼다 — 기본값은 안 쓴 색부터)와 `projectPaletteFor()`. 색 고르기는 `ColorPicker`로만. 배지·막대·점에 쓰고, 색만으로 구분하지 않도록 항상 프로젝트 이름을 함께 쓴다(§4-4).
+18. **위젯 컴포넌트(`src/widget/`)엔 `'use no memo'`** — 위젯 라이브러리가 컴포넌트를 React 렌더링 밖에서 함수로 호출하므로 React Compiler가 넣는 훅이 깨진다. 위젯은 스크린리더가 읽지 못하는 이미지로 그려지므로 `accessibilityLabel`에 요약 문장을 넣는다. 위젯 혼자서는 30분마다만 갱신되므로(삼성은 백그라운드 앱을 얼려 더 늦다) 앱이 일정을 받을 때마다 `widget/WidgetSync`가 바로 다시 그린다.
+19. **프로젝트는 고유 색으로 구분한다** — `Project.color`(7색, 사용자가 등록 때 고르고 상세에서 바꾼다 — 기본값은 안 쓴 색부터)와 `projectPaletteFor()`. 색 고르기는 `ColorPicker`로만. 배지·막대·점에 쓰고, 색만으로 구분하지 않도록 항상 프로젝트 이름을 함께 쓴다(§4-4).
 20. **아이콘은 `src/components/icons.tsx`(react-native-svg)만** — Figma의 선 아이콘(24 그리드, 1.6 선) 경로를 그대로 옮겼다. 새 아이콘도 같은 규칙으로 추가한다. 아이콘은 장식이라 의미는 글자나 `accessibilityLabel`로 전한다.
 21. **Figma와 다른 부분은 주석으로 남긴다** — 예: 입력칸의 보이는 라벨(§4-3, Figma는 placeholder만), 대비 보정 색, Google 로그인·알림 설정 제외, 작업 수정·미루기·고정 일정 제외(사용자 결정 — 바뀔 수 있음).
 22. **작업 날짜는 서버가 정한다** — 일정 알고리즘은 백엔드 `schedule/domain/Scheduler.kt`. 앱은 날짜를 만들지 않고 부하 계산만 한다(`lib/scheduler.ts`의 `taskHoursOn`·`taskEndDate`, `lib/schedule.ts`의 선택 함수). 하루 몫은 서버가 보낸 날짜별 배정 시간(`Task.days`)을 그대로 쓴다(없을 때만 기간에 똑같이 나눔). 오늘은 서버 일정의 `today`를 쓰고, 못 받았을 때만 `todayKey()`(하루는 아침 6시에 바뀐다 — 서버와 같은 기준).
+
+23. **화면 키보드 회피는 공통 `Screen`이 Android에서도 `behavior="padding"`으로 한다** — 앱이 화면 끝까지 그리는(edge-to-edge) 방식이라 `adjustResize`가 화면을 줄여 주지 않는다. (Android에서 꺼 두었더니 챗봇 입력칸이 키보드에 가려졌다, 2026-10-01)
+24. **파일 업로드는 `bytes()`가 있는 값으로 `FormData`에 넣는다** — SDK 57은 전역 `fetch`를 Expo 구현으로 바꿔서 React Native식 `{ uri, name, type }`을 보내지 못한다("Unsupported FormDataPart implementation"). 파일 이름은 Expo가 퍼센트 인코딩해 보내므로 서버가 되돌린다. (첨부가 "서버에 연결할 수 없어요"로 실패했다, 2026-10-01)
 
 ## 3. 디렉터리 골격
 
@@ -84,7 +87,7 @@ mobile/
     │   ├── overload.tsx     # 04-c 이번 주 과부하(날짜별)
     │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
-    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · ColorPicker · Dialog · ProjectCompleteDialog · icons
+    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트) · Dialog · ProjectCompleteDialog · icons
     ├── theme/               # colors(+프로젝트 팔레트) · spacing(+radius) · typography(Pretendard·JetBrains Mono) · useAppTheme (단일 소스, 밝은 테마만)
     ├── lib/                 # 순수 헬퍼: date · korean · validation(Zod) · contrast · scheduler(부하 계산) · schedule(오늘 할 일·밀림·부하·이번 주 날짜별 부하 선택 함수)
     ├── api/                 # client(request·토큰 갱신) · token-store(Secure Store) · types(Zod) · auth · projects · attachments · chat · errors

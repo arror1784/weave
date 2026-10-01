@@ -57,4 +57,33 @@ object ImageMetadataStripper {
         }
         return out.toByteArray()
     }
+
+    /** WebP 메타데이터 청크: EXIF(위치 등)·XMP */
+    private val WEBP_METADATA_CHUNKS = setOf("EXIF", "XMP ")
+
+    /**
+     * WebP(RIFF): 청크를 훑어 EXIF·XMP 청크를 버리고, VP8X 플래그의 EXIF(0x08)·XMP(0x04) 표시를 끈 뒤 RIFF 크기를 다시 적는다.
+     * 청크 길이가 홀수면 1바이트 채움이 붙는다.
+     */
+    fun stripWebp(bytes: ByteArray): ByteArray {
+        require(bytes.size >= 12 && String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" && String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP") { "WebP가 아니다" }
+        val body = ByteArrayOutputStream(bytes.size)
+        body.write(bytes, 8, 4)
+        var i = 12
+        while (i + 8 <= bytes.size) {
+            val type = String(bytes, i, 4, Charsets.US_ASCII)
+            val length = (bytes[i + 4].toInt() and 0xFF) or ((bytes[i + 5].toInt() and 0xFF) shl 8) or
+                ((bytes[i + 6].toInt() and 0xFF) shl 16) or ((bytes[i + 7].toInt() and 0xFF) shl 24)
+            val end = i + 8 + length + (length and 1)
+            require(length >= 0 && i + 8 + length <= bytes.size) { "WebP 청크 길이가 올바르지 않다" }
+            if (type !in WEBP_METADATA_CHUNKS) {
+                val chunk = bytes.copyOfRange(i, minOf(end, bytes.size))
+                if (type == "VP8X" && length > 0) chunk[8] = (chunk[8].toInt() and 0x0C.inv()).toByte()
+                body.write(chunk)
+            }
+            i = end
+        }
+        val size = body.size()
+        return "RIFF".toByteArray() + byteArrayOf(size.toByte(), (size shr 8).toByte(), (size shr 16).toByte(), (size shr 24).toByte()) + body.toByteArray()
+    }
 }

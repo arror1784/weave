@@ -21,7 +21,8 @@ import kr.dogfoot.hwpxlib.tool.textextractor.TextExtractor as HwpxExtractor
 
 /**
  * 첨부를 AI에게 보낼 내용으로 바꾼다(사용자 결정 2026-10-01: 첨부는 AI에게 보낸다).
- * PDF·사진(jpg·png)은 그대로, txt는 글자로, Office(docx·pptx·xlsx)·한글(hwp·hwpx)은 서버가 글자를 뽑아서, 링크는 주소만.
+ * PDF·사진(jpg·png·gif·webp)은 그대로, 글자 파일(txt·md·코드 등)은 글자로, Office(docx·pptx·xlsx·doc·ppt·xls)·한글(hwp·hwpx)은
+ * 서버가 글자를 뽑아서, 링크는 주소만. zip·음성·HEIC는 AI가 볼 수 없다고 알린다.
  */
 @Service
 class AttachmentContentLoader(
@@ -54,10 +55,12 @@ class AttachmentContentLoader(
         return try {
             when (type) {
                 FileType.PDF -> AiAttachment.Pdf(a.name, base64(bytes))
-                FileType.JPEG, FileType.PNG -> AiAttachment.Image(a.name, base64(bytes), type.contentType)
+                FileType.JPEG, FileType.PNG, FileType.GIF, FileType.WEBP -> AiAttachment.Image(a.name, base64(bytes), type.contentType)
                 FileType.HEIC -> AiAttachment.Text(a.name, "(HEIC 사진은 AI가 볼 수 없어요)")
                 FileType.TXT -> text(a, String(bytes, Charsets.UTF_8))
-                FileType.DOCX, FileType.PPTX, FileType.XLSX -> text(a, ExtractorFactory.createExtractor(bytes.inputStream()).use { it.text })
+                FileType.ZIP -> AiAttachment.Text(a.name, "(압축 파일은 AI가 볼 수 없어요)")
+                FileType.MP3, FileType.M4A, FileType.WAV -> AiAttachment.Text(a.name, "(음성 파일은 AI가 들을 수 없어요)")
+                FileType.DOCX, FileType.PPTX, FileType.XLSX, FileType.DOC, FileType.PPT, FileType.XLS -> text(a, ExtractorFactory.createExtractor(bytes.inputStream()).use { it.text })
                 FileType.HWP -> text(a, HwpExtractor.extract(HWPReader.fromInputStream(bytes.inputStream()), HwpMethod.InsertControlTextBetweenParagraphText))
                 FileType.HWPX -> text(a, extractHwpx(bytes))
                 null -> AiAttachment.Text(a.name, "(읽을 수 없는 형식이에요)")
