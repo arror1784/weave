@@ -21,7 +21,7 @@ export function ProjectCompleteDialog() {
   const notYet = () => {
     const { taskId } = pending;
     dismiss();
-    setDone.mutate({ taskId, done: false }, { onError: (e) => toast(errorMessage(e)) });
+    setDone.mutate({ taskId, done: false }, { onError: (e) => toast(errorMessage(e), 'error') });
   };
 
   const complete = () => {
@@ -29,7 +29,7 @@ export function ProjectCompleteDialog() {
     dismiss();
     update.mutate(
       { id: projectId, changes: { status: 'done' } },
-      { onSuccess: () => toast(`${withParticle(name, '을', '를')} 완료했어요`), onError: (e) => toast(errorMessage(e)) },
+      { onSuccess: () => toast(`${withParticle(name, '을', '를')} 완료했어요`), onError: (e) => toast(errorMessage(e), 'error') },
     );
   };
 
