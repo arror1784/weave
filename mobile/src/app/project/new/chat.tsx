@@ -15,13 +15,10 @@ import { StepHeader } from '@/components/StepHeader';
 import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
 
-/** 진행 표시의 전체 질문 수 — Figma 디자인(질문 n/5). 서버 응답이 오면 그 값을 쓴다 */
-const DEFAULT_TOTAL = 5;
-
 /**
  * 프로젝트 등록 2/3: AI와 작업 쪼개기 (Figma 02-b-ii).
  * 서버가 Claude API를 부른다(앱은 AI를 직접 부르지 않는다). 대화는 초안에 보관하고 매번 전체를 보낸다.
- * 질문 내용은 서버의 임시 프롬프트가 정한다(사용자가 작성 중).
+ * 질문 내용은 서버의 임시 프롬프트가 정한다(사용자가 작성 중). 첨부도 함께 보내 AI가 읽게 한다.
  */
 export default function ChatScreen() {
   const router = useRouter();
@@ -33,11 +30,13 @@ export default function ChatScreen() {
   const [last, setLast] = useState<ChatResponse | null>(null);
   const scroll = useRef<ScrollView>(null);
   const project = draft ? { name: draft.name, description: draft.description, deadline: draft.deadline } : null;
+  // 등록 1단계에서 올린 첨부 — 서버가 내용을 AI에게 함께 보낸다(사용자 결정 2026-10-01)
+  const attachmentIds = draft?.attachments.map((a) => a.id) ?? [];
 
   // 첫 질문: 대화가 비어 있으면 기본 정보만 보내 받는다(화면에 들어오면 한 번)
   const first = useQuery({
-    queryKey: ['project-chat-first', project],
-    queryFn: () => sendChat(project!, []),
+    queryKey: ['project-chat-first', project, attachmentIds],
+    queryFn: () => sendChat(project!, [], attachmentIds),
     enabled: !!draft && draft.chat.length === 0 && draft.tasks.length === 0,
     staleTime: Infinity,
     retry: false,
@@ -48,8 +47,6 @@ export default function ChatScreen() {
   const finished = (draft?.tasks.length ?? 0) > 0 || reply?.type === 'tasks';
   const pending = sending || first.isFetching;
   const error = sendError ?? (draft?.chat.length ? undefined : first.error ? errorMessage(first.error) : undefined);
-  const total = reply?.totalQuestions ?? DEFAULT_TOTAL;
-  const shownProgress = finished ? total : (reply?.questionNumber ?? 0);
 
   function applyTasks(r: ChatResponse) {
     if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
@@ -60,7 +57,7 @@ export default function ChatScreen() {
     setSending(true);
     setSendError(undefined);
     try {
-      const r = await sendChat(project, history);
+      const r = await sendChat(project, history, attachmentIds);
       dispatch({ type: 'setChat', chat: [...history, { role: 'assistant', text: r.message }] });
       applyTasks(r);
       setLast(r);
@@ -96,20 +93,8 @@ export default function ChatScreen() {
   return (
     <Screen
       scroll={false}
-      header={
-        <>
-          <StepHeader step={2} title="AI와 작업 쪼개기" onBack={() => router.back()} />
-          <View style={[styles.progress, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-            <IconSparkle size={14} color={colors.thread} />
-            <AppText variant="caption" tone="soft">
-              질문 진행
-            </AppText>
-            <AppText variant="monoBold" color={colors.thread} style={styles.right} accessibilityLabel={`질문 ${total}개 중 ${shownProgress}번째`}>
-              {`${shownProgress}/${total}`}
-            </AppText>
-          </View>
-        </>
-      }
+      // Figma의 질문 진행 표시(n/5)는 뺐다 — 사용자 결정(2026-10-01)
+      header={<StepHeader step={2} title="AI와 작업 쪼개기" onBack={() => router.back()} />}
       footer={
         <Footer>
           {finished ? (
@@ -187,8 +172,6 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  progress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 1 },
-  right: { marginLeft: 'auto' },
   messages: { paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
   botRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

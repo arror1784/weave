@@ -5,13 +5,14 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
-import { IconChevron, IconUser, IconWidget } from '@/components/icons';
+import { IconCal, IconChevron, IconUser, IconWidget } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { SettingsGroup, SettingsRow } from '@/components/SettingsGroup';
 import { errorMessage } from '@/api/errors';
 import { useAuth } from '@/auth/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useMe, useUpdateDailyHours } from '@/queries/me';
+import { useReplan } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 
 /**
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const auth = useAuth();
   const me = useMe();
   const updateHours = useUpdateDailyHours();
+  const replan = useReplan();
   const email = me.data?.email ?? auth.user?.email ?? '';
   // 슬라이더를 움직이는 동안은 화면에만 보여주고, 손을 떼면 서버에 저장한다
   const [dragging, setDragging] = useState<number | null>(null);
@@ -33,6 +35,17 @@ export default function SettingsScreen() {
   function saveHours(value: number) {
     const rounded = Math.round(value * 2) / 2;
     updateHours.mutate(rounded, { onError: (e) => toast(errorMessage(e)), onSettled: () => setDragging(null) });
+  }
+
+  /** 작업이 몰렸을 때 사용자가 원하면 다시 배치(사용자 결정 2026-10-01) — 밀린 작업도 포함, 지연 표시는 남는다 */
+  function confirmReplan() {
+    Alert.alert('작업 다시 배치', '진행중 프로젝트의 남은 작업을 오늘부터 다시 배치해요. 밀린 작업도 비는 날로 옮겨요.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '다시 배치',
+        onPress: () => replan.mutate(undefined, { onSuccess: () => toast('작업을 다시 배치했어요'), onError: (e) => toast(errorMessage(e)) }),
+      },
+    ]);
   }
 
   function confirmDelete() {
@@ -88,7 +101,8 @@ export default function SettingsScreen() {
       </SettingsGroup>
 
       <SettingsGroup title="기타">
-        <SettingsRow icon={(c) => <IconWidget size={18} color={c} />} label="홈 화면 위젯" onPress={() => router.push('/widgets')} right={<IconChevron size={16} color={colors.inkSoft} />} />
+        <SettingsRow icon={(c) => <IconCal size={18} color={c} />} label="작업 다시 배치" onPress={confirmReplan} />
+        <SettingsRow divider icon={(c) => <IconWidget size={18} color={c} />} label="홈 화면 위젯" onPress={() => router.push('/widgets')} right={<IconChevron size={16} color={colors.inkSoft} />} />
         <SettingsRow icon={(c) => <IconUser size={18} color={c} />} label="로그아웃" onPress={() => auth.signOut()} divider />
       </SettingsGroup>
 

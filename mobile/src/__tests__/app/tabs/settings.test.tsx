@@ -39,6 +39,17 @@ describe('설정', () => {
     expect(auth.updateSettings).toHaveBeenCalledWith(4.5);
   });
 
+  it('작업 다시 배치: 확인을 받은 뒤 서버에 다시 배치를 요청하고 알린다', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    projects.replanSchedule.mockResolvedValueOnce(sampleSchedule(TEST_TODAY));
+    await renderWithProviders(<SettingsScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: '작업 다시 배치' }));
+    expect(projects.replanSchedule).not.toHaveBeenCalled();
+    await act(async () => alert.mock.calls.at(-1)![2]!.find((b) => b.text === '다시 배치')!.onPress!());
+    expect(projects.replanSchedule).toHaveBeenCalled();
+    expect(await screen.findByText('작업을 다시 배치했어요')).toBeOnTheScreen();
+  });
+
   it('홈 화면 위젯 미리보기로 간다', async () => {
     await renderWithProviders(<SettingsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '홈 화면 위젯' }));

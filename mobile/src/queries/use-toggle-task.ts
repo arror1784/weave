@@ -10,6 +10,6 @@ export function useToggleTask(projectName: (projectId: number) => string) {
   return (task: Task) =>
     setDone.mutate(
       { taskId: task.id, done: !task.done },
-      { onSuccess: (result) => (result.projectAllDone ? prompt.ask(task.projectId, projectName(task.projectId)) : undefined) },
+      { onSuccess: (result) => (result.projectAllDone ? prompt.ask({ projectId: task.projectId, name: projectName(task.projectId), taskId: task.id }) : undefined) },
     );
 }

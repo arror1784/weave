@@ -18,8 +18,9 @@ const ROW_H = 44;
 
 type Props = { tasks: Task[]; range: DateKey[]; today: DateKey; color: string };
 
+/** 밀림: 서버가 오늘로 옮긴 작업(delayedFrom) 또는 끝나는 날이 지난 미완료 작업 */
 function isLate(t: Task, today: DateKey) {
-  return !t.done && t.scheduledDate !== null && diffInDays(today, t.scheduledDate) + t.spanDays - 1 < 0;
+  return !t.done && (t.delayedFrom !== null || (t.scheduledDate !== null && diffInDays(today, t.scheduledDate) + t.spanDays - 1 < 0));
 }
 
 /** 프로젝트 일정 (Figma 04-b 간트): 작업 막대 · 오늘 선 · 선행 관계 선 · 밀린 작업 경고 */

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Badge } from '@/components/Badge';
@@ -10,14 +10,16 @@ import { Checkbox } from '@/components/Checkbox';
 import { ColorPicker } from '@/components/ColorPicker';
 import { DDay } from '@/components/DDay';
 import { Gantt } from '@/components/Gantt';
-import { IconArrowDep, IconChat } from '@/components/icons';
+import { IconArrowDep, IconChat, IconFile, IconImage, IconLink } from '@/components/icons';
 import { LoadError, Loading } from '@/components/QueryStatus';
 import { Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
 import { TopBar } from '@/components/TopBar';
 import { dDayLabel } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
+import { downloadAttachment } from '@/api/attachments';
 import { errorMessage } from '@/api/errors';
+import type { Attachment } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { selectGanttRange } from '@/lib/schedule';
 import { useProject, useUpdateProject } from '@/queries/projects';
@@ -53,6 +55,16 @@ export default function ProjectDetailScreen() {
         {query.isPending ? <Loading /> : notFound ? <AppText>프로젝트를 찾을 수 없어요.</AppText> : <LoadError error={query.error} onRetry={() => query.refetch()} />}
       </Screen>
     );
+  }
+
+  /** 첨부: 파일은 내려받아 공유 창으로 열고, 링크는 브라우저로 연다(사용자 결정 2026-10-01) */
+  async function openAttachment(a: Attachment) {
+    try {
+      if (a.kind === 'link' && a.url) await Linking.openURL(a.url);
+      else await downloadAttachment(a);
+    } catch (e) {
+      toast(errorMessage(e));
+    }
   }
 
   const palette = projectPaletteFor(project.color);
@@ -150,11 +162,42 @@ export default function ProjectDetailScreen() {
             })}
           </View>
           <Button label="AI에게 재요청" variant="soft" onPress={() => router.push('/project/new')} icon={(c) => <IconChat size={16} color={c} />} />
+          {project.attachments.length > 0 ? (
+            <View style={styles.attachments}>
+              <AppText variant="label">참고자료</AppText>
+              {project.attachments.map((a) => (
+                <AttachmentRow key={a.id} attachment={a} onPress={() => openAttachment(a)} />
+              ))}
+            </View>
+          ) : null}
         </>
       ) : (
         <Gantt tasks={tasks} range={selectGanttRange(today)} today={today} color={palette.dot} />
       )}
     </Screen>
+  );
+}
+
+const KIND_ICON = { link: IconLink, file: IconFile, image: IconImage } as const;
+
+function AttachmentRow({ attachment, onPress }: { attachment: Attachment; onPress: () => void }) {
+  const { colors, radius } = useAppTheme();
+  const Icon = KIND_ICON[attachment.kind];
+  const action = attachment.kind === 'link' ? '열기' : '내려받기';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${attachment.name} ${action}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.attachRow, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.control }, pressed && { backgroundColor: colors.canvas }]}>
+      <Icon size={16} color={colors.inkSoft} />
+      <AppText variant="small" numberOfLines={1} style={styles.flex}>
+        {attachment.name}
+      </AppText>
+      <AppText variant="caption" color={colors.thread}>
+        {action}
+      </AppText>
+    </Pressable>
   );
 }
 
@@ -177,4 +220,6 @@ const styles = StyleSheet.create({
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   depLine: { marginTop: 6, gap: 4 },
   flex: { flex: 1 },
+  attachments: { gap: 8, marginTop: 8 },
+  attachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, paddingHorizontal: 14, minHeight: 48 },
 });

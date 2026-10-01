@@ -1,4 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { Linking } from 'react-native';
+
+import * as attachmentsApi from '@/api/attachments';
 
 import { ApiError } from '@/api/client';
 import * as projectsApi from '@/api/projects';
@@ -9,7 +12,9 @@ import { completionRef, renderWithProviders, TEST_TODAY } from '@/test-utils/ren
 import { mockParams, mockRouter, resetRouterMock } from '@/test-utils/router';
 
 jest.mock('@/api/projects');
+jest.mock('@/api/attachments');
 const api = jest.mocked(projectsApi);
+const attachments = jest.mocked(attachmentsApi);
 
 function embedded(): ProjectDetail {
   const s = sampleSchedule(TEST_TODAY);
@@ -47,7 +52,7 @@ describe('프로젝트 상세', () => {
     api.setTaskDone.mockResolvedValueOnce({ task: { ...embedded().tasks[4], done: true }, projectAllDone: true });
     await renderWithProviders(<ProjectDetailScreen />);
     await fireEvent.press(await screen.findByRole('checkbox', { name: '발표자료 제작 완료' }));
-    await waitFor(() => expect(completionRef.current).toEqual({ projectId: 1, name: '임베디드시스템 과제' }));
+    await waitFor(() => expect(completionRef.current).toEqual({ projectId: 1, name: '임베디드시스템 과제', taskId: 105 }));
   });
 
   it('등록된 작업은 고칠 수 없다: 작업 수정·작업 추가가 없다 (완료 체크만 가능)', async () => {
@@ -79,6 +84,29 @@ describe('프로젝트 상세', () => {
     await fireEvent.press(await screen.findByRole('tab', { name: '일정' }));
     expect(screen.getByLabelText(/^설계 문서 작성, 9\/29부터 1일, 3시간, 밀림/)).toBeOnTheScreen();
     expect(screen.getByText(/설계 문서 작성이 밀려서 보고서 v2 초안 작성 시작이 늦어질 수 있어요/)).toBeOnTheScreen();
+  });
+
+  it('첨부 목록을 보여주고, 파일은 내려받고 링크는 연다', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    attachments.downloadAttachment.mockResolvedValueOnce(undefined);
+    api.getProject.mockResolvedValue({
+      ...embedded(),
+      attachments: [
+        { id: 21, kind: 'file', name: '명세서.pdf', contentType: 'application/pdf', size: 1000 },
+        { id: 22, kind: 'link', name: 'https://example.com/spec', url: 'https://example.com/spec' },
+      ],
+    });
+    await renderWithProviders(<ProjectDetailScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: '명세서.pdf 내려받기' }));
+    expect(attachments.downloadAttachment).toHaveBeenCalledWith(expect.objectContaining({ id: 21 }));
+    await fireEvent.press(screen.getByRole('button', { name: 'https://example.com/spec 열기' }));
+    expect(openURL).toHaveBeenCalledWith('https://example.com/spec');
+  });
+
+  it('첨부가 없으면 참고자료 구역을 보여주지 않는다', async () => {
+    await renderWithProviders(<ProjectDetailScreen />);
+    await screen.findByRole('header', { name: '임베디드시스템 과제' });
+    expect(screen.queryByText('참고자료')).toBeNull();
   });
 
   it('없는(또는 남의) 프로젝트면 안내를 보여준다', async () => {

@@ -31,3 +31,10 @@ jest.mock('expo-image-picker', () => ({
 
 // 토큰 보안 저장소(네이티브)
 jest.mock('expo-secure-store', () => ({ getItemAsync: jest.fn(async () => null), setItemAsync: jest.fn(async () => {}), deleteItemAsync: jest.fn(async () => {}) }));
+
+// 첨부 내려받기·공유(네이티브)
+jest.mock('expo-file-system', () => ({
+  File: Object.assign(jest.fn(), { downloadFileAsync: jest.fn(async () => ({ uri: 'file:///cache/x' })) }),
+  Paths: { cache: 'file:///cache' },
+}));
+jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(async () => true), shareAsync: jest.fn(async () => {}) }));

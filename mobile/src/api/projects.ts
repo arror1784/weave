@@ -21,6 +21,9 @@ export type NewProject = {
 /** 오늘·전체 일정·과부하·위젯이 함께 쓰는 스냅샷 (진행중 프로젝트와 그 작업) */
 export const getSchedule = () => request('/api/v1/schedule', scheduleSchema);
 
+/** 작업 다시 배치(설정 버튼) — 밀린 작업까지 오늘부터 다시 배치한 일정 */
+export const replanSchedule = () => request('/api/v1/schedule/replan', scheduleSchema, { method: 'POST' });
+
 export const listProjects = (status: Project['status'], page: number, size = 20) =>
   request(`/api/v1/projects?status=${status}&page=${page}&size=${size}`, pageSchema(projectSummarySchema));
 
