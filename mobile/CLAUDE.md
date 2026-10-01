@@ -63,7 +63,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 19. **프로젝트는 고유 색으로 구분한다** — `Project.color`(8색, 사용자가 등록 때 고르고 상세에서 바꾼다 — 기본값은 안 쓴 색부터)와 `projectPaletteFor()`. 색 고르기는 `ColorPicker`로만. 배지·막대·점에 쓰고, 색만으로 구분하지 않도록 항상 프로젝트 이름을 함께 쓴다(§4-4).
 20. **아이콘은 `src/components/icons.tsx`(react-native-svg)만** — Figma의 선 아이콘(24 그리드, 1.6 선) 경로를 그대로 옮겼다. 새 아이콘도 같은 규칙으로 추가한다. 아이콘은 장식이라 의미는 글자나 `accessibilityLabel`로 전한다.
 21. **Figma와 다른 부분은 주석으로 남긴다** — 예: 입력칸의 보이는 라벨(§4-3, Figma는 placeholder만), 대비 보정 색, Google 로그인·알림 설정 제외, 작업 수정·미루기·고정 일정 제외(사용자 결정 — 바뀔 수 있음).
-22. **작업 날짜는 서버가 정한다** — 임시 일정 알고리즘은 백엔드 `schedule/domain/Scheduler.kt`로 옮겼다. 앱은 날짜를 만들지 않고 부하 계산만 한다(`lib/scheduler.ts`의 `taskHoursOn`·`taskEndDate`, `lib/schedule.ts`의 선택 함수). 여러 날 작업의 시간은 기간에 똑같이 나눠 하루 몫으로 센다 — 서버와 같은 규칙.
+22. **작업 날짜는 서버가 정한다** — 일정 알고리즘은 백엔드 `schedule/domain/Scheduler.kt`. 앱은 날짜를 만들지 않고 부하 계산만 한다(`lib/scheduler.ts`의 `taskHoursOn`·`taskEndDate`, `lib/schedule.ts`의 선택 함수). 하루 몫은 서버가 보낸 날짜별 배정 시간(`Task.days`)을 그대로 쓴다(없을 때만 기간에 똑같이 나눔). 오늘은 서버 일정의 `today`를 쓰고, 못 받았을 때만 `todayKey()`(하루는 아침 6시에 바뀐다 — 서버와 같은 기준).
 
 ## 3. 디렉터리 골격
 
@@ -81,12 +81,12 @@ mobile/
     │   ├── (tabs)/          # 커스텀 TabBar — index(02-a 오늘) · schedule(03 전체 일정) · settings(05)
     │   │   └── projects/    # 탭 안 스택: index(04 목록) · [id](04-a/b 상세 — 탭이 보인다)
     │   ├── project/new/     # index(02-b-i 기본 정보) → chat(02-b-ii 챗봇) → review(02-b-iii 작업 검토)
-    │   ├── overload.tsx     # 04-c 이번 주 과부하
+    │   ├── overload.tsx     # 04-c 이번 주 과부하(날짜별)
     │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
     ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · ColorPicker · Dialog · ProjectCompleteDialog · icons
     ├── theme/               # colors(+프로젝트 팔레트) · spacing(+radius) · typography(Pretendard·JetBrains Mono) · useAppTheme (단일 소스, 밝은 테마만)
-    ├── lib/                 # 순수 헬퍼: date · korean · validation(Zod) · contrast · scheduler(부하 계산) · schedule(오늘 할 일·밀림·부하·이번 주 선택 함수)
+    ├── lib/                 # 순수 헬퍼: date · korean · validation(Zod) · contrast · scheduler(부하 계산) · schedule(오늘 할 일·밀림·부하·이번 주 날짜별 부하 선택 함수)
     ├── api/                 # client(request·토큰 갱신) · token-store(Secure Store) · types(Zod) · auth · projects · attachments · chat · errors
     ├── queries/             # TanStack Query 훅 · query-client(온라인·포그라운드 연결) · use-toggle-task(완료 모달 연결) · use-today(서버 기준 오늘)
     ├── auth/                # AuthProvider — 앱 시작 시 세션 복구, 로그아웃·탈퇴·만료 시 기기 데이터 삭제

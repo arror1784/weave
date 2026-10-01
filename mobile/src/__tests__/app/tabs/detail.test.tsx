@@ -1,5 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { Alert, Linking } from 'react-native';
 
 import * as attachmentsApi from '@/api/attachments';
 
@@ -120,5 +120,29 @@ describe('프로젝트 상세', () => {
     api.getProject.mockRejectedValueOnce(new ApiError(404, 'NOT_FOUND', '프로젝트를 찾을 수 없어요.'));
     await renderWithProviders(<ProjectDetailScreen />);
     expect(await screen.findByText('프로젝트를 찾을 수 없어요.')).toBeOnTheScreen();
+  });
+
+  it('프로젝트 삭제: 확인을 받은 뒤 서버에 삭제를 요청하고 목록으로 돌아가 알린다 (사용자 결정 2026-10-01 — 상시 프로젝트를 끝낼 때)', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    api.deleteProject.mockResolvedValueOnce(undefined);
+    await renderWithProviders(<ProjectDetailScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: '프로젝트 삭제' }));
+    expect(api.deleteProject).not.toHaveBeenCalled();
+    const [title, , buttons] = alert.mock.calls.at(-1)!;
+    expect(title).toBe('프로젝트 삭제');
+    await act(async () => buttons!.find((b) => b.style === 'destructive')!.onPress!());
+    expect(api.deleteProject).toHaveBeenCalledWith(1);
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    expect(await screen.findByText('임베디드시스템 과제를 삭제했어요')).toBeOnTheScreen();
+  });
+
+  it('프로젝트 삭제를 취소하면 아무것도 지우지 않는다', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    await renderWithProviders(<ProjectDetailScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: '프로젝트 삭제' }));
+    const cancel = alert.mock.calls.at(-1)![2]!.find((b) => b.style === 'cancel')!;
+    await act(async () => cancel.onPress?.());
+    expect(api.deleteProject).not.toHaveBeenCalled();
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 });

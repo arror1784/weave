@@ -27,6 +27,7 @@ export type DraftAction =
   | { type: 'updateTask'; key: string; changes: Partial<Omit<DraftTask, 'key'>> }
   | { type: 'deleteTask'; key: string }
   | { type: 'addTask'; key: string }
+  | { type: 'moveTask'; key: string; offset: -1 | 1 }
   | { type: 'reset' };
 
 export function draftReducer(draft: Draft | null, action: DraftAction): Draft | null {
@@ -56,9 +57,28 @@ export function draftReducer(draft: Draft | null, action: DraftAction): Draft | 
       return { ...draft, tasks: draft.tasks.map((t) => (t.key === action.key ? { ...t, ...action.changes } : t)) };
     case 'deleteTask':
       return { ...draft, tasks: draft.tasks.filter((t) => t.key !== action.key).map((t) => (t.dependsOnKey === action.key ? { ...t, dependsOnKey: null } : t)) };
+    case 'moveTask': {
+      if (!canMoveTask(draft.tasks, action.key, action.offset)) return draft;
+      const tasks = [...draft.tasks];
+      const i = tasks.findIndex((t) => t.key === action.key);
+      [tasks[i], tasks[i + action.offset]] = [tasks[i + action.offset], tasks[i]];
+      return { ...draft, tasks };
+    }
     case 'addTask':
       return { ...draft, tasks: [...draft.tasks, { key: action.key, title: '새 작업', description: '', estimatedHours: 1, dependsOnKey: null, prerequisite: false, aiDueDate: null }] };
   }
+}
+
+/**
+ * 순서 바꾸기는 이웃과 자리를 바꾸되, 선행 작업이 뒤따르는 작업보다 아래로 가면 막는다(사용자 결정 2026-10-01 — 의존성을 지키는 한해서).
+ * 서버는 선행 작업을 먼저 배치하므로 막지 않아도 일정은 맞지만, 목록 순서가 실제 순서와 어긋나 보이지 않게 한다.
+ */
+export function canMoveTask(tasks: DraftTask[], key: string, offset: -1 | 1): boolean {
+  const i = tasks.findIndex((t) => t.key === key);
+  const j = i + offset;
+  if (i < 0 || j < 0 || j >= tasks.length) return false;
+  const [upper, lower] = offset < 0 ? [tasks[j], tasks[i]] : [tasks[i], tasks[j]];
+  return lower.dependsOnKey !== upper.key;
 }
 
 let sequence = 0;

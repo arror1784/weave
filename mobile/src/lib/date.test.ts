@@ -1,4 +1,4 @@
-import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, toDateKey, weekDays, weekdayLabel } from './date';
+import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, toDateKey, todayKey, weekDays, weekdayLabel } from './date';
 
 describe('date', () => {
   it('Date를 로컬 기준 YYYY-MM-DD 키로 바꾼다', () => {
@@ -43,5 +43,11 @@ describe('date', () => {
     expect(cells.slice(0, 4)).toEqual([null, null, null, '2026-10-01']);
     expect(cells.length % 7).toBe(0);
     expect(cells.filter(Boolean)).toHaveLength(31);
+  });
+
+  it('하루는 아침 6시에 바뀐다 — 새벽 5시 59분까지는 전날 (사용자 결정 2026-10-01, 서버와 같은 기준)', () => {
+    expect(todayKey(new Date(2026, 9, 1, 5, 59))).toBe('2026-09-30');
+    expect(todayKey(new Date(2026, 9, 1, 6, 0))).toBe('2026-10-01');
+    expect(todayKey(new Date(2026, 9, 1, 23, 59))).toBe('2026-10-01');
   });
 });
