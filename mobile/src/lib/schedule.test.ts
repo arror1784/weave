@@ -1,6 +1,6 @@
 import type { Project, Task } from '@/api/types';
 
-import { isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectWeekDays, taskTone, type ScheduleData } from './schedule';
+import { isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
 
 const T = '2026-09-30'; // 수요일
 
@@ -133,6 +133,16 @@ describe('일정 계산', () => {
     expect(selectDayItems(d, '2026-10-01')).toEqual([]);
     expect(selectWeekDays(d, T)[1].tasks).toEqual([]);
     expect(selectDayItems(d, '2026-10-02')[0].hours).toBe(1);
+  });
+
+  it('오늘 작업량: 오늘 몫 전부(완료 포함) + 아직 안 옮긴 밀린 작업, 그중 완료한 시간 — 총량이 가용을 넘으면 과부하 (사용자 결정 2026-10-01)', () => {
+    // late 1 + today1 0.75 + today2 2 + doneToday 1.5(완료) + multi 1 = 6.25
+    expect(selectTodayWork(data, T)).toEqual({ total: 6.25, done: 1.5, remaining: 4.75, capacity: 5, over: true });
+  });
+
+  it('오늘 작업을 다 끝내도 작업량은 그대로 남는다', () => {
+    const allDone: ScheduleData = { ...data, tasks: data.tasks.filter((t) => t.title !== 'late').map((t) => ({ ...t, done: true })) };
+    expect(selectTodayWork(allDone, T)).toEqual({ total: 5.25, done: 5.25, remaining: 0, capacity: 5, over: true });
   });
 
   it('프로젝트 일정(간트) 범위: 오늘 이틀 전부터 9일', () => {

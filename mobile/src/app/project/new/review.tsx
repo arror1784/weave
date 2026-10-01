@@ -112,7 +112,10 @@ export default function ReviewScreen() {
                 <TextInput
                   accessibilityLabel={`${n}번 작업 이름`}
                   value={t.title}
-                  onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title } })}
+                  // 긴 이름도 전부 보이게 줄바꿈한다(사용자 결정 2026-10-01). 엔터는 줄을 바꾸지 않고 입력을 마친다
+                  multiline
+                  submitBehavior="blurAndSubmit"
+                  onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title: title.replace(/\n/g, ' ') } })}
                   style={[typography.body, styles.nameInput, { color: colors.ink }]}
                 />
                 {([-1, 1] as const).map((offset) => {

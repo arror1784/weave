@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { sendChat, type ChatTurn } from '@/api/chat';
 import { errorMessage } from '@/api/errors';
@@ -11,9 +11,11 @@ import { Footer } from '@/components/Footer';
 import { IconCheck, IconSend, IconSparkle } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
+import { parseBold, stripBold } from '@/lib/markdown';
 import { assistantTurn, chatProject } from '@/state/draft';
 import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
+import { fonts } from '@/theme/typography';
 
 /**
  * 프로젝트 등록 2/3: AI와 작업 쪼개기 (Figma 02-b-ii).
@@ -45,6 +47,12 @@ export default function ChatScreen() {
   const chat: ChatTurn[] = draft?.chat.length ? draft.chat : first.data ? [assistantTurn(first.data)] : [];
   const proposed = (draft?.tasks.length ?? 0) > 0 || chat.some((m) => m.tasks?.length);
   const pending = sending || first.isFetching;
+  // 기다리는 동안 무엇을 하는 중인지(사용자 결정 2026-10-01 — 화면 변화가 없어 멈춘 것처럼 보였다)
+  const pendingText = first.isFetching && !draft?.chat.length
+    ? '프로젝트 정보를 읽고 첫 질문을 준비하고 있어요…'
+    : proposed
+      ? '고친 내용을 반영해 작업을 다시 정리하고 있어요…'
+      : '답변을 바탕으로 생각하고 있어요…';
   const error = sendError ?? (draft?.chat.length ? undefined : first.error ? errorMessage(first.error) : undefined);
 
   async function ask(history: ChatTurn[]) {
@@ -91,7 +99,17 @@ export default function ChatScreen() {
     <Screen
       scroll={false}
       // Figma의 질문 진행 표시(n/5)는 뺐다 — 사용자 결정(2026-10-01)
-      header={<StepHeader step={2} title="AI와 작업 쪼개기" onBack={() => router.back()} />}
+      header={
+        <>
+          <StepHeader step={2} title="AI와 작업 쪼개기" onBack={() => router.back()} />
+          {/* 지금 단계 안내(사용자 결정 2026-10-01) */}
+          <View style={[styles.status, { backgroundColor: colors.threadSoft }]}>
+            <AppText variant="caption" color={colors.thread} accessibilityLiveRegion="polite">
+              {proposed ? '작업 목록을 받았어요. 고칠 점을 말하거나 검토로 넘어가세요.' : '질문에 답하면 AI가 작업 목록을 제안해요.'}
+            </AppText>
+          </View>
+        </>
+      }
       footer={
         <Footer>
           {/* 제안을 받은 뒤에도 의견을 보내 다시 제안받을 수 있다 — 검토 화면의 "등록 완료"가 확정 */}
@@ -102,6 +120,7 @@ export default function ChatScreen() {
                 value={input}
                 onChangeText={setInput}
                 onSubmitEditing={send}
+                editable={!pending}
                 returnKeyType="send"
                 placeholder={proposed ? '고칠 점을 말해 주세요' : '답변을 입력하세요'}
                 placeholderTextColor={colors.inkSoft}
@@ -139,10 +158,16 @@ export default function ChatScreen() {
           </View>
         ) : null}
         {pending ? (
-          <View style={styles.typing} accessibilityLabel="도우미가 입력 중">
-            {[0, 1, 2].map((d) => (
-              <View key={d} style={[styles.typingDot, { backgroundColor: colors.inkFaint }]} />
-            ))}
+          <View style={styles.botRow} accessible accessibilityLabel="AI가 답을 준비하는 중" accessibilityLiveRegion="polite">
+            <View style={[styles.avatar, { backgroundColor: colors.threadSoft }]}>
+              <IconSparkle size={15} color={colors.thread} />
+            </View>
+            <View style={[styles.bubble, styles.botBubble, styles.pendingBubble, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.card }]}>
+              <ActivityIndicator size="small" color={colors.thread} />
+              <AppText variant="small" tone="soft" style={styles.flex}>
+                {pendingText}
+              </AppText>
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -151,12 +176,14 @@ export default function ChatScreen() {
 
   function BotBubble({ text }: { text: string }) {
     return (
-      <View style={styles.botRow} accessible accessibilityLabel={`도우미: ${text}`}>
+      <View style={styles.botRow} accessible accessibilityLabel={`도우미: ${stripBold(text)}`}>
         <View style={[styles.avatar, { backgroundColor: colors.threadSoft }]}>
           <IconSparkle size={15} color={colors.thread} />
         </View>
         <View style={[styles.bubble, styles.botBubble, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.card }]}>
-          <AppText variant="bodyRegular">{text}</AppText>
+          <AppText variant="bodyRegular">
+            {parseBold(text).map((p, i) => (p.bold ? <AppText key={i} variant="bodyRegular" style={styles.bold}>{p.text}</AppText> : p.text))}
+          </AppText>
         </View>
       </View>
     );
@@ -195,9 +222,11 @@ const styles = StyleSheet.create({
   botBubble: { borderWidth: 1, borderTopLeftRadius: 6 },
   userRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   userBubble: { borderTopRightRadius: 6 },
-  typing: { flexDirection: 'row', gap: 4, paddingLeft: 40 },
+  bold: { fontFamily: fonts.bold },
+  status: { paddingHorizontal: 20, paddingVertical: 8 },
+  pendingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flex: { flexShrink: 1 },
   errorRow: { alignItems: 'flex-start', gap: 8, paddingLeft: 36 },
-  typingDot: { width: 6, height: 6, borderRadius: 3 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inputGap: { marginTop: 8 },
   turn: { gap: 8 },

@@ -9,13 +9,13 @@ import { SectionLabel } from '@/components/SectionLabel';
 import { TaskCard } from '@/components/TaskCard';
 import { formatDateLabel, formatMonthEyebrow } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { selectDayLoad, selectTodayTasks } from '@/lib/schedule';
+import { selectTodayTasks, selectTodayWork } from '@/lib/schedule';
 import { useSchedule } from '@/queries/schedule';
 import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
-/** 오늘의 일정 (Figma 02-a): 날짜·남은 일 / 과부하 카드 / 오늘 할 일 / 새 프로젝트 버튼. Figma의 고정 일정 구역은 뺐다(사용자 결정 G — 고정 일정은 나중에) */
+/** 오늘의 일정 (Figma 02-a): 날짜·남은 일 / 오늘 작업량(과부하) 카드 / 오늘 할 일 / 새 프로젝트 버튼. Figma의 고정 일정 구역은 뺐다(사용자 결정 G — 고정 일정은 나중에) */
 export default function TodayScreen() {
   const router = useRouter();
   const { colors, typography, radius } = useAppTheme();
@@ -44,7 +44,10 @@ export default function TodayScreen() {
   const today = data.today;
   const tasks = selectTodayTasks(data, today);
   const left = tasks.filter((t) => !t.done).length;
-  const load = selectDayLoad(data, today, { includeOverdue: true });
+  const work = selectTodayWork(data, today);
+  const accent = work.over ? colors.warn : colors.thread;
+  const scale = Math.max(work.total, work.capacity);
+  const pct = (h: number) => `${Math.min(100, (h / scale) * 100)}%` as const;
   const [date, weekday] = splitWeekday(formatDateLabel(today));
 
   return (
@@ -64,28 +67,33 @@ export default function TodayScreen() {
         </AppText>
       </View>
 
-      {load.over ? (
+      {/* 오늘 작업량 — 작업을 다 끝내도 남긴다. 총량이 가용을 넘으면 과부하로 보인다(사용자 결정 2026-10-01) */}
+      {work.total > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`과부하, ${load.hours}시간 / 가용 ${load.capacity}시간, 이번 주 과부하 보기`}
+          accessibilityLabel={`${work.over ? '과부하' : '오늘 작업'}, ${work.total}시간 / 가용 ${work.capacity}시간, 완료 ${work.done}시간, 이번 주 보기`}
           onPress={() => router.push('/overload')}
-          style={({ pressed }) => [styles.overload, { backgroundColor: colors.warnSoft, borderRadius: radius.card }, pressed && styles.pressedCard]}>
+          style={({ pressed }) => [styles.overload, { backgroundColor: work.over ? colors.warnSoft : colors.surface, borderRadius: radius.card }, !work.over && { borderWidth: 1, borderColor: colors.line }, pressed && styles.pressedCard]}>
           <View style={styles.inline}>
-            <IconWarn size={16} color={colors.warn} />
-            <AppText variant="label" color={colors.warnText} style={styles.small}>
-              과부하
+            {work.over ? <IconWarn size={16} color={colors.warn} /> : null}
+            <AppText variant="label" color={work.over ? colors.warnText : colors.ink} style={styles.small}>
+              {work.over ? '과부하' : '오늘 작업'}
             </AppText>
             <AppText variant="monoBold" style={styles.overloadHours}>
-              {formatHours(load.hours)} <Text style={{ color: colors.inkSoft }}>{`/ 가용 ${formatHours(load.capacity)}`}</Text>
+              {formatHours(work.total)} <Text style={{ color: colors.inkSoft }}>{`/ 가용 ${formatHours(work.capacity)}`}</Text>
             </AppText>
           </View>
-          <View style={[styles.track, { backgroundColor: colors.surface }]}>
-            <View style={[styles.fill, { width: '100%', backgroundColor: colors.warn }]} />
-            <View style={[styles.fill, { width: `${(load.capacity / load.hours) * 100}%`, backgroundColor: colors.ink, opacity: 0.8 }]} />
+          {/* 막대: 전체 길이 = 총량과 가용 중 큰 값. 진한 부분이 완료, 옅은 부분이 남은 시간, 세로선이 가용 시간 */}
+          <View style={[styles.track, { backgroundColor: work.over ? colors.surface : colors.canvas }]}>
+            <View style={[styles.fill, { width: pct(work.total), backgroundColor: accent, opacity: 0.35 }]} />
+            <View style={[styles.fill, { width: pct(work.done), backgroundColor: accent }]} />
+            {work.over ? <View style={[styles.capacity, { left: pct(work.capacity), backgroundColor: colors.ink }]} /> : null}
           </View>
           <View style={[styles.inline, styles.between]}>
-            <AppText variant="caption" color={colors.warnText}>{`오늘 ${formatHours(load.hours - load.capacity)} 초과 · 이번 주도 확인해보세요`}</AppText>
-            <IconChevron size={14} color={colors.warnText} />
+            <AppText variant="caption" color={work.over ? colors.warnText : colors.inkSoft}>
+              {[`완료 ${formatHours(work.done)}`, `남은 ${formatHours(work.remaining)}`, work.over ? `${formatHours(work.total - work.capacity)} 초과` : null].filter(Boolean).join(' · ')}
+            </AppText>
+            <IconChevron size={14} color={work.over ? colors.warnText : colors.inkSoft} />
           </View>
         </Pressable>
       ) : null}
@@ -125,6 +133,7 @@ const styles = StyleSheet.create({
   overloadHours: { marginLeft: 'auto', fontSize: 14 },
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
+  capacity: { position: 'absolute', top: 0, bottom: 0, width: 2 },
   list: { gap: 8 },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', elevation: 6 },
   pressed: { transform: [{ scale: 0.95 }] },
