@@ -12,6 +12,8 @@ export const taskSchema = z.object({
   id: z.number(),
   projectId: z.number(),
   title: z.string(),
+  /** 목표·범위·완료 기준 (AI가 제안) */
+  description: z.string(),
   estimatedHours: z.number().nullable(),
   dependsOnId: z.number().nullable(),
   scheduledDate: dateKey.nullable(),
@@ -67,17 +69,20 @@ export const updateTaskResponseSchema = z.object({ task: taskSchema, projectAllD
 export const proposedTaskSchema = z.object({
   key: z.string(),
   title: z.string(),
+  description: z.string(),
   estimatedHours: z.number(),
   dependsOnKey: z.string().nullable(),
   prerequisite: z.boolean(),
+  /** AI가 역산한 마감일 — 참고용(저장·표시는 서버 일정 알고리즘이 정한 날짜) */
+  aiDueDate: dateKey.nullable(),
 });
 
 export const chatResponseSchema = z.object({
   type: z.enum(['question', 'tasks']),
   message: z.string(),
-  questionNumber: z.number(),
-  totalQuestions: z.number(),
   tasks: z.array(proposedTaskSchema).optional(),
+  /** AI가 가정한 것·일정이 빠듯한 작업 안내 */
+  assumptions: z.array(z.string()).optional(),
 });
 
 export type User = z.infer<typeof userSchema>;

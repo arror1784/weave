@@ -32,6 +32,9 @@ export const signupSchema = z
 export const projectBasicSchema = z.object({
   name: z.string().trim().min(1, '프로젝트명을 입력해 주세요.'),
   description: z.string().trim(),
+  /** 결과물 형태·기 진행사항 — 비어 있으면 AI 챗봇이 묻는다 */
+  deliverable: z.string().trim(),
+  progress: z.string().trim(),
   /** 비우면 마감 없음(상시) */
   deadline: z
     .string()

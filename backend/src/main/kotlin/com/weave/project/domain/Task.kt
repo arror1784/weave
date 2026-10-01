@@ -25,6 +25,10 @@ class Task(
     @Column(nullable = false)
     val title: String,
 
+    /** 목표·범위·완료 기준 */
+    @Column(nullable = false)
+    val description: String,
+
     @Column(name = "estimated_hours")
     val estimatedHours: Double?,
 

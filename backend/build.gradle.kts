@@ -66,3 +66,11 @@ allOpen {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// AI 시스템 프롬프트의 원본은 사용자가 쓴 docs/ 문서 하나 — 빌드할 때 서버 리소스로 복사한다(코드에 따로 두지 않는다)
+tasks.processResources {
+    from(rootProject.file("../docs/Weave — AI 작업 분할 시스템 프롬프트.md")) {
+        into("prompts")
+        rename { "project-breakdown.md" }
+    }
+}

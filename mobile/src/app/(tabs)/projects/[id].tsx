@@ -46,6 +46,7 @@ export default function ProjectDetailScreen() {
   const toggle = useToggleTask(() => query.data?.name ?? '');
   const [tab, setTab] = useState<Tab>('tasks');
   const [colorOpen, setColorOpen] = useState(false);
+  const [openTask, setOpenTask] = useState<number | null>(null);
   const project = query.data;
 
   if (!project) {
@@ -141,7 +142,13 @@ export default function ProjectDetailScreen() {
               return (
                 <View key={t.id} style={[styles.taskRow, { backgroundColor: colors.surface, borderColor: colors.line, borderRadius: radius.card }]}>
                   <Checkbox checked={t.done} onToggle={() => toggle(t)} label={`${t.title} 완료`} color={palette.dot} />
-                  <View accessible accessibilityLabel={`${t.title}, ${t.estimatedHours ?? 0}시간${dep ? `, 선행 ${dep.title}${blocked ? ' 필요' : ''}` : ''}`} style={styles.taskBody}>
+                  {/* 누르면 세부 설명(목표·범위·완료 기준)을 펼친다 — 작업 내용은 고칠 수 없다(사용자 결정 B) */}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: openTask === t.id }}
+                    accessibilityLabel={`${t.title}, ${t.estimatedHours ?? 0}시간${dep ? `, 선행 ${dep.title}${blocked ? ' 필요' : ''}` : ''}, 설명 ${openTask === t.id ? '접기' : '보기'}`}
+                    onPress={() => setOpenTask((o) => (o === t.id ? null : t.id))}
+                    style={styles.taskBody}>
                     <View style={styles.flex}>
                       <View style={styles.inline}>
                         <AppText style={[styles.flex, t.done && { color: colors.inkSoft, textDecorationLine: 'line-through' }]}>{t.title}</AppText>
@@ -155,8 +162,13 @@ export default function ProjectDetailScreen() {
                           <AppText variant="micro" tone="soft">{`선행: ${dep.title}${blocked ? ' 필요' : ''}`}</AppText>
                         </View>
                       ) : null}
+                      {openTask === t.id ? (
+                        <AppText variant="small" tone="soft" style={styles.description}>
+                          {t.description || '설명이 없어요.'}
+                        </AppText>
+                      ) : null}
                     </View>
-                  </View>
+                  </Pressable>
                 </View>
               );
             })}
@@ -219,6 +231,7 @@ const styles = StyleSheet.create({
   taskBody: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingRight: 16, minHeight: 24 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   depLine: { marginTop: 6, gap: 4 },
+  description: { marginTop: 8 },
   flex: { flex: 1 },
   attachments: { gap: 8, marginTop: 8 },
   attachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, paddingHorizontal: 14, minHeight: 48 },

@@ -28,19 +28,20 @@ beforeEach(() => {
   projects.getSchedule.mockResolvedValue(sampleSchedule(TEST_TODAY));
 });
 
-const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', color: 'gray', attachments: [], chat: [], tasks: [] };
+const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '', color: 'gray', attachments: [], chat: [], tasks: [] };
 const proposed: ProposedTask[] = [
-  { key: 'k1', title: '관련 개념 학습 (인터럽트)', estimatedHours: 2, dependsOnKey: null, prerequisite: true },
-  { key: 'k2', title: '설계 문서 작성', estimatedHours: 3, dependsOnKey: 'k1', prerequisite: false },
-  { key: 'k3', title: '보고서 초안 작성', estimatedHours: 4, dependsOnKey: 'k2', prerequisite: false },
-  { key: 'k4', title: '발표자료 제작', estimatedHours: 2, dependsOnKey: null, prerequisite: false },
+  { key: 'k1', title: '관련 개념 학습 (인터럽트)', description: 'NVIC·EXTI 개념 정리, 예제 1개 실행', estimatedHours: 2, dependsOnKey: null, prerequisite: true, aiDueDate: '2026-10-03' },
+  { key: 'k2', title: '설계 문서 작성', description: '블록도와 시퀀스', estimatedHours: 3, dependsOnKey: 'k1', prerequisite: false, aiDueDate: '2026-10-05' },
+  { key: 'k3', title: '보고서 초안 작성', description: '', estimatedHours: 4, dependsOnKey: 'k2', prerequisite: false, aiDueDate: null },
+  { key: 'k4', title: '발표자료 제작', description: '', estimatedHours: 2, dependsOnKey: null, prerequisite: false, aiDueDate: null },
 ];
+const draftTasks = proposed.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite, aiDueDate }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite, aiDueDate }));
 
 describe('등록 1/3 기본 정보', () => {
   it('단계 표시와 입력칸을 보여준다', async () => {
     await renderWithProviders(<NewProjectScreen />);
     expect(screen.getByText('1 / 3')).toBeOnTheScreen();
-    for (const label of ['프로젝트명', '마감일', '설명 · 목표']) expect(screen.getByLabelText(label)).toBeOnTheScreen();
+    for (const label of ['프로젝트명', '마감일', '설명 · 목표', '결과물 형태', '기 진행사항']) expect(screen.getByLabelText(label)).toBeOnTheScreen();
   });
 
   it('프로젝트명이 없거나 마감일 형식이 틀리면 다음으로 가지 않는다', async () => {
@@ -58,8 +59,10 @@ describe('등록 1/3 기본 정보', () => {
     await fireEvent.changeText(screen.getByLabelText('마감일'), '2026-10-09');
     expect(await screen.findByText('D-9')).toBeOnTheScreen();
     await fireEvent.changeText(screen.getByLabelText('설명 · 목표'), '3인 팀플');
+    await fireEvent.changeText(screen.getByLabelText('결과물 형태'), '보고서, 발표자료');
+    await fireEvent.changeText(screen.getByLabelText('기 진행사항'), '회로 구성 끝');
     await fireEvent.press(screen.getByRole('button', { name: '다음' }));
-    expect(draftRef.current).toMatchObject({ name: '임베디드시스템 과제', deadline: '2026-10-09', description: '3인 팀플' });
+    expect(draftRef.current).toMatchObject({ name: '임베디드시스템 과제', deadline: '2026-10-09', description: '3인 팀플', deliverable: '보고서, 발표자료', progress: '회로 구성 끝' });
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
   });
 
@@ -118,7 +121,7 @@ describe('등록 1/3 기본 정보', () => {
 
 describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
   it('등록 1단계에서 올린 첨부 id를 함께 보내 AI가 첨부를 읽게 한다', async () => {
-    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '명세서를 읽었어요. 팀원은 몇 명인가요?', questionNumber: 1, totalQuestions: 5 });
+    chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '명세서를 읽었어요. 팀원은 몇 명인가요?' });
     await renderWithProviders(<ChatScreen />, { draft: { ...draft, attachments: [{ id: 21, kind: 'file', name: 'spec.pdf' }, { id: 22, kind: 'link', name: 'https://example.com', url: 'https://example.com' }] } });
     expect(await screen.findByText('명세서를 읽었어요. 팀원은 몇 명인가요?')).toBeOnTheScreen();
     expect(chat.sendChat).toHaveBeenCalledWith(expect.anything(), [], [21, 22]);
@@ -126,11 +129,11 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
 
   it('처음 들어오면 기본 정보로 첫 질문을 받고, 답하면 대화 전체를 보내 다음 질문을 받는다', async () => {
     chat.sendChat
-      .mockResolvedValueOnce({ type: 'question', message: '선행 지식이 있나요?', questionNumber: 1, totalQuestions: 5 })
-      .mockResolvedValueOnce({ type: 'question', message: '누가 보고서를 맡나요?', questionNumber: 2, totalQuestions: 5 });
+      .mockResolvedValueOnce({ type: 'question', message: '선행 지식이 있나요?' })
+      .mockResolvedValueOnce({ type: 'question', message: '누가 보고서를 맡나요?' });
     await renderWithProviders(<ChatScreen />, { draft });
     expect(await screen.findByText('선행 지식이 있나요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09' }, [], []);
+    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '' }, [], []);
     // 질문 진행 표시(n/5)는 없앴다
     expect(screen.queryByText(/\/5$/)).toBeNull();
 
@@ -147,13 +150,27 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
     );
   });
 
-  it('AI가 작업을 제안하면 초안에 담고 검토로 갈 수 있다', async () => {
-    chat.sendChat.mockResolvedValueOnce({ type: 'tasks', message: '4개 작업을 만들었어요.', questionNumber: 3, totalQuestions: 5, tasks: proposed });
+  it('AI가 작업을 제안하면 초안에 담고 가정을 보여준다 — 검토로 갈 수도, 대화로 계속 고칠 수도 있다', async () => {
+    chat.sendChat
+      .mockResolvedValueOnce({ type: 'tasks', message: '4개 작업을 만들었어요.', tasks: proposed, assumptions: ['팀원 3명으로 가정했어요'] })
+      .mockResolvedValueOnce({ type: 'tasks', message: '발표자료를 나눴어요.', tasks: proposed, assumptions: [] });
     await renderWithProviders(<ChatScreen />, { draft: { ...draft, chat: [{ role: 'assistant', text: '하루에 얼마나?' }] } });
     await fireEvent.changeText(screen.getByLabelText('답변 입력'), '하루 2시간');
     await fireEvent.press(screen.getByRole('button', { name: '보내기' }));
     expect(await screen.findByText('4개 작업을 만들었어요.')).toBeOnTheScreen();
-    expect(draftRef.current?.tasks).toHaveLength(4);
+    expect(screen.getByText('제안한 작업 4개')).toBeOnTheScreen();
+    expect(screen.getByText('· 팀원 3명으로 가정했어요')).toBeOnTheScreen();
+    expect(draftRef.current?.tasks.map((t) => t.title)).toEqual(proposed.map((t) => t.title));
+
+    // 제안 뒤에도 대화로 의견을 보낼 수 있다 — 앞서 받은 제안을 함께 보낸다
+    await fireEvent.changeText(screen.getByLabelText('답변 입력'), '발표자료는 너무 커');
+    await fireEvent.press(screen.getByRole('button', { name: '보내기' }));
+    expect(await screen.findByText('발표자료를 나눴어요.')).toBeOnTheScreen();
+    const history = chat.sendChat.mock.calls.at(-1)![1];
+    expect(history.at(-2)).toMatchObject({ role: 'assistant', text: '4개 작업을 만들었어요.' });
+    expect(history.at(-2)!.tasks![1]).toEqual({ title: '설계 문서 작성', description: '블록도와 시퀀스', estimatedHours: 3, dependsOnTitle: '관련 개념 학습 (인터럽트)', prerequisite: false });
+    expect(history.at(-1)).toEqual({ role: 'user', text: '발표자료는 너무 커' });
+
     await fireEvent.press(screen.getByRole('button', { name: '작업 검토하기' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/review');
   });
@@ -161,7 +178,7 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
   it('빈 답변은 보낼 수 없고, AI가 응답하지 않으면 다시 시도할 수 있다', async () => {
     chat.sendChat
       .mockRejectedValueOnce(new ApiError(503, 'AI_UNAVAILABLE', 'AI가 잠시 응답하지 않아요. 다시 시도해 주세요.'))
-      .mockResolvedValueOnce({ type: 'question', message: '선행 지식이 있나요?', questionNumber: 1, totalQuestions: 5 });
+      .mockResolvedValueOnce({ type: 'question', message: '선행 지식이 있나요?' });
     await renderWithProviders(<ChatScreen />, { draft });
     expect(await screen.findByText('AI가 잠시 응답하지 않아요. 다시 시도해 주세요.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();
@@ -171,7 +188,7 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
 });
 
 describe('등록 3/3 작업 검토', () => {
-  const withTasks = { ...draft, tasks: proposed };
+  const withTasks = { ...draft, tasks: draftTasks };
 
   it('제안된 작업 수와 총 시간, 선행 학습·선행 연결을 보여준다', async () => {
     await renderWithProviders(<ReviewScreen />, { draft: withTasks });
@@ -179,6 +196,28 @@ describe('등록 3/3 작업 검토', () => {
     expect(screen.getByText('총 11h')).toBeOnTheScreen();
     expect(screen.getByText('선행 학습')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: '선행 연결 해제: 관련 개념 학습 완료 후' })).toBeOnTheScreen();
+  });
+
+  it('작업을 누르면 세부 설명과 AI가 역산한 마감일(참고)을 펼쳐 보여준다', async () => {
+    await renderWithProviders(<ReviewScreen />, { draft: withTasks });
+    expect(screen.queryByText('NVIC·EXTI 개념 정리, 예제 1개 실행')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '1번 작업 설명 보기' }));
+    expect(screen.getByText('NVIC·EXTI 개념 정리, 예제 1개 실행')).toBeOnTheScreen();
+    expect(screen.getByText('AI 제안 마감 10/3 (참고)')).toBeOnTheScreen();
+  });
+
+  it('직접 고친 목록을 AI에게 보내 다시 정리받는다 (대화 기록과 함께)', async () => {
+    chat.sendChat.mockResolvedValueOnce({ type: 'tasks', message: '반영해서 다시 정리했어요.', tasks: proposed.slice(0, 2), assumptions: [] });
+    const history = [{ role: 'assistant' as const, text: '팀원은?' }, { role: 'user' as const, text: '3명' }];
+    await renderWithProviders(<ReviewScreen />, { draft: { ...withTasks, chat: history } });
+    await fireEvent.press(screen.getByRole('button', { name: '4번 작업 삭제' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'AI에게 다시 정리 요청' }));
+    const [, sent] = chat.sendChat.mock.calls.at(-1)!;
+    expect(sent.slice(0, 2)).toEqual(history);
+    expect(sent.at(-1)!.role).toBe('user');
+    expect(sent.at(-1)!.tasks!.map((t) => t.title)).toEqual(['관련 개념 학습 (인터럽트)', '설계 문서 작성', '보고서 초안 작성']);
+    expect(await screen.findByText('반영해서 다시 정리했어요.')).toBeOnTheScreen();
+    expect(draftRef.current?.tasks).toHaveLength(2);
   });
 
   it('이름·시간을 고치고, 삭제·추가하고, 선행 연결을 토글한다', async () => {
@@ -208,7 +247,7 @@ describe('등록 3/3 작업 검토', () => {
       description: 'STM32',
       deadline: '2026-10-09',
       color: 'gray',
-      tasks: proposed,
+      tasks: proposed.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite })),
       attachmentIds: [21],
     });
     expect(await screen.findByText('임베디드시스템 과제가 등록됐어요 · 마감 안에 끝내기 빠듯한 작업 1개')).toBeOnTheScreen();

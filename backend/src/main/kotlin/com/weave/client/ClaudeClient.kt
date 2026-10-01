@@ -8,9 +8,9 @@ import com.anthropic.models.messages.CacheControlEphemeral
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.DocumentBlockParam
 import com.anthropic.models.messages.ImageBlockParam
-import com.anthropic.models.messages.JsonOutputFormat
 import com.anthropic.models.messages.MessageCreateParams
-import com.anthropic.models.messages.OutputConfig
+import com.anthropic.models.messages.Tool
+import com.anthropic.models.messages.ToolChoiceTool
 import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
 import org.springframework.http.HttpStatus
@@ -21,27 +21,35 @@ import org.springframework.stereotype.Component
  * 모델은 사용자 결정대로 Claude Sonnet 5.5, 키는 .env의 ANTHROPIC_API_KEY.
  */
 @Component
-class ClaudeClient(private val properties: WeaveProperties) : AiClient {
+class ClaudeClient(private val weaveProperties: WeaveProperties) : AiClient {
 
     private val client: AnthropicClient? by lazy {
-        properties.anthropic.apiKey.takeIf { it.isNotBlank() }?.let { AnthropicOkHttpClient.builder().apiKey(it).build() }
+        weaveProperties.anthropic.apiKey.takeIf { it.isNotBlank() }?.let { AnthropicOkHttpClient.builder().apiKey(it).build() }
     }
 
-    override fun complete(system: String, turns: List<AiTurn>, schema: Map<String, Any>): String {
+    override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean): AiResult {
         val api = client ?: throw ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AI_UNAVAILABLE", "AI 설정이 없어요.")
+        @Suppress("UNCHECKED_CAST")
+        val properties = tool.inputSchema["properties"] as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val required = tool.inputSchema["required"] as? List<String> ?: emptyList()
         val params = MessageCreateParams.builder()
-            .model(properties.anthropic.model)
+            .model(weaveProperties.anthropic.model)
             .maxTokens(MAX_TOKENS)
             .system(system)
-            .outputConfig(
-                OutputConfig.builder()
-                    .format(
-                        JsonOutputFormat.builder()
-                            .schema(JsonOutputFormat.Schema.builder().putAllAdditionalProperties(schema.mapValues { JsonValue.from(it.value) }).build())
+            .addTool(
+                Tool.builder()
+                    .name(tool.name)
+                    .description(tool.description)
+                    .inputSchema(
+                        Tool.InputSchema.builder()
+                            .properties(Tool.InputSchema.Properties.builder().putAllAdditionalProperties(properties.mapValues { JsonValue.from(it.value) }).build())
+                            .required(required)
                             .build(),
                     )
                     .build(),
             )
+            .apply { if (forceTool) toolChoice(ToolChoiceTool.builder().name(tool.name).build()) }
             .apply {
                 turns.forEach {
                     when {
@@ -53,7 +61,13 @@ class ClaudeClient(private val properties: WeaveProperties) : AiClient {
             }
             .build()
         val message = api.messages().create(params)
-        return message.content().mapNotNull { block -> block.text().orElse(null)?.text() }.joinToString("")
+        val text = message.content().mapNotNull { block -> block.text().orElse(null)?.text() }.joinToString("").trim()
+        val toolInput = message.content().firstNotNullOfOrNull { block -> block.toolUse().orElse(null)?.takeIf { it.name() == tool.name } }
+            ?.let {
+                @Suppress("UNCHECKED_CAST")
+                it._input().convert(Map::class.java) as Map<String, Any?>
+            }
+        return AiResult(text, toolInput)
     }
 
     /**

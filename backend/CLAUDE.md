@@ -51,13 +51,13 @@ backend/
     │   ├── project/                     # 프로젝트·작업 (작업은 완료 여부만 바뀐다)
     │   ├── schedule/                    # domain/Scheduler(임시 일정 알고리즘 — 등록 때 전부 다시 배치) · service/OverdueRoller(밀린 작업 → 오늘, 매일 0시 5분) · 일정 스냅샷 API
     │   ├── attachment/                  # 첨부 업로드·링크·내려받기 · storage/FileStorage(로컬 디스크) · OrphanAttachmentCleaner(연결 안 된 첨부 24시간 후 삭제, 매일 4시)
-    │   ├── ai/                          # 등록 챗봇(ProjectChatService) · AttachmentContentLoader(첨부 → AI 내용) — 프롬프트는 resources/prompts/project-breakdown.md(임시)
+    │   ├── ai/                          # 등록 챗봇(ProjectChatService — propose_tasks 도구, 5턴 뒤 강제) · AttachmentContentLoader(첨부 → AI 내용)
     │   ├── client/                      # 외부 연동: AiClient ← ClaudeClient
     │   └── {feature}/{controller,dto,service,repository,domain}/
     ├── main/resources/
     │   ├── application.yml
-    │   ├── prompts/project-breakdown.md # ⚠ 임시 AI 프롬프트 — 사용자가 작성 중. 이 파일만 바꾸면 된다
-    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from
+    │   │                                # AI 시스템 프롬프트는 여기 두지 않는다 — 빌드할 때 ../docs/Weave — AI 작업 분할 시스템 프롬프트.md를 prompts/project-breakdown.md로 복사(build.gradle.kts)
+    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description
     └── test/kotlin/com/weave/           # main과 같은 패키지 구조
         ├── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용
         └── support/ApiTestSupport.kt       # 가입 후 토큰 받기·JSON 헬퍼 (통합 테스트는 @ActiveProfiles("test") — src/test/resources/application-test.yml)

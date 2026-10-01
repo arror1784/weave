@@ -45,7 +45,7 @@ class ProjectService(
 
         val project = projectRepository.save(Project(userId, request.name.trim(), request.description.trim(), request.deadline, request.color))
         val saved = request.tasks.mapIndexed { i, t ->
-            t.key to taskRepository.save(Task(project.id!!, i, t.title.trim(), t.estimatedHours, null, 1, null, t.prerequisite))
+            t.key to taskRepository.save(Task(project.id!!, i, t.title.trim(), t.description.trim(), t.estimatedHours, null, 1, null, t.prerequisite))
         }.toMap()
         request.tasks.forEach { t -> t.dependsOnKey?.let { saved.getValue(t.key).dependsOnId = saved.getValue(it).id } }
 

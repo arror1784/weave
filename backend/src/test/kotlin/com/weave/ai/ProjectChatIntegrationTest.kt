@@ -2,6 +2,8 @@ package com.weave.ai
 
 import com.weave.TestcontainersConfiguration
 import com.weave.client.AiClient
+import com.weave.client.AiResult
+import com.weave.client.AiTool
 import com.weave.client.AiTurn
 import com.weave.support.ApiTestSupport
 import io.kotest.core.extensions.ApplyExtension
@@ -26,8 +28,7 @@ class FakeAiConfiguration {
     @Bean
     @Primary
     fun fakeAiClient(): AiClient = object : AiClient {
-        override fun complete(system: String, turns: List<AiTurn>, schema: Map<String, Any>) =
-            """{"type":"question","message":"팀원은 몇 명인가요?","tasks":[]}"""
+        override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean) = AiResult("팀원은 몇 명인가요?", null)
     }
 }
 
@@ -50,7 +51,6 @@ class ProjectChatIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
             status { isOk() }
             jsonPath("$.type") { value("question") }
             jsonPath("$.message") { value("팀원은 몇 명인가요?") }
-            jsonPath("$.questionNumber") { value(1) }
         }
     }
 

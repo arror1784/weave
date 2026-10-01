@@ -1,14 +1,14 @@
 import { draftReducer, type Draft } from './draft';
 
-const base: Draft = { name: '임베디드', description: '', deadline: '2026-10-09', color: 'teal', attachments: [], chat: [], tasks: [] };
+const base: Draft = { name: '임베디드', description: '', deadline: '2026-10-09', deliverable: '', progress: '', color: 'teal', attachments: [], chat: [], tasks: [] };
 
 describe('등록 초안', () => {
   it('작업을 고치고, 지우면 그 작업을 선행으로 둔 연결도 끊고, 새 작업을 추가한다', () => {
     let d = draftReducer(base, {
       type: 'setTasks',
       tasks: [
-        { key: 'a', title: '개념 학습', estimatedHours: 2, dependsOnKey: null, prerequisite: true },
-        { key: 'b', title: '설계 문서', estimatedHours: 3, dependsOnKey: 'a', prerequisite: false },
+        { key: 'a', title: '개념 학습', description: '', estimatedHours: 2, dependsOnKey: null, prerequisite: true, aiDueDate: null },
+        { key: 'b', title: '설계 문서', description: '', estimatedHours: 3, dependsOnKey: 'a', prerequisite: false, aiDueDate: null },
       ],
     });
     d = draftReducer(d, { type: 'updateTask', key: 'b', changes: { estimatedHours: 3.5 } });

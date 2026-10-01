@@ -5,20 +5,21 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 
 import { sendChat, type ChatTurn } from '@/api/chat';
 import { errorMessage } from '@/api/errors';
-import type { ChatResponse } from '@/api/types';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Footer } from '@/components/Footer';
 import { IconCheck, IconSend, IconSparkle } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
+import { assistantTurn, chatProject } from '@/state/draft';
 import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
 
 /**
  * 프로젝트 등록 2/3: AI와 작업 쪼개기 (Figma 02-b-ii).
- * 서버가 Claude API를 부른다(앱은 AI를 직접 부르지 않는다). 대화는 초안에 보관하고 매번 전체를 보낸다.
- * 질문 내용은 서버의 임시 프롬프트가 정한다(사용자가 작성 중). 첨부도 함께 보내 AI가 읽게 한다.
+ * 서버가 Claude API를 부르고, 질문·작업 분할은 사용자 프롬프트(docs/Weave — AI 작업 분할 시스템 프롬프트.md)를 따른다.
+ * 대화는 초안에 보관하고 매번 전체를 보낸다(첨부 id 포함). 작업을 제안받은 뒤에도 대화로 계속 고칠 수 있고,
+ * 검토 화면의 "등록 완료"가 확정이다(사용자 결정 2026-10-01).
  */
 export default function ChatScreen() {
   const router = useRouter();
@@ -27,10 +28,9 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string>();
-  const [last, setLast] = useState<ChatResponse | null>(null);
   const scroll = useRef<ScrollView>(null);
-  const project = draft ? { name: draft.name, description: draft.description, deadline: draft.deadline } : null;
-  // 등록 1단계에서 올린 첨부 — 서버가 내용을 AI에게 함께 보낸다(사용자 결정 2026-10-01)
+  const project = draft ? chatProject(draft) : null;
+  // 등록 1단계에서 올린 첨부 — 서버가 내용을 AI에게 함께 보낸다
   const attachmentIds = draft?.attachments.map((a) => a.id) ?? [];
 
   // 첫 질문: 대화가 비어 있으면 기본 정보만 보내 받는다(화면에 들어오면 한 번)
@@ -42,15 +42,10 @@ export default function ChatScreen() {
     retry: false,
   });
 
-  const chat: ChatTurn[] = draft?.chat.length ? draft.chat : first.data ? [{ role: 'assistant', text: first.data.message }] : [];
-  const reply = last ?? first.data ?? null;
-  const finished = (draft?.tasks.length ?? 0) > 0 || reply?.type === 'tasks';
+  const chat: ChatTurn[] = draft?.chat.length ? draft.chat : first.data ? [assistantTurn(first.data)] : [];
+  const proposed = (draft?.tasks.length ?? 0) > 0 || chat.some((m) => m.tasks?.length);
   const pending = sending || first.isFetching;
   const error = sendError ?? (draft?.chat.length ? undefined : first.error ? errorMessage(first.error) : undefined);
-
-  function applyTasks(r: ChatResponse) {
-    if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
-  }
 
   async function ask(history: ChatTurn[]) {
     if (!project) return;
@@ -58,9 +53,8 @@ export default function ChatScreen() {
     setSendError(undefined);
     try {
       const r = await sendChat(project, history, attachmentIds);
-      dispatch({ type: 'setChat', chat: [...history, { role: 'assistant', text: r.message }] });
-      applyTasks(r);
-      setLast(r);
+      dispatch({ type: 'setChat', chat: [...history, assistantTurn(r)] });
+      if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
     } catch (e) {
       setSendError(errorMessage(e));
     } finally {
@@ -84,7 +78,10 @@ export default function ChatScreen() {
 
   function review() {
     // 첫 응답에서 바로 작업을 제안했으면 초안에 담고 간다
-    if (first.data && !draft?.tasks.length) applyTasks(first.data);
+    if (first.data?.tasks && !draft?.tasks.length) {
+      dispatch({ type: 'setChat', chat });
+      dispatch({ type: 'setTasks', tasks: first.data.tasks });
+    }
     router.push('/project/new/review');
   }
 
@@ -97,17 +94,16 @@ export default function ChatScreen() {
       header={<StepHeader step={2} title="AI와 작업 쪼개기" onBack={() => router.back()} />}
       footer={
         <Footer>
-          {finished ? (
-            <Button label="작업 검토하기" onPress={review} icon={(c) => <IconCheck size={17} color={c} />} />
-          ) : (
-            <View style={styles.inputRow}>
+          {/* 제안을 받은 뒤에도 의견을 보내 다시 제안받을 수 있다 — 검토 화면의 "등록 완료"가 확정 */}
+          {proposed ? <Button label="작업 검토하기" onPress={review} icon={(c) => <IconCheck size={17} color={c} />} /> : null}
+            <View style={[styles.inputRow, proposed && styles.inputGap]}>
               <TextInput
                 accessibilityLabel="답변 입력"
                 value={input}
                 onChangeText={setInput}
                 onSubmitEditing={send}
                 returnKeyType="send"
-                placeholder="답변을 입력하세요"
+                placeholder={proposed ? '고칠 점을 말해 주세요' : '답변을 입력하세요'}
                 placeholderTextColor={colors.inkSoft}
                 style={[typography.body, styles.input, { borderColor: colors.control, color: colors.ink, backgroundColor: colors.surface }]}
               />
@@ -121,11 +117,19 @@ export default function ChatScreen() {
                 <IconSend size={18} color={canSend ? colors.onThread : colors.inkSoft} />
               </Pressable>
             </View>
-          )}
         </Footer>
       }>
       <ScrollView ref={scroll} contentContainerStyle={styles.messages} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
-        {chat.map((m, i) => (m.role === 'assistant' ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />))}
+        {chat.map((m, i) =>
+          m.role === 'assistant' ? (
+            <View key={i} style={styles.turn}>
+              <BotBubble text={m.text} />
+              {m.tasks?.length ? <ProposalCard count={m.tasks.length} assumptions={m.assumptions ?? []} /> : null}
+            </View>
+          ) : (
+            <UserBubble key={i} text={m.tasks?.length ? [`직접 고친 목록(${m.tasks.length}개)을 보냈어요.`, m.text].filter(Boolean).join('\n') : m.text} />
+          ),
+        )}
         {error ? (
           <View style={styles.errorRow}>
             <AppText variant="small" color={colors.dangerText} accessibilityLiveRegion="polite">
@@ -158,6 +162,18 @@ export default function ChatScreen() {
     );
   }
 
+  /** 작업 제안 요약 — 개수와 AI가 가정한 것(일정이 빠듯한 작업 안내 포함). 목록 자체는 검토 화면에서 */
+  function ProposalCard({ count, assumptions }: { count: number; assumptions: string[] }) {
+    return (
+      <View style={[styles.card, { backgroundColor: colors.threadSoft, borderRadius: radius.card }]}>
+        <AppText variant="label" color={colors.thread}>{`제안한 작업 ${count}개`}</AppText>
+        {assumptions.map((a, i) => (
+          <AppText key={i} variant="small" tone="soft">{`· ${a}`}</AppText>
+        ))}
+      </View>
+    );
+  }
+
   function UserBubble({ text }: { text: string }) {
     return (
       <View style={styles.userRow} accessible accessibilityLabel={`나: ${text}`}>
@@ -183,6 +199,9 @@ const styles = StyleSheet.create({
   errorRow: { alignItems: 'flex-start', gap: 8, paddingLeft: 36 },
   typingDot: { width: 6, height: 6, borderRadius: 3 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inputGap: { marginTop: 8 },
+  turn: { gap: 8 },
+  card: { marginLeft: 36, padding: 12, gap: 4 },
   input: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 999, paddingHorizontal: 16 },
   send: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
 });

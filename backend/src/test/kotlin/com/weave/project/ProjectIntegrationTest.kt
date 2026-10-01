@@ -33,8 +33,8 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
     val today = LocalDate.now(ZoneId.of("Asia/Seoul"))
     fun newUser() = api.signup("p-${UUID.randomUUID()}@example.com")
 
-    fun task(key: String, title: String, hours: Double, dependsOn: String? = null, prerequisite: Boolean = false) =
-        mapOf("key" to key, "title" to title, "estimatedHours" to hours, "dependsOnKey" to dependsOn, "prerequisite" to prerequisite)
+    fun task(key: String, title: String, hours: Double, dependsOn: String? = null, prerequisite: Boolean = false, description: String = "") =
+        mapOf("key" to key, "title" to title, "description" to description, "estimatedHours" to hours, "dependsOnKey" to dependsOn, "prerequisite" to prerequisite)
 
     val embeddedTasks = listOf(
         task("k1", "관련 개념 학습", 2.0, prerequisite = true),
@@ -68,6 +68,11 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         tasks[1]["dependsOnId"].asLong() shouldBe tasks[0]["id"].asLong()
         tasks[0]["prerequisite"].asBoolean() shouldBe true
         tasks[0]["done"].asBoolean() shouldBe false
+    }
+
+    test("작업 세부 설명(목표·범위·완료 기준)을 저장하고 돌려준다") {
+        val body = createOk(newUser(), tasks = listOf(task("a", "설계 문서 작성", 3.0, description = "블록도와 시퀀스 다이어그램, 리뷰 1회")))
+        body["project"]["tasks"][0]["description"].asString() shouldBe "블록도와 시퀀스 다이어그램, 리뷰 1회"
     }
 
     test("두 번째 프로젝트는 첫 프로젝트가 쓴 시간을 피해 배정한다") {

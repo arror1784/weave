@@ -15,6 +15,9 @@ data class CreateTaskRequest(
     @field:Size(max = 200)
     val title: String,
 
+    @field:Size(max = 2000)
+    val description: String = "",
+
     @field:DecimalMin(value = "0.5", message = "소요 시간은 0.5시간 이상이어야 해요.")
     @field:DecimalMax(value = "200")
     val estimatedHours: Double,

@@ -14,4 +14,12 @@ data class ChatProjectInfo(
     val description: String = "",
 
     val deadline: LocalDate? = null,
+
+    /** 결과물 형태 (예: 보고서, 발표자료, 앱) — 비어 있으면 AI가 묻는다 */
+    @field:Size(max = 500)
+    val deliverable: String = "",
+
+    /** 기 진행사항 (이미 해 둔 작업) */
+    @field:Size(max = 2000)
+    val progress: String = "",
 )
