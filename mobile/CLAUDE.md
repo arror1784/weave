@@ -31,6 +31,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 | @tanstack/react-query | 5.x | 서버 상태 캐시 (`src/queries/`) |
 | expo-secure-store | 57.0.x | 리프레시 토큰 보관(루트 §3-2) |
 | @react-native-community/netinfo | 12.x | 오프라인 감지 → Query `onlineManager` |
+| expo-file-system · expo-sharing | 57.0.x | 첨부 내려받기(`File.downloadFileAsync`) → 공유 창으로 열기 |
 | expo-document-picker · expo-image-picker | 57.0.x | 참고자료 파일·사진 첨부 (카메라·마이크 권한은 `app.config.ts`에서 막음) |
 | react-native-android-widget | 0.22.x | Android 홈 화면 위젯(config plugin). 공식 예제는 SDK 55 기준 — SDK 57 실기기 동작은 확인 전 |
 | Jest + jest-expo | 29.7 + 57.0.x | jest-expo 57은 Jest 29 기반 — 30으로 올리지 않는다 |
