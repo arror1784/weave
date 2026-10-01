@@ -58,9 +58,10 @@ export function TaskCard({ task, project, today, onToggle, blockedBy }: TaskCard
               </View>
             ) : null}
             {blockedBy && !task.done ? (
-              <View style={styles.inline}>
+              // 자기 줄에 두고 길면 줄바꿈한다 — 같은 줄에 두었더니 긴 작업명이 카드 밖으로 잘렸다(2026-10-01)
+              <View style={[styles.inline, styles.warnLine]}>
                 <IconWarn size={12} color={colors.warn} />
-                <AppText variant="micro" color={colors.warnText}>{`${blockedBy} 미완료`}</AppText>
+                <AppText variant="micro" color={colors.warnText} style={styles.shrink}>{`${blockedBy} 미완료`}</AppText>
               </View>
             ) : null}
           </View>
@@ -79,4 +80,6 @@ const styles = StyleSheet.create({
   pill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  warnLine: { width: '100%', alignItems: 'flex-start' },
+  shrink: { flexShrink: 1 },
 });
