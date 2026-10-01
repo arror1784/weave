@@ -37,7 +37,11 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             accessibilityLabel={tab.label}
             onPress={() => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+              if (event.defaultPrevented) return;
+              // 탭을 누르면 언제나 그 탭의 첫 화면으로 — 프로젝트 탭은 상세를 보다 떠났어도 목록이 뜬다(사용자 결정 2026-10-02)
+              const nested = route.state;
+              if (nested?.key && (nested.index ?? 0) > 0) navigation.dispatch({ type: 'POP_TO_TOP', target: nested.key });
+              if (!focused) navigation.navigate(route.name);
             }}
             style={styles.tab}>
             <tab.Icon size={22} color={color} />
