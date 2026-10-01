@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/theme';
@@ -28,7 +28,9 @@ export function Screen({ children, contentStyle, scroll = true, edges = ['top'],
   const { colors } = useAppTheme();
   return (
     <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: background === 'surface' ? colors.surface : colors.canvas }]}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android도 padding — 앱이 화면 끝까지 그리는(edge-to-edge) 방식이라 시스템이 키보드만큼 화면을 줄여 주지 않는다.
+          꺼 두었더니 챗봇 입력칸이 키보드에 가려졌다(2026-10-01) */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         {header}
         {scroll ? (
           <ScrollView style={styles.flex} contentContainerStyle={[styles.content, contentStyle]} keyboardShouldPersistTaps="handled">
