@@ -60,3 +60,5 @@ CLAUDE.local.md
 local-docs/
 *.hwp
 *.hwpx
+# 저장소 루트의 TEST 폴더만 (앞의 / 없이 쓰면 Mac에서 src/test 폴더까지 무시된다)
+/TEST/
