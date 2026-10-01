@@ -37,6 +37,10 @@ dependencies {
     implementation(libs.anthropic.java)
     // 업로드 사진의 위치정보(GPS) 확인 — HEIC처럼 직접 지우기 어려운 형식에 사용
     implementation(libs.metadata.extractor)
+    // 첨부를 AI에게 보낼 때 글자 뽑기 — Office(docx·pptx·xlsx), 한글(hwp·hwpx)
+    implementation(libs.poi.ooxml)
+    implementation(libs.hwplib)
+    implementation(libs.hwpxlib)
     runtimeOnly(libs.postgresql)
     developmentOnly(libs.spring.boot.docker.compose)
 

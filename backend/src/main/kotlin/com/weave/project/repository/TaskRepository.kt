@@ -10,6 +10,13 @@ interface TaskRepository : JpaRepository<Task, Long> {
 
     fun findByProjectIdInOrderByProjectIdAscPositionAsc(projectIds: Collection<Long>): List<Task>
 
+    /** 밀렸을 수 있는 작업(진행중 프로젝트, 미완료, 오늘 전에 시작) — 정확한 판정은 Task.isOverdue */
+    @Query(
+        "SELECT t FROM Task t WHERE t.done = false AND t.scheduledDate < :today " +
+            "AND t.projectId IN (SELECT p.id FROM Project p WHERE p.status = 'active')",
+    )
+    fun findOverdueCandidates(today: java.time.LocalDate): List<Task>
+
     /** 본인 프로젝트의 작업만 (IDOR 방지 §3-6) */
     @Query("SELECT t FROM Task t WHERE t.id = :id AND t.projectId IN (SELECT p.id FROM Project p WHERE p.userId = :userId)")
     fun findOwned(id: Long, userId: Long): Task?

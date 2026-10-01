@@ -77,6 +77,74 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         second["project"]["tasks"][0]["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
     }
 
+    test("새 프로젝트를 등록하면 기존 작업도 오늘부터 다시 배치하고, 마감이 가까운 프로젝트를 먼저 채운다") {
+        val tokens = newUser()
+        val first = createOk(tokens, name = "먼 마감", deadline = today.plusDays(20), tasks = listOf(task("a", "먼 작업", 3.0)))
+        first["project"]["tasks"][0]["scheduledDate"].asString() shouldBe today.toString()
+        // 마감이 더 가까운 프로젝트가 들어오면 오늘 자리를 가져가고, 먼 작업은 내일로 밀린다
+        val second = createOk(tokens, name = "가까운 마감", deadline = today.plusDays(2), tasks = listOf(task("b", "급한 작업", 3.0)))
+        second["project"]["tasks"][0]["scheduledDate"].asString() shouldBe today.toString()
+        val moved = api.read(mockMvc.get("/api/v1/projects/${first["project"]["id"].asLong()}") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)
+        moved["tasks"][0]["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
+    }
+
+    test("완료한 작업은 다시 배치하지 않는다") {
+        val tokens = newUser()
+        val doneTask = createOk(tokens, deadline = null, tasks = listOf(task("a", "끝낸 작업", 3.0)))["project"]["tasks"][0]
+        mockMvc.patch("/api/v1/tasks/${doneTask["id"].asLong()}") {
+            header("Authorization", api.bearer(tokens))
+            contentType = MediaType.APPLICATION_JSON
+            content = api.json(mapOf("done" to true))
+        }
+        createOk(tokens, name = "다음", deadline = null, tasks = listOf(task("b", "새 작업", 3.0)))
+        val tasks = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)["tasks"]
+        tasks.asIterable().associate { it["title"].asString() to it["scheduledDate"].asString() } shouldBe mapOf("끝낸 작업" to today.toString(), "새 작업" to today.toString())
+    }
+
+    test("밀린 작업은 오늘로 옮기고 원래 끝나는 날(delayedFrom)을 남긴다 — 옮길 때 다른 작업 배치는 그대로, 다음 등록 때도 밀린 작업은 다시 배치하지 않는다") {
+        val tokens = newUser()
+        val tasks = createOk(tokens, deadline = null, tasks = listOf(task("a", "어제 할 일", 2.0), task("b", "모레 할 일", 3.0)))["project"]["tasks"]
+        val lateId = tasks[0]["id"].asLong()
+        val otherId = tasks[1]["id"].asLong()
+        jdbc.update("UPDATE tasks SET scheduled_date = ?, span_days = 2 WHERE id = ?", today.minusDays(3), lateId)
+        jdbc.update("UPDATE tasks SET scheduled_date = ? WHERE id = ?", today.plusDays(2), otherId)
+
+        val snapshot = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)
+        val late = snapshot["tasks"].asIterable().first { it["id"].asLong() == lateId }
+        late["scheduledDate"].asString() shouldBe today.toString()
+        late["spanDays"].asInt() shouldBe 1
+        late["delayedFrom"].asString() shouldBe today.minusDays(2).toString()
+        snapshot["tasks"].asIterable().first { it["id"].asLong() == otherId }["scheduledDate"].asString() shouldBe today.plusDays(2).toString()
+
+        // 다음 등록 때: 밀린 작업은 오늘 그대로(추가 작업이라 자리를 차지하지 않음).
+        // 나머지는 오늘부터 다시 배치 — 둘 다 마감이 없으니 먼저 등록한 "모레 할 일"이 오늘, 새 작업은 내일
+        val next = createOk(tokens, name = "다음", deadline = null, tasks = listOf(task("c", "새 작업", 3.0)))
+        next["project"]["tasks"][0]["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
+        val after = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)["tasks"]
+        after.asIterable().first { it["id"].asLong() == lateId }["scheduledDate"].asString() shouldBe today.toString()
+        after.asIterable().first { it["id"].asLong() == otherId }["scheduledDate"].asString() shouldBe today.toString()
+    }
+
+    test("작업 다시 배치(설정 버튼): 밀린 작업도 포함해 오늘부터 다시 배치하고 지연 표시는 남긴다, 완료한 작업은 그대로") {
+        val tokens = newUser()
+        val tasks = createOk(tokens, deadline = null, tasks = listOf(task("a", "밀린 일", 3.0), task("b", "끝낸 일", 1.0), task("c", "다른 일", 3.0)))["project"]["tasks"]
+        val lateId = tasks[0]["id"].asLong()
+        val doneId = tasks[1]["id"].asLong()
+        jdbc.update("UPDATE tasks SET scheduled_date = ? WHERE id = ?", today.minusDays(2), lateId)
+        jdbc.update("UPDATE tasks SET done = true, scheduled_date = ? WHERE id = ?", today.minusDays(5), doneId)
+        // 일정을 읽으면 밀린 일이 오늘로 옮겨져 오늘이 몰린다(밀린 일 3h + 다른 일)
+        mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }
+
+        val body = api.read(mockMvc.post("/api/v1/schedule/replan") { header("Authorization", api.bearer(tokens)) }
+            .andExpect { status { isOk() } }.andReturn().response.contentAsString)
+        val byTitle = body["tasks"].asIterable().associateBy { it["title"].asString() }
+        byTitle.getValue("밀린 일")["scheduledDate"].asString() shouldBe today.toString()
+        byTitle.getValue("밀린 일")["delayedFrom"].asString() shouldBe today.minusDays(2).toString()
+        byTitle.getValue("다른 일")["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
+        byTitle.getValue("끝낸 일")["scheduledDate"].asString() shouldBe today.minusDays(5).toString()
+        mockMvc.post("/api/v1/schedule/replan").andExpect { status { isUnauthorized() } }
+    }
+
     test("입력 검증: 이름 없음·작업 없음·없는 색·없는 선행 key·날짜 형식 오류는 400") {
         val tokens = newUser()
         val valid = mapOf("name" to "x", "description" to "", "deadline" to null, "color" to "teal", "tasks" to listOf(task("a", "t", 1.0)))

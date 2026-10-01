@@ -11,4 +11,8 @@ data class ProjectChatRequest(
     @field:Valid
     @field:Size(max = 40, message = "대화가 너무 길어요.")
     val messages: List<ChatMessage> = emptyList(),
+
+    /** 등록 1단계에서 올린 첨부 — 내용을 AI에게 함께 보낸다(사용자 결정 2026-10-01) */
+    @field:Size(max = 10)
+    val attachmentIds: List<Long> = emptyList(),
 )

@@ -1,6 +1,7 @@
 package com.weave.attachment
 
 import com.weave.TestcontainersConfiguration
+import com.weave.attachment.service.OrphanAttachmentCleaner
 import com.weave.support.ApiTestSupport
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
@@ -29,7 +30,12 @@ import java.util.UUID
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration::class)
 @ApplyExtension(SpringExtension::class)
-class AttachmentIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapper, jdbc: JdbcTemplate) : FunSpec({
+class AttachmentIntegrationTest(
+    private val mockMvc: MockMvc,
+    objectMapper: ObjectMapper,
+    jdbc: JdbcTemplate,
+    cleaner: OrphanAttachmentCleaner,
+) : FunSpec({
     val api = ApiTestSupport(mockMvc, objectMapper)
     val storageRoot = Path.of("build/test-uploads").toAbsolutePath()
     val pdf = "%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF".toByteArray()
@@ -117,6 +123,46 @@ class AttachmentIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obje
         mockMvc.delete("/api/v1/attachments/$id") { header("Authorization", api.bearer(other)) }.andExpect { status { isNotFound() } }
         mockMvc.delete("/api/v1/attachments/$id") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNoContent() } }
         Files.exists(storageRoot.resolve(key)) shouldBe false
+    }
+
+    test("내 첨부 파일은 내려받을 수 있다(원래 이름·형식으로), 남의 것과 링크는 404") {
+        val tokens = newUser()
+        val other = newUser()
+        val id = api.read(upload(tokens, "명세서.pdf", pdf).andReturn().response.contentAsString)["id"].asLong()
+        val response = mockMvc.get("/api/v1/attachments/$id/content") { header("Authorization", api.bearer(tokens)) }
+            .andExpect {
+                status { isOk() }
+                content { contentType("application/pdf") }
+                header { string("Content-Disposition", org.hamcrest.Matchers.containsString("filename*=UTF-8''%EB%AA%85%EC%84%B8%EC%84%9C.pdf")) }
+            }.andReturn().response
+        response.contentAsByteArray.contentEquals(pdf) shouldBe true
+        mockMvc.get("/api/v1/attachments/$id/content") { header("Authorization", api.bearer(other)) }.andExpect { status { isNotFound() } }
+        val link = api.read(mockMvc.post("/api/v1/attachments/links") {
+            header("Authorization", api.bearer(tokens))
+            contentType = MediaType.APPLICATION_JSON
+            content = api.json(mapOf("url" to "https://example.com"))
+        }.andReturn().response.contentAsString)["id"].asLong()
+        mockMvc.get("/api/v1/attachments/$link/content") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNotFound() } }
+    }
+
+    test("하루에 한 번 정리: 프로젝트에 연결되지 않고 24시간 지난 첨부만 파일과 함께 지운다") {
+        val tokens = newUser()
+        val oldOrphan = api.read(upload(tokens, "old.pdf", pdf).andReturn().response.contentAsString)["id"].asLong()
+        val freshOrphan = api.read(upload(tokens, "fresh.pdf", pdf).andReturn().response.contentAsString)["id"].asLong()
+        val linked = api.read(upload(tokens, "linked.pdf", pdf).andReturn().response.contentAsString)["id"].asLong()
+        mockMvc.post("/api/v1/projects") {
+            header("Authorization", api.bearer(tokens))
+            contentType = MediaType.APPLICATION_JSON
+            content = api.json(mapOf("name" to "x", "color" to "teal", "tasks" to listOf(mapOf("key" to "a", "title" to "t", "estimatedHours" to 1.0)), "attachmentIds" to listOf(linked)))
+        }.andExpect { status { isCreated() } }
+        val oldKey = storageKeyOf(oldOrphan)
+        jdbc.update("UPDATE attachments SET created_at = now() - interval '25 hours' WHERE id IN (?, ?)", oldOrphan, linked)
+
+        cleaner.cleanUp()
+
+        jdbc.queryForObject("SELECT count(*) FROM attachments WHERE id = ?", Long::class.java, oldOrphan) shouldBe 0L
+        Files.exists(storageRoot.resolve(oldKey)) shouldBe false
+        jdbc.queryForObject("SELECT count(*) FROM attachments WHERE id IN (?, ?)", Long::class.java, freshOrphan, linked) shouldBe 2L
     }
 
     test("탈퇴하면 첨부 행과 파일이 실제로 지워진다") {

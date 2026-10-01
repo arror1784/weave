@@ -1,7 +1,7 @@
 package com.weave.client
 
-/** 대화 한 턴 — role은 "user" | "assistant" */
-data class AiTurn(val role: String, val text: String)
+/** 대화 한 턴 — role은 "user" | "assistant". 첨부는 사용자 턴에만 붙는다 */
+data class AiTurn(val role: String, val text: String, val attachments: List<AiAttachment> = emptyList())
 
 /** AI 호출 창구. 실제 구현은 ClaudeClient 하나이고, 테스트에서는 가짜로 바꾼다. */
 interface AiClient {

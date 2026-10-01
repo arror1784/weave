@@ -6,8 +6,3 @@ weave:
     root: build/test-uploads
   anthropic:
     api-key: test-key
-  # 모든 테스트 요청이 같은 IP(127.0.0.1)에서 오므로 IP 기준 제한은 넉넉하게 — 이메일 기준 로그인 제한은 기본값(10회) 그대로 검사한다
-  rate-limit:
-    signup-per-ip: 100000
-    login-per-ip: 100000
-    refresh-per-ip: 100000

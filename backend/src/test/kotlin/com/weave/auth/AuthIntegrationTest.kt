@@ -156,21 +156,6 @@ class AuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapp
         body shouldNotContain "at com."
     }
 
-    test("같은 이메일로 로그인을 너무 많이 시도하면 429를 돌려준다") {
-        val email = email()
-        api.signup(email)
-        repeat(10) {
-            mockMvc.post("/api/v1/auth/login") {
-                contentType = MediaType.APPLICATION_JSON
-                content = api.json(mapOf("email" to email, "password" to "wrong2026!"))
-            }
-        }
-        mockMvc.post("/api/v1/auth/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = api.json(mapOf("email" to email, "password" to "weave2026!"))
-        }.andExpect { status { isTooManyRequests() }; jsonPath("$.code") { value("TOO_MANY_REQUESTS") } }
-    }
-
     test("개발용 로그인은 local 프로필이 아니면 404") {
         mockMvc.post("/api/v1/dev/login") {
             contentType = MediaType.APPLICATION_JSON

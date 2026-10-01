@@ -7,6 +7,9 @@ mockk = "1.14.11"
 springmockk = "5.0.1"
 anthropic = "2.66.0"
 metadata-extractor = "2.21.0"
+poi = "5.5.1"
+hwplib = "1.1.11"
+hwpxlib = "1.0.9"
 
 [libraries]
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
@@ -23,6 +26,9 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 spring-boot-starter-security-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-resource-server" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 metadata-extractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadata-extractor" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
+hwplib = { module = "kr.dogfoot:hwplib", version.ref = "hwplib" }
+hwpxlib = { module = "kr.dogfoot:hwpxlib", version.ref = "hwpxlib" }
 springdoc-openapi-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }

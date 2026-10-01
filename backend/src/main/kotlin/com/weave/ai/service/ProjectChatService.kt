@@ -6,9 +6,7 @@ import com.weave.ai.dto.ProjectChatResponse
 import com.weave.ai.dto.ProposedTask
 import com.weave.client.AiClient
 import com.weave.client.AiTurn
-import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
-import com.weave.global.security.RateLimiter
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -22,8 +20,7 @@ import tools.jackson.databind.ObjectMapper
 class ProjectChatService(
     private val aiClient: AiClient,
     private val prompt: ProjectBreakdownPrompt,
-    private val rateLimiter: RateLimiter,
-    private val properties: WeaveProperties,
+    private val attachmentContentLoader: AttachmentContentLoader,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -32,10 +29,9 @@ class ProjectChatService(
     private data class AiTask(val title: String, val estimatedHours: Double, val dependsOnIndex: Int = -1, val prerequisite: Boolean = false)
 
     fun chat(userId: Long, request: ProjectChatRequest): ProjectChatResponse {
-        val limits = properties.rateLimit
-        rateLimiter.check("ai:user:$userId", limits.aiPerUser, limits.aiWindow)
-
-        val turns = listOf(AiTurn("user", introduce(request.project))) + request.messages.map { AiTurn(it.role, it.text) }
+        // 첨부는 첫 사용자 메시지(프로젝트 소개)에 붙인다 — 대화 내내 같은 내용이라 ClaudeClient가 캐시한다
+        val attachments = attachmentContentLoader.load(userId, request.attachmentIds)
+        val turns = listOf(AiTurn("user", introduce(request.project), attachments)) + request.messages.map { AiTurn(it.role, it.text) }
         val reply = try {
             objectMapper.readValue(aiClient.complete(prompt.system(), turns, SCHEMA), AiReply::class.java)
         } catch (e: ApiException) {

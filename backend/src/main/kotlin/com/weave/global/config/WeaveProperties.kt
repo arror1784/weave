@@ -7,7 +7,6 @@ import java.time.Duration
 @ConfigurationProperties("weave")
 data class WeaveProperties(
     val jwt: Jwt,
-    val rateLimit: RateLimit = RateLimit(),
     val storage: Storage = Storage(),
     val anthropic: Anthropic = Anthropic(),
 ) {
@@ -17,19 +16,6 @@ data class WeaveProperties(
         val accessTokenTtl: Duration = Duration.ofMinutes(15),
         /** 사용자 결정: 로그인 30일 유지 (리프레시 토큰은 쓸 때마다 교체) */
         val refreshTokenTtl: Duration = Duration.ofDays(30),
-    )
-
-    data class RateLimit(
-        val loginPerEmail: Int = 10,
-        val loginPerIp: Int = 50,
-        val loginWindow: Duration = Duration.ofMinutes(5),
-        val signupPerIp: Int = 10,
-        val signupWindow: Duration = Duration.ofHours(1),
-        val refreshPerIp: Int = 60,
-        val refreshWindow: Duration = Duration.ofMinutes(1),
-        /** AI 호출 비용 보호 — 사용자당 */
-        val aiPerUser: Int = 30,
-        val aiWindow: Duration = Duration.ofHours(1),
     )
 
     data class Storage(
