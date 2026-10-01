@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile
+import java.net.URLDecoder
+import java.text.Normalizer
 import java.util.UUID
 
 @Service
@@ -99,7 +101,20 @@ class AttachmentService(
         const val MAX_BYTES = 10L * 1024 * 1024
 
         /** 경로를 떼고 이름만, 300자까지 — 보여주기용일 뿐 저장 경로엔 쓰지 않는다 */
-        fun displayName(original: String?): String =
-            (original ?: "file").substringAfterLast('/').substringAfterLast('\\').trim().ifEmpty { "file" }.take(300)
+        private val PERCENT_ENCODED = Regex("%[0-9A-Fa-f]{2}")
+
+        /**
+         * 보여줄 파일 이름. 앱(Expo의 fetch)은 파일 이름을 encodeURIComponent로 보내서 한글이 %EA%B0%80처럼 온다 — 되돌린다.
+         * 폰은 한글을 자모로 분해한(NFD) 이름을 줄 때가 있어 합친다(NFC). 되돌릴 수 없는 이름('100%.pdf' 등)은 그대로 둔다.
+         */
+        fun displayName(original: String?): String {
+            val raw = (original ?: "file").substringAfterLast('/').substringAfterLast('\\')
+            val decoded = if (PERCENT_ENCODED.containsMatchIn(raw)) {
+                runCatching { URLDecoder.decode(raw.replace("+", "%2B"), Charsets.UTF_8) }.getOrDefault(raw)
+            } else {
+                raw
+            }
+            return Normalizer.normalize(decoded, Normalizer.Form.NFC).trim().ifEmpty { "file" }.take(300)
+        }
     }
 }
