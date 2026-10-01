@@ -8,8 +8,9 @@ import { IconLock, IconMail } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { WeaveMark } from '@/components/WeaveMark';
+import { errorMessage } from '@/api/errors';
+import { useAuth } from '@/auth/AuthProvider';
 import { fieldErrors, loginSchema } from '@/lib/validation';
-import { useMockStore } from '@/mocks/MockStoreProvider';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
@@ -17,19 +18,30 @@ import { fonts } from '@/theme/typography';
 export default function LoginScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
-  const { dispatch } = useMockStore();
+  const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit() {
+  async function submit() {
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       setErrors(fieldErrors(result.error));
       return;
     }
-    // ⚠ 목업: 서버 인증 없이 로그인 처리. API 연동 시 교체.
-    dispatch({ type: 'signIn', email: result.data.email });
+    setErrors({});
+    setServerError(undefined);
+    setSubmitting(true);
+    try {
+      // 성공하면 로그인 상태가 바뀌어 탭 화면으로 넘어간다(_layout의 Stack.Protected)
+      await auth.signIn(result.data.email, result.data.password);
+    } catch (e) {
+      setServerError(errorMessage(e));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -49,7 +61,12 @@ export default function LoginScreen() {
         <TextField label="비밀번호" placeholder="비밀번호" value={password} onChangeText={setPassword} error={errors.password} leading={(c) => <IconLock size={18} color={c} />} secureTextEntry autoComplete="password" textContentType="password" />
       </View>
 
-      <Button label="로그인" onPress={submit} />
+      {serverError ? (
+        <AppText variant="small" color={colors.dangerText} accessibilityLiveRegion="polite">
+          {serverError}
+        </AppText>
+      ) : null}
+      <Button label="로그인" onPress={submit} disabled={submitting} />
 
       <View style={styles.signup}>
         <AppText variant="small" tone="soft">

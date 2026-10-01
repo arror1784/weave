@@ -9,8 +9,9 @@ import { Screen } from '@/components/Screen';
 import { TimeBar } from '@/components/TimeBar';
 import { TopBar } from '@/components/TopBar';
 import { formatHours } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectWeekLoad } from '@/mocks/store';
+import { LoadError, Loading } from '@/components/QueryStatus';
+import { selectWeekLoad } from '@/lib/schedule';
+import { useSchedule } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 
 /**
@@ -20,8 +21,16 @@ import { useAppTheme } from '@/theme';
 export default function OverloadScreen() {
   const router = useRouter();
   const { colors, radius } = useAppTheme();
-  const { state, today } = useMockStore();
-  const { estimated, available, tasks } = selectWeekLoad(state, today);
+  const schedule = useSchedule();
+  if (!schedule.data) {
+    return (
+      <Screen header={<TopBar title="이번 주" onBack={() => router.back()} />} contentStyle={styles.content}>
+        {schedule.isError ? <LoadError error={schedule.error} onRetry={() => schedule.refetch()} /> : <Loading />}
+      </Screen>
+    );
+  }
+  const state = schedule.data;
+  const { estimated, available, tasks } = selectWeekLoad(state, state.today);
   const over = estimated > available;
   const max = Math.max(estimated, available);
 

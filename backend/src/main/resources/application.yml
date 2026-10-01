@@ -17,3 +17,17 @@ management:
     web:
       exposure:
         include: health
+
+weave:
+  jwt:
+    # 32바이트 이상 임의 문자열 — .env의 JWT_SECRET
+    secret: ${JWT_SECRET}
+  storage:
+    root: ${WEAVE_STORAGE_ROOT:uploads}
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+
+spring.servlet.multipart:
+  # 사용자 결정: 첨부 파일당 10MB
+  max-file-size: 10MB
+  max-request-size: 11MB

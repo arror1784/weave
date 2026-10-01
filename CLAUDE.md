@@ -40,7 +40,7 @@
 - **잠정(바뀔 수 있음):** 작업 잠금·미루기 없음·하루 3시간·고정 일정 없음은 개발하며 바뀔 수 있고, 일정 생성 알고리즘·비밀번호 규칙·색 8가지는 **Claude가 정한 임시안**이라 사용자 확인이 필요하다.
 - **미정 결정:** 일정 생성 알고리즘(사용자가 설계 중 — 그동안 Claude 임시안, `mobile/src/lib/scheduler.ts`) · AI 프롬프트·작업 분할 기준과 챗봇 질문(사용자가 작성 중) · 하루 가용 시간 실제 계산 · 완료한 프로젝트를 다시 진행중으로 돌리는 방법 · 첨부 자료를 등록 후에 보여줄지.
 - **대상 플랫폼:** **Android 우선.** iOS는 나중에 추가한다 — 추가 전까지 Layer 6 검증은 Android 기준, iOS 미확인은 보고에 적는다.
-- **상태:** 백엔드는 스캐폴딩(보안 설정·BaseEntity·헬스체크)만. 앱은 **Figma 디자인의 전체 화면이 목업 데이터로 동작**한다(`mobile/src/mocks/` — API 연동 전, 챗봇은 목업, 첨부는 앱에서 고르기까지). 새 프로젝트의 작업은 임시 일정 알고리즘(`mobile/src/lib/scheduler.ts`)으로 날짜가 배정된다. 홈 화면 위젯은 `react-native-android-widget`으로 구현(중형 4×2).
+- **상태:** 백엔드 API 구현(인증·프로젝트·작업·일정 스냅샷·첨부·AI 챗봇, 2026-10-01). 앱은 목업을 걷어내고 **실제 API로 동작**한다. 작업 날짜는 서버의 임시 일정 알고리즘(`backend/.../schedule/domain/Scheduler.kt`)이 정한다. AI 챗봇은 서버가 Claude API를 부르고, 프롬프트는 임시(`backend/src/main/resources/prompts/project-breakdown.md` — 사용자가 작성 중). 첨부는 서버 로컬 디스크에 저장만 하고 AI로 보내지는 않는다. 홈 화면 위젯은 `react-native-android-widget`(중형 4×2).
 - **식별자:** 패키지 `com.weave` · 번들 ID/Android package `com.weave.app` (출시 후 변경 불가) · URL 스킴 `weave`
 - **켠 선택 규칙(§9):** 없음 — 전부 끄고 시작. 필요해지면 템플릿 §9에서 가져와 켠다(알림 S9는 푸시가 필요한 기능이 생기면 켠다 — 사용자 결정).
 
@@ -95,10 +95,10 @@
 
 ```
 [React Native 앱 (Android 우선)] ──JSON(camelCase, /api/v1) + Authorization: Bearer──▶ [Spring Boot API] ──▶ PostgreSQL (Flyway)
-   │ 리프레시 토큰: Secure Store                                                        ├──▶ auth/ ──▶ 소셜 로그인 ID 토큰 검증
-   │ 서버 데이터: TanStack Query 캐시                                                    └──▶ client/ ──▶ 외부 서비스
+   │ 리프레시 토큰: Secure Store                                                        ├──▶ auth/ ──▶ 이메일·비밀번호(bcrypt) → 자체 JWT 발급
+   │ 서버 데이터: TanStack Query 캐시                                                    └──▶ client/ ──▶ Claude API (AI 챗봇)
 ```
-(auth·TanStack Query·Secure Store는 해당 기능을 만들 때 추가한다 — 아직 설치 전.)
+(인증은 소셜 로그인 대신 이메일+비밀번호 — 사용자 결정. 리프레시 토큰은 Secure Store, 서버 데이터는 TanStack Query.)
 
 ---
 

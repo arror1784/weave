@@ -8,10 +8,11 @@ import { IconWarn } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
 import { dayOfMonth, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, monthOf, weekDays, weekdayLabel, type DateKey } from '@/lib/date';
+import type { Project } from '@/api/types';
+import { LoadError, Loading } from '@/components/QueryStatus';
 import { formatHours } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectDayItems, selectDayLoad, type DayItem } from '@/mocks/store';
-import type { Project } from '@/mocks/types';
+import { selectDayItems, selectDayLoad, type DayItem } from '@/lib/schedule';
+import { useSchedule } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 
@@ -19,10 +20,21 @@ type CalendarView = 'month' | 'week';
 
 /** 전체 일정 (Figma 03-a 월간 캘린더 / 03-b 주간 타임라인) */
 export default function ScheduleScreen() {
-  const { state, today } = useMockStore();
+  const schedule = useSchedule();
   const [view, setView] = useState<CalendarView>('week');
   const [selected, setSelected] = useState<DateKey | null>(null);
-  const project = (id: string) => state.projects.find((p) => p.id === id)!;
+
+  if (!schedule.data) {
+    return (
+      <Screen contentStyle={styles.content}>
+        <AppText variant="title">전체 일정</AppText>
+        {schedule.isError ? <LoadError error={schedule.error} onRetry={() => schedule.refetch()} /> : <Loading />}
+      </Screen>
+    );
+  }
+  const state = schedule.data;
+  const today = state.today;
+  const project = (id: number) => state.projects.find((p) => p.id === id)!;
 
   return (
     <Screen contentStyle={styles.content}>
@@ -56,7 +68,7 @@ function Legend({ projects }: { projects: Project[] }) {
         <View key={p.id} style={styles.inline}>
           <View style={[styles.dot8, { backgroundColor: projectPaletteFor(p.color).dot }]} />
           <AppText variant="caption" tone="soft">
-            {p.short}
+            {p.name}
           </AppText>
         </View>
       ))}
@@ -66,7 +78,7 @@ function Legend({ projects }: { projects: Project[] }) {
 
 function MonthView({ onPick }: { onPick: (d: DateKey) => void }) {
   const { colors, radius } = useAppTheme();
-  const { state, today } = useMockStore();
+  const { state, today } = useLoadedSchedule();
   const cells = monthGrid(today);
 
   return (
@@ -125,7 +137,7 @@ function MonthView({ onPick }: { onPick: (d: DateKey) => void }) {
 
 function WeekView() {
   const { colors, radius } = useAppTheme();
-  const { state, today } = useMockStore();
+  const { state, today } = useLoadedSchedule();
   const days = weekDays(today);
 
   return (
@@ -198,9 +210,9 @@ function WeekChip({ item, project }: { item: DayItem; project: Project }) {
   );
 }
 
-function DayDetail({ date, project }: { date: DateKey; project: (id: string) => Project }) {
+function DayDetail({ date, project }: { date: DateKey; project: (id: number) => Project }) {
   const { colors, radius } = useAppTheme();
-  const { state } = useMockStore();
+  const { state } = useLoadedSchedule();
   const items = selectDayItems(state, date);
   const load = selectDayLoad(state, date);
   return (
@@ -289,3 +301,9 @@ const styles = StyleSheet.create({
   sheetItem: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   sheetBar: { width: 4, height: 32, borderRadius: 2 },
 });
+
+/** 하위 화면은 부모가 데이터를 받은 뒤에만 그려진다 — 같은 캐시를 읽는다 */
+function useLoadedSchedule() {
+  const state = useSchedule().data!;
+  return { state, today: state.today };
+}

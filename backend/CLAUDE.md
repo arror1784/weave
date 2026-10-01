@@ -14,6 +14,9 @@
 | PostgreSQL | 18.6 | 로컬은 `compose.yaml`, 테스트는 Testcontainers |
 | springdoc-openapi | 3.1.1 | `/swagger-ui.html`, `/v3/api-docs` |
 | Testcontainers / Kotest / MockK / springmockk | 2.0.5 / 6.2.5 / 1.14.11 / 5.0.1 | |
+| Spring Security OAuth2 Resource Server | 7.1 (Boot 관리) | 서버가 직접 발급한 JWT(HS256) 검증 — 스타터 이름은 `spring-boot-starter-security-oauth2-resource-server` |
+| anthropic-java | 2.66.0 | Claude API 공식 SDK — `client/ClaudeClient`에서만 |
+| metadata-extractor | 2.21.0 | HEIC 사진의 위치정보(GPS) 확인용. JPEG·PNG 메타데이터는 직접 지운다(commons-imaging은 정식 버전이 없어 안 씀) |
 
 ⚠ 인터넷의 옛 예제(Boot 2·3)를 복사할 때 주의: `javax.*` → `jakarta.*`, Jackson 2 → 3, `spring-boot-starter-web` → **`spring-boot-starter-webmvc`**, `@AutoConfigureMockMvc`는 `org.springframework.boot.webmvc.test.autoconfigure` 패키지, Testcontainers 2는 `org.testcontainers.postgresql.PostgreSQLContainer`, Flyway는 **`spring-boot-starter-flyway` + `flyway-database-postgresql`** 둘 다 필요.
 ⚠ `developmentOnly`는 `implementation`의 BOM을 상속하지 않는다 — 새 설정에 의존성을 넣을 땐 `springBootBom` 플랫폼도 같이 건다(`build.gradle.kts`).
@@ -41,15 +44,22 @@ backend/
 └── src/
     ├── main/kotlin/com/weave/
     │   ├── WeaveApplication.kt
-    │   ├── global/                      # config(SecurityConfig) · domain(BaseEntity) · 공통 예외
-    │   ├── auth/                        # (추가 예정) ID 토큰 검증 · 토큰 발급/갱신/폐기
-    │   ├── client/                      # (추가 예정) 외부 연동
+    │   ├── global/                      # config(Security·Jwt·Clock(KST)·Password·WeaveProperties) · domain(BaseEntity) · error(ApiException·오류 응답) · security(RateLimiter·Jwt.userId()) · web(PageResponse)
+    │   ├── auth/                        # 가입·로그인·토큰 갱신(교체·재사용 감지)·로그아웃 · 개발용 로그인(@Profile("local"))
+    │   ├── user/                        # 내 정보·하루 가용 시간·탈퇴(개인정보 실제 삭제 — AccountDeletionService)
+    │   ├── project/                     # 프로젝트·작업 (작업은 완료 여부만 바뀐다)
+    │   ├── schedule/                    # domain/Scheduler(임시 일정 알고리즘) · 일정 스냅샷 API
+    │   ├── attachment/                  # 첨부 업로드·링크 · storage/FileStorage(로컬 디스크)
+    │   ├── ai/                          # 등록 챗봇(ProjectChatService) — 프롬프트는 resources/prompts/project-breakdown.md(임시)
+    │   ├── client/                      # 외부 연동: AiClient ← ClaudeClient
     │   └── {feature}/{controller,dto,service,repository,domain}/
     ├── main/resources/
     │   ├── application.yml
-    │   └── db/migration/                # V1__init.sql … (첫 기능에서 생성)
+    │   ├── prompts/project-breakdown.md # ⚠ 임시 AI 프롬프트 — 사용자가 작성 중. 이 파일만 바꾸면 된다
+    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments
     └── test/kotlin/com/weave/           # main과 같은 패키지 구조
-        └── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용
+        ├── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용
+        └── support/ApiTestSupport.kt       # 가입 후 토큰 받기·JSON 헬퍼 (통합 테스트는 @ActiveProfiles("test") — src/test/resources/application-test.yml)
 ```
 
 ## 4. 명령어 (2026-09-29 실제 실행 확인)
@@ -64,3 +74,17 @@ backend/
 ```
 
 확인용 엔드포인트: `GET /actuator/health`(공개) · `/swagger-ui.html`(공개) · 그 외는 토큰 없으면 401.
+
+**로컬 실행에 필요한 `.env` 값**(`backend/.env`, 커밋되지 않음): `JWT_SECRET`(32바이트 이상 임의 문자열) · `ANTHROPIC_API_KEY` · (선택) `WEAVE_STORAGE_ROOT`(첨부 저장 폴더, 기본 `uploads/`).
+
+```bash
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /api/v1/dev/login {email} 이 열린다
+```
+
+**API 요약** (`/api/v1`, 모두 camelCase): `auth/signup·login·refresh·logout` · `me`(GET·DELETE) · `me/settings`(PATCH 하루 가용 시간) · `projects`(POST 등록 → 서버가 날짜 배정 / GET `?status&page&size`) · `projects/{id}`(GET · PATCH 색·`status=done`) · `tasks/{id}`(PATCH `done`) · `schedule`(오늘 기준 스냅샷) · `attachments`(POST multipart · `links` · DELETE) · `project-chat`(AI 챗봇).
+
+**겪은 함정**
+- Jackson 3의 `JsonNode.map(...)`은 코틀린 컬렉션 `map`이 아니다(노드 자체를 변환) — 테스트에서 배열을 돌 땐 `asIterable().map`.
+- PostgreSQL은 준비된 문장 하나에 SQL 두 개를 못 넣는다 — `@Modifying` 네이티브 쿼리는 문장마다 메서드를 나눈다.
+- `@Email`은 앞뒤 공백이 있으면 실패한다 — 앱이 trim해서 보낸다.
+- 요청 횟수 제한은 서버 메모리(RateLimiter)라 서버를 여러 대로 늘리면 공유 저장소로 옮긴다. 통합 테스트는 모두 같은 IP라 test 프로필에서 IP 기준 제한만 넉넉하게 푼다.

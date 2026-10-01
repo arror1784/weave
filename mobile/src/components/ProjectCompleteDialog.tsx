@@ -1,5 +1,7 @@
+import { errorMessage } from '@/api/errors';
 import { withParticle } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
+import { useUpdateProject } from '@/queries/projects';
+import { useCompletionPrompt } from '@/state/CompletionPrompt';
 
 import { Dialog } from './Dialog';
 import { useToast } from './Toast';
@@ -10,21 +12,24 @@ import { useToast } from './Toast';
  */
 export function ProjectCompleteDialog() {
   const toast = useToast();
-  const { state, dispatch } = useMockStore();
-  const project = state.projects.find((p) => p.id === state.completionPrompt);
-  if (!project) return null;
+  const { pending, dismiss } = useCompletionPrompt();
+  const update = useUpdateProject();
+  if (!pending) return null;
 
-  const dismiss = () => dispatch({ type: 'dismissCompletionPrompt' });
   const complete = () => {
-    dispatch({ type: 'completeProject', projectId: project.id });
-    toast(`${withParticle(project.name, '을', '를')} 완료했어요`);
+    const { projectId, name } = pending;
+    dismiss();
+    update.mutate(
+      { id: projectId, changes: { status: 'done' } },
+      { onSuccess: () => toast(`${withParticle(name, '을', '를')} 완료했어요`), onError: (e) => toast(errorMessage(e)) },
+    );
   };
 
   return (
     <Dialog
       visible
       title="프로젝트가 완료되었습니까?"
-      body={`${project.name}의 작업을 모두 끝냈어요.`}
+      body={`${pending.name}의 작업을 모두 끝냈어요.`}
       onClose={dismiss}
       actions={[
         { label: '아직이에요', variant: 'outline', onPress: dismiss },

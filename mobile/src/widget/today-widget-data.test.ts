@@ -1,11 +1,10 @@
-import { createSeed } from '@/mocks/seed';
-import { initialState } from '@/mocks/store';
-import type { State } from '@/mocks/types';
+import type { Schedule } from '@/api/types';
+import { sampleSchedule } from '@/test-utils/fixtures';
 
 import { buildTodayWidgetData } from './today-widget-data';
 
 const TODAY = '2026-09-30';
-const state = (): State => ({ ...initialState, ...createSeed(TODAY) });
+const state = (): Schedule => sampleSchedule(TODAY);
 
 describe('오늘의 일정 위젯 데이터 (Figma 중형 4×2)', () => {
   it('날짜, 과부하, 남은 오늘 작업 최대 4개(프로젝트 색·D-day)를 만든다', () => {
@@ -19,7 +18,7 @@ describe('오늘의 일정 위젯 데이터 (Figma 중형 4×2)', () => {
 
   it('과부하가 아니면 overload는 없다', () => {
     const s = state();
-    s.settings = { dailyAvailableHours: 24 };
+    s.dailyAvailableHours = 24;
     expect(buildTodayWidgetData(s, TODAY).overload).toBeNull();
   });
 

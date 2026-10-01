@@ -1,4 +1,4 @@
-import type { Tone } from '@/mocks/store';
+import type { Tone } from '@/lib/schedule';
 import { useAppTheme } from '@/theme';
 
 import { AppText } from './AppText';

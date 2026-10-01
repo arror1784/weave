@@ -8,9 +8,11 @@ import { IconArrowDep, IconPlus, IconTrash } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { StepHeader } from '@/components/StepHeader';
 import { useToast } from '@/components/Toast';
+import { errorMessage } from '@/api/errors';
 import { formatHours, withParticle } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { createId, previewDraftSchedule } from '@/mocks/store';
+import { useCreateProject } from '@/queries/projects';
+import { newKey } from '@/state/draft';
+import { useDraft } from '@/state/DraftProvider';
 import { useAppTheme } from '@/theme';
 import { fonts } from '@/theme/typography';
 
@@ -22,8 +24,8 @@ export default function ReviewScreen() {
   const router = useRouter();
   const toast = useToast();
   const { colors, radius, typography } = useAppTheme();
-  const { state, dispatch, today } = useMockStore();
-  const draft = state.draft;
+  const { draft, dispatch } = useDraft();
+  const create = useCreateProject();
 
   if (!draft) {
     return (
@@ -37,14 +39,20 @@ export default function ReviewScreen() {
   const total = tasks.reduce((a, t) => a + t.estimatedHours, 0);
 
   function confirm() {
-    const projectId = createId('p');
-    const name = draft!.name;
-    // 등록하면 임시 일정 알고리즘이 날짜를 배정한다(src/lib/scheduler.ts)
-    const { lateCount } = previewDraftSchedule(state, today);
-    dispatch({ type: 'confirmDraft', projectId, today });
-    toast(`${withParticle(name, '이', '가')} 등록됐어요${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
-    router.dismissAll();
-    router.navigate(`/projects/${projectId}`, { withAnchor: true });
+    const d = draft!;
+    // 서버가 임시 일정 알고리즘으로 작업 날짜를 배정한다(backend Scheduler)
+    create.mutate(
+      { name: d.name, description: d.description, deadline: d.deadline, color: d.color, tasks: d.tasks, attachmentIds: d.attachments.map((a) => a.id) },
+      {
+        onSuccess: ({ project, lateCount }) => {
+          toast(`${withParticle(d.name, '이', '가')} 등록됐어요${lateCount ? ` · 마감 안에 끝내기 빠듯한 작업 ${lateCount}개` : ''}`);
+          router.dismissAll();
+          router.navigate(`/projects/${project.id}`, { withAnchor: true });
+          dispatch({ type: 'reset' });
+        },
+        onError: (e) => toast(errorMessage(e)),
+      },
+    );
   }
 
   return (
@@ -52,7 +60,7 @@ export default function ReviewScreen() {
       header={<StepHeader step={3} title="작업 검토" onBack={() => router.back()} />}
       footer={
         <Footer>
-          <Button label="등록 완료" onPress={confirm} />
+          <Button label="등록 완료" onPress={confirm} disabled={create.isPending} />
         </Footer>
       }
       contentStyle={styles.content}>
@@ -78,22 +86,22 @@ export default function ReviewScreen() {
                 <TextInput
                   accessibilityLabel={`${n}번 작업 이름`}
                   value={t.title}
-                  onChangeText={(title) => dispatch({ type: 'updateDraftTask', key: t.key, changes: { title } })}
+                  onChangeText={(title) => dispatch({ type: 'updateTask', key: t.key, changes: { title } })}
                   style={[typography.body, styles.nameInput, { color: colors.ink }]}
                 />
-                <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 삭제`} onPress={() => dispatch({ type: 'deleteDraftTask', key: t.key })} hitSlop={12} style={styles.iconButton}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 삭제`} onPress={() => dispatch({ type: 'deleteTask', key: t.key })} hitSlop={12} style={styles.iconButton}>
                   <IconTrash size={17} color={colors.inkSoft} />
                 </Pressable>
               </View>
               <View style={[styles.row, styles.meta]}>
                 <View style={[styles.stepper, { borderColor: colors.line }]}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 시간 줄이기`} onPress={() => dispatch({ type: 'updateDraftTask', key: t.key, changes: { estimatedHours: Math.max(0.5, t.estimatedHours - 0.5) } })} style={styles.stepButton}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 시간 줄이기`} onPress={() => dispatch({ type: 'updateTask', key: t.key, changes: { estimatedHours: Math.max(0.5, t.estimatedHours - 0.5) } })} style={styles.stepButton}>
                     <AppText tone="soft">−</AppText>
                   </Pressable>
                   <AppText variant="monoBold" style={styles.stepValue} accessibilityLabel={`${n}번 작업 ${t.estimatedHours}시간`}>
                     {formatHours(t.estimatedHours)}
                   </AppText>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 시간 늘리기`} onPress={() => dispatch({ type: 'updateDraftTask', key: t.key, changes: { estimatedHours: t.estimatedHours + 0.5 } })} style={styles.stepButton}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${n}번 작업 시간 늘리기`} onPress={() => dispatch({ type: 'updateTask', key: t.key, changes: { estimatedHours: t.estimatedHours + 0.5 } })} style={styles.stepButton}>
                     <AppText tone="soft">+</AppText>
                   </Pressable>
                 </View>
@@ -108,7 +116,7 @@ export default function ReviewScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={dep ? `선행 연결 해제: ${depName} 완료 후` : `선행 연결: ${depName} 완료 후`}
-                    onPress={() => dispatch({ type: 'updateDraftTask', key: t.key, changes: { dependsOnKey: dep ? null : prev.key } })}
+                    onPress={() => dispatch({ type: 'updateTask', key: t.key, changes: { dependsOnKey: dep ? null : prev.key } })}
                     style={[styles.depButton, dep ? { backgroundColor: colors.threadSoft } : { borderColor: colors.control, borderWidth: 1, borderStyle: 'dashed' }]}>
                     <IconArrowDep size={13} color={dep ? colors.thread : colors.inkSoft} />
                     <AppText variant="micro" color={dep ? colors.thread : colors.inkSoft} numberOfLines={1} style={styles.depText}>
@@ -122,7 +130,7 @@ export default function ReviewScreen() {
         })}
       </View>
 
-      <Button label="작업 직접 추가" variant="dashed" onPress={() => dispatch({ type: 'addDraftTask', key: createId('k') })} icon={(c) => <IconPlus size={16} color={c} />} />
+      <Button label="작업 직접 추가" variant="dashed" onPress={() => dispatch({ type: 'addTask', key: newKey('k') })} icon={(c) => <IconPlus size={16} color={c} />} />
     </Screen>
   );
 }

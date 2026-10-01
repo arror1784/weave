@@ -8,8 +8,9 @@ import { Screen } from '@/components/Screen';
 import { TopBar } from '@/components/TopBar';
 import { dDayLabel, formatDateLabel } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { useMockStore } from '@/mocks/MockStoreProvider';
-import { selectDayLoad, selectTodayTasks, taskTone } from '@/mocks/store';
+import { LoadError, Loading } from '@/components/QueryStatus';
+import { selectDayLoad, selectTodayTasks, taskTone } from '@/lib/schedule';
+import { useSchedule } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
@@ -18,13 +19,22 @@ import { fonts } from '@/theme/typography';
 export default function WidgetsScreen() {
   const router = useRouter();
   const { colors, typography } = useAppTheme();
-  const { state, today } = useMockStore();
+  const schedule = useSchedule();
+  if (!schedule.data) {
+    return (
+      <Screen header={<TopBar title="홈 화면 위젯" onBack={() => router.back()} />} contentStyle={styles.content}>
+        {schedule.isError ? <LoadError error={schedule.error} onRetry={() => schedule.refetch()} /> : <Loading />}
+      </Screen>
+    );
+  }
+  const state = schedule.data;
+  const today = state.today;
   const pending = selectTodayTasks(state, today).filter((t) => !t.done);
   const urgent = pending[0];
   const load = selectDayLoad(state, today, { includeOverdue: true });
   /** '9월 30일 수' */
   const shortDate = formatDateLabel(today).replace(/요일$/, '');
-  const projectOf = (id: string) => state.projects.find((p) => p.id === id)!;
+  const projectOf = (id: number) => state.projects.find((p) => p.id === id)!;
 
   return (
     <Screen header={<TopBar title="홈 화면 위젯" onBack={() => router.back()} />} contentStyle={{ ...styles.content, backgroundColor: colors.wallpaper }}>

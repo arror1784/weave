@@ -2,12 +2,16 @@ import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
+import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { ProjectCompleteDialog } from '@/components/ProjectCompleteDialog';
 import { Splash } from '@/components/Splash';
 import { ToastProvider } from '@/components/Toast';
-import { MockStoreProvider, useMockStore } from '@/mocks/MockStoreProvider';
+import { createQueryClient, wireQueryEnvironment } from '@/queries/query-client';
+import { CompletionPromptProvider } from '@/state/CompletionPrompt';
+import { DraftProvider } from '@/state/DraftProvider';
 import { colors } from '@/theme';
 import { fonts } from '@/theme/typography';
 
@@ -20,8 +24,8 @@ const navigationTheme = {
 };
 
 function RootStack() {
-  const { state } = useMockStore();
-  const signedIn = state.session !== null;
+  const { status } = useAuth();
+  const signedIn = status === 'signedIn';
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
@@ -54,6 +58,9 @@ export default function RootLayout() {
   const ready = fontsLoaded || fontError !== null;
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);
+  const [queryClient] = useState(createQueryClient);
+
+  useEffect(wireQueryEnvironment, []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -63,22 +70,32 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <MockStoreProvider>
-      <ThemeProvider value={navigationTheme}>
-        <ToastProvider>
-          {/* 로딩 화면(00)이 끝난 뒤에 내비게이션을 띄운다 — 겹쳐 그리면 Android에서 로딩 화면이 보이지 않았다 */}
-          {splashDone ? (
-            <>
-              <RootStack />
-              {/* 마지막 작업을 끝내면 어느 화면에서든 프로젝트 완료 여부를 묻는다 */}
-              <ProjectCompleteDialog />
-            </>
-          ) : (
-            <Splash onDone={finishSplash} />
-          )}
-        </ToastProvider>
-        <StatusBar style="dark" />
-      </ThemeProvider>
-    </MockStoreProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <DraftProvider>
+          <CompletionPromptProvider>
+            <ThemeProvider value={navigationTheme}>
+              <ToastProvider>
+                <App splashDone={splashDone} onSplashDone={finishSplash} />
+              </ToastProvider>
+              <StatusBar style="dark" />
+            </ThemeProvider>
+          </CompletionPromptProvider>
+        </DraftProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+
+/** 로딩 화면(00)과 저장된 로그인 복구가 모두 끝난 뒤에 내비게이션을 띄운다 — 겹쳐 그리면 Android에서 로딩 화면이 보이지 않았다 */
+function App({ splashDone, onSplashDone }: { splashDone: boolean; onSplashDone: () => void }) {
+  const { status } = useAuth();
+  if (!splashDone || status === 'loading') return <Splash onDone={onSplashDone} />;
+  return (
+    <>
+      <RootStack />
+      {/* 마지막 작업을 끝내면 어느 화면에서든 프로젝트 완료 여부를 묻는다 */}
+      <ProjectCompleteDialog />
+    </>
   );
 }

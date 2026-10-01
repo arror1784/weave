@@ -1,5 +1,6 @@
 import Slider from '@react-native-community/slider';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -7,7 +8,10 @@ import { Card } from '@/components/Card';
 import { IconChevron, IconUser, IconWidget } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { SettingsGroup, SettingsRow } from '@/components/SettingsGroup';
-import { useMockStore } from '@/mocks/MockStoreProvider';
+import { errorMessage } from '@/api/errors';
+import { useAuth } from '@/auth/AuthProvider';
+import { useToast } from '@/components/Toast';
+import { useMe, useUpdateDailyHours } from '@/queries/me';
 import { useAppTheme } from '@/theme';
 
 /**
@@ -17,15 +21,25 @@ import { useAppTheme } from '@/theme';
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
-  const { state, dispatch } = useMockStore();
-  const email = state.session?.email ?? '';
-  const hours = state.settings.dailyAvailableHours;
+  const toast = useToast();
+  const auth = useAuth();
+  const me = useMe();
+  const updateHours = useUpdateDailyHours();
+  const email = me.data?.email ?? auth.user?.email ?? '';
+  // 슬라이더를 움직이는 동안은 화면에만 보여주고, 손을 떼면 서버에 저장한다
+  const [dragging, setDragging] = useState<number | null>(null);
+  const hours = dragging ?? me.data?.dailyAvailableHours ?? auth.user?.dailyAvailableHours ?? 3;
+
+  function saveHours(value: number) {
+    const rounded = Math.round(value * 2) / 2;
+    updateHours.mutate(rounded, { onError: (e) => toast(errorMessage(e)), onSettled: () => setDragging(null) });
+  }
 
   function confirmDelete() {
     Alert.alert('계정 삭제', '계정과 모든 프로젝트·일정이 삭제돼요. 되돌릴 수 없어요.', [
       { text: '취소', style: 'cancel' },
-      // ⚠ 목업: 서버 탈퇴 처리 없이 로그아웃만 한다. API 연동 시 서버에서 삭제·익명화(루트 CLAUDE.md §3-17).
-      { text: '삭제', style: 'destructive', onPress: () => dispatch({ type: 'signOut' }) },
+      // 서버가 개인정보(계정·프로젝트·첨부 파일)를 실제로 지운다(루트 CLAUDE.md §3-17)
+      { text: '삭제', style: 'destructive', onPress: () => auth.deleteAccount().catch((e) => toast(errorMessage(e))) },
     ]);
   }
 
@@ -60,7 +74,8 @@ export default function SettingsScreen() {
             maximumValue={8}
             step={0.5}
             value={hours}
-            onValueChange={(v: number) => dispatch({ type: 'setDailyHours', hours: Math.round(v * 2) / 2 })}
+            onValueChange={(v: number) => setDragging(Math.round(v * 2) / 2)}
+            onSlidingComplete={saveHours}
             minimumTrackTintColor={colors.thread}
             maximumTrackTintColor={colors.line}
             thumbTintColor={colors.thread}
@@ -74,7 +89,7 @@ export default function SettingsScreen() {
 
       <SettingsGroup title="기타">
         <SettingsRow icon={(c) => <IconWidget size={18} color={c} />} label="홈 화면 위젯" onPress={() => router.push('/widgets')} right={<IconChevron size={16} color={colors.inkSoft} />} />
-        <SettingsRow icon={(c) => <IconUser size={18} color={c} />} label="로그아웃" onPress={() => dispatch({ type: 'signOut' })} divider />
+        <SettingsRow icon={(c) => <IconUser size={18} color={c} />} label="로그아웃" onPress={() => auth.signOut()} divider />
       </SettingsGroup>
 
       <Pressable accessibilityRole="button" accessibilityLabel="계정 삭제" onPress={confirmDelete} style={styles.delete}>

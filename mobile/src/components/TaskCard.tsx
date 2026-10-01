@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
 import { dDayLabel, type DateKey } from '@/lib/date';
-import { isOverdue, taskTone } from '@/mocks/store';
-import type { Project, Task } from '@/mocks/types';
+import type { Project, Task } from '@/api/types';
+import { isOverdue, taskTone } from '@/lib/schedule';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
 
