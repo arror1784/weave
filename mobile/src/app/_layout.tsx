@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
+import { WidgetSync } from '@/widget/WidgetSync';
 import { ProjectCompleteDialog } from '@/components/ProjectCompleteDialog';
 import { Splash } from '@/components/Splash';
 import { ToastProvider } from '@/components/Toast';
@@ -72,6 +73,8 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        {/* 일정이 바뀔 때마다 홈 화면 위젯을 다시 그린다 */}
+        <WidgetSync />
         <DraftProvider>
           <CompletionPromptProvider>
             <ThemeProvider value={navigationTheme}>
