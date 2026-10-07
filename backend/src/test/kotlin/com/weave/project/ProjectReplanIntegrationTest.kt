@@ -24,7 +24,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
-/** "AI에게 재요청" — 기존 프로젝트의 기본 정보를 그대로 가져와 AI와 다시 나누고, 확정하면 같은 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02) */
+/** "AI에게 재요청" — `POST /projects/{id}/replan-tasks`(backend 규칙 8: PUT 금지). 기존 프로젝트의 기본 정보를 그대로 가져와 AI와 다시 나누고, 확정하면 같은 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02) */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -59,7 +59,7 @@ class ProjectReplanIntegrationTest(private val mockMvc: MockMvc, objectMapper: O
         }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
     )["project"]
 
-    fun replan(tokens: JsonNode, id: Long, body: Map<String, Any?>) = mockMvc.put("/api/v1/projects/$id") {
+    fun replan(tokens: JsonNode, id: Long, body: Map<String, Any?>) = mockMvc.post("/api/v1/projects/$id/replan-tasks") {
         header("Authorization", api.bearer(tokens))
         contentType = MediaType.APPLICATION_JSON
         content = api.json(body)
@@ -145,5 +145,15 @@ class ProjectReplanIntegrationTest(private val mockMvc: MockMvc, objectMapper: O
             content = api.json(mapOf("status" to "done"))
         }
         replan(tokens, id, ok).andExpect { status { isConflict() } }
+    }
+
+    test("재요청 확정은 POST /projects/{id}/replan-tasks — PUT /projects/{id}는 받지 않는다(규칙 8)") {
+        val tokens = newUser()
+        val id = create(tokens, body("임베디드", listOf(task("a", "설계", 2.0))))["id"].asLong()
+        mockMvc.put("/api/v1/projects/$id") {
+            header("Authorization", api.bearer(tokens))
+            contentType = MediaType.APPLICATION_JSON
+            content = api.json(body("바꿈", listOf(task("a", "설계", 2.0))))
+        }.andExpect { status { isMethodNotAllowed() } }
     }
 })

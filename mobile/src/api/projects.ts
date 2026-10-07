@@ -36,7 +36,7 @@ export const createProject = (project: NewProject) => request('/api/v1/projects'
 
 /** "AI에게 재요청" 확정 — 기본 정보와 미완료 작업을 바꾼다(완료한 작업은 서버가 남긴다) */
 export const replaceProjectTasks = (id: number, project: NewProject) =>
-  request(`/api/v1/projects/${id}`, createProjectResponseSchema, { method: 'PUT', body: project });
+  request(`/api/v1/projects/${id}/replan-tasks`, createProjectResponseSchema, { method: 'POST', body: project });
 
 export const updateProject = (id: number, changes: { color?: Project['color']; status?: 'done' }) =>
   request(`/api/v1/projects/${id}`, projectDetailSchema, { method: 'PATCH', body: changes });
