@@ -10,6 +10,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import org.hibernate.annotations.SQLDelete
 import org.hibernate.annotations.SQLRestriction
+import java.time.Instant
 import java.time.LocalDate
 
 /** 작업 — 등록한 뒤에는 완료 여부만 바뀐다(사용자 결정 B, 바뀔 수 있음). 날짜는 일정 알고리즘이 정한다. */
@@ -47,6 +48,18 @@ class Task(
 
     @Column(nullable = false)
     var done: Boolean = false
+        protected set
+
+    /** 완료한 시각 — 사용 기록용. 완료를 풀면 지운다 */
+    @Column(name = "done_at")
+    var doneAt: Instant? = null
+        protected set
+
+    fun markDone(done: Boolean, now: Instant) {
+        if (this.done == done) return
+        this.done = done
+        doneAt = if (done) now else null
+    }
 
     /** 일정 알고리즘이 정한 시작일·기간·작업 마감일 — 서버만 바꾼다 */
     @Column(name = "scheduled_date")

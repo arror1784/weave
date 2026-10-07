@@ -1,5 +1,7 @@
 package com.weave.schedule.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.global.time.TodayProvider
 import com.weave.project.domain.Project
 import com.weave.project.dto.TaskResponse
@@ -20,13 +22,15 @@ class ScheduleService(
     private val overdueRoller: OverdueRoller,
     private val replanner: Replanner,
     private val todayProvider: TodayProvider,
+    private val activityRecorder: ActivityRecorder,
 ) {
     /** 설정의 "작업 다시 배치" — 밀린 작업까지 오늘부터 다시 배치한 뒤의 일정(사용자 결정 2026-10-01) */
     @Transactional
     fun replan(userId: Long): ScheduleResponse {
         val user = userService.find(userId)
         overdueRoller.roll(userId)
-        replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, includeDelayed = true)
+        val placements = replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, includeDelayed = true)
+        activityRecorder.record(userId, ActivityType.SCHEDULE_REPLANNED, detail = mapOf("taskCount" to placements.size, "lateCount" to placements.values.count { it.late }, "dailyAvailableHours" to user.dailyAvailableHours))
         return snapshot(userId)
     }
 

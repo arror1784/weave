@@ -9,7 +9,11 @@ export const mockRouter = {
 
 export const mockParams: { current: Record<string, string> } = { current: {} };
 
+/** 지금 화면 경로 (usePathname) */
+export const mockPathname = { current: '/' };
+
 export function resetRouterMock() {
   Object.values(mockRouter).forEach((fn) => fn.mockClear());
   mockParams.current = {};
+  mockPathname.current = '/';
 }

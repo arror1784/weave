@@ -67,7 +67,8 @@ class ClaudeClient(private val weaveProperties: WeaveProperties) : AiClient {
                 @Suppress("UNCHECKED_CAST")
                 it._input().convert(Map::class.java) as Map<String, Any?>
             }
-        return AiResult(text, toolInput)
+        val usage = message.usage()
+        return AiResult(text, toolInput, usage.inputTokens(), usage.outputTokens())
     }
 
     /**

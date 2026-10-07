@@ -1,5 +1,7 @@
 package com.weave.project.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.global.time.TodayProvider
 import com.weave.attachment.service.AttachmentLinker
 import com.weave.global.error.ApiException
@@ -32,6 +34,7 @@ class ProjectService(
     private val overdueRoller: OverdueRoller,
     private val replanner: Replanner,
     private val todayProvider: TodayProvider,
+    private val activityRecorder: ActivityRecorder,
 ) {
     /**
      * 등록: 새 프로젝트와 진행중 프로젝트의 미완료 작업을 오늘부터 전부 다시 배치한다(사용자 결정 2026-10-01).
@@ -52,6 +55,14 @@ class ProjectService(
 
         val tasks = saved.sortedBy { it.position }
         val lateCount = tasks.count { placements[it.id!!]?.late == true }
+        activityRecorder.record(
+            userId, ActivityType.PROJECT_CREATED, projectId = project.id,
+            detail = mapOf(
+                "name" to project.name, "deadline" to project.deadline?.toString(), "color" to project.color,
+                "taskCount" to tasks.size, "totalHours" to tasks.sumOf { it.estimatedHours ?: 0.0 },
+                "attachmentCount" to request.attachmentIds.size, "lateCount" to lateCount,
+            ),
+        )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(project.id!!)), lateCount)
     }
 
@@ -80,6 +91,14 @@ class ProjectService(
         val placements = replanner.replan(userId, today, user.dailyAvailableHours, includeDelayed = false)
         val tasks = (kept + saved).sortedBy { it.position }
         val lateCount = saved.count { placements[it.id!!]?.late == true }
+        activityRecorder.record(
+            userId, ActivityType.PROJECT_REPLANNED, projectId = projectId,
+            detail = mapOf(
+                "name" to project.name, "deadline" to project.deadline?.toString(),
+                "keptDone" to kept.size, "removed" to removed.size, "added" to saved.size,
+                "addedHours" to saved.sumOf { it.estimatedHours ?: 0.0 }, "lateCount" to lateCount,
+            ),
+        )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(projectId)), lateCount)
     }
 
@@ -110,8 +129,14 @@ class ProjectService(
     @Transactional
     fun update(userId: Long, projectId: Long, request: UpdateProjectRequest): ProjectDetailResponse {
         val project = owned(userId, projectId)
-        request.color?.let { project.color = it }
-        if (request.status == Project.DONE) project.complete()
+        request.color?.takeIf { it != project.color }?.let {
+            activityRecorder.record(userId, ActivityType.PROJECT_COLOR_CHANGED, projectId = projectId, detail = mapOf("name" to project.name, "from" to project.color, "to" to it))
+            project.color = it
+        }
+        if (request.status == Project.DONE && project.status != Project.DONE) {
+            project.complete()
+            activityRecorder.record(userId, ActivityType.PROJECT_COMPLETED, projectId = projectId, detail = mapOf("name" to project.name))
+        }
         return ProjectDetailResponse.of(project, taskRepository.findByProjectIdOrderByPosition(projectId), attachmentLinker.ofProject(projectId))
     }
 
@@ -121,8 +146,13 @@ class ProjectService(
     @Transactional
     fun delete(userId: Long, projectId: Long) {
         val project = owned(userId, projectId)
+        val tasks = taskRepository.findByProjectIdOrderByPosition(projectId)
+        activityRecorder.record(
+            userId, ActivityType.PROJECT_DELETED, projectId = projectId,
+            detail = mapOf("name" to project.name, "status" to project.status, "taskCount" to tasks.size, "doneCount" to tasks.count { it.done }),
+        )
         attachmentLinker.deleteOfProject(projectId)
-        taskRepository.deleteAll(taskRepository.findByProjectIdOrderByPosition(projectId))
+        taskRepository.deleteAll(tasks)
         projectRepository.delete(project)
     }
 

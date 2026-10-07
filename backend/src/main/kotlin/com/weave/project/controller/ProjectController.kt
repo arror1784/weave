@@ -16,7 +16,6 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -50,8 +49,8 @@ class ProjectController(private val projectService: ProjectService) {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long) = projectService.delete(jwt.userId(), id)
 
-    /** "AI에게 재요청" 확정 — 기본 정보와 미완료 작업을 통째로 바꾼다(완료한 작업은 남긴다) */
-    @PutMapping("/{id}")
+    /** "AI에게 재요청" 확정 — 기본 정보와 미완료 작업을 통째로 바꾼다(완료한 작업은 남긴다). 규칙 8(PUT 금지)에 따라 동작 이름 경로로 POST */
+    @PostMapping("/{id}/replan-tasks")
     fun replaceTasks(@AuthenticationPrincipal jwt: Jwt, @PathVariable id: Long, @Valid @RequestBody request: CreateProjectRequest): CreateProjectResponse =
         projectService.replaceTasks(jwt.userId(), id, request)
 

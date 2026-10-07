@@ -1,5 +1,7 @@
 package com.weave.project.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.global.error.ApiException
 import com.weave.project.domain.Project
 import com.weave.project.dto.TaskResponse
@@ -9,19 +11,28 @@ import com.weave.project.repository.ProjectRepository
 import com.weave.project.repository.TaskRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import java.time.Clock
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class TaskService(
     private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
+    private val activityRecorder: ActivityRecorder,
+    private val clock: Clock,
 ) {
     /** 완료 체크만 — 제목·시간·날짜는 바꿀 수 없다(사용자 결정 B) */
     @Transactional
     fun update(userId: Long, taskId: Long, request: UpdateTaskRequest): UpdateTaskResponse {
         val task = taskRepository.findOwned(taskId, userId) ?: throw ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "작업을 찾을 수 없어요.")
-        task.done = request.done
         val project = projectRepository.findById(task.projectId).orElseThrow()
+        if (task.done != request.done) {
+            task.markDone(request.done, clock.instant())
+            activityRecorder.record(
+                userId, if (request.done) ActivityType.TASK_DONE else ActivityType.TASK_UNDONE, projectId = project.id, taskId = task.id,
+                detail = mapOf("title" to task.title, "projectName" to project.name, "estimatedHours" to task.estimatedHours, "scheduledDate" to task.scheduledDate?.toString(), "delayedFrom" to task.delayedFrom?.toString()),
+            )
+        }
         val allDone = project.status == Project.ACTIVE && taskRepository.findByProjectIdOrderByPosition(project.id!!).all { it.done }
         return UpdateTaskResponse(TaskResponse.of(task), allDone)
     }

@@ -1,5 +1,7 @@
 package com.weave.user.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.global.error.ApiException
 import com.weave.user.domain.User
 import com.weave.user.dto.UpdateSettingsRequest
@@ -10,7 +12,10 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class UserService(private val userRepository: UserRepository) {
+class UserService(
+    private val userRepository: UserRepository,
+    private val activityRecorder: ActivityRecorder,
+) {
 
     @Transactional(readOnly = true)
     fun me(userId: Long): UserResponse = UserResponse.of(find(userId))
@@ -21,6 +26,7 @@ class UserService(private val userRepository: UserRepository) {
             throw ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "0.5시간 단위로 정해 주세요.")
         }
         val user = find(userId)
+        activityRecorder.record(userId, ActivityType.SETTINGS_CHANGED, detail = mapOf("from" to user.dailyAvailableHours, "to" to request.dailyAvailableHours))
         user.dailyAvailableHours = request.dailyAvailableHours
         return UserResponse.of(user)
     }

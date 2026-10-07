@@ -1,5 +1,6 @@
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
+import { flushActivity, logActivity } from '@/api/activity';
 import { getSchedule } from '@/api/projects';
 import { todayKey } from '@/lib/date';
 import { colors } from '@/theme/colors';
@@ -22,6 +23,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       const data = schedule ? buildTodayWidgetData(schedule, schedule.today) : buildUnavailableWidgetData(todayKey());
       // 앱과 같이 밝은 테마만 쓴다
       props.renderWidget(<TodayWidget data={data} colors={colors} />);
+      // 사용 기록(사용자 결정 2026-10-07) — 일정을 받은 갱신만. 기록이 실패해도 위젯에는 영향 없다
+      if (schedule) {
+        logActivity('WIDGET_RENDERED', { action: props.widgetAction, taskCount: data.tasks.length });
+        try {
+          await flushActivity();
+        } catch {
+          // 기록을 못 보내도 위젯은 그대로
+        }
+      }
       break;
     }
     default:

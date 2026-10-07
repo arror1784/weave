@@ -1,6 +1,8 @@
 package com.weave.attachment.service
 
 import com.drew.imaging.ImageMetadataReader
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.drew.metadata.exif.GpsDirectory
 import com.weave.attachment.domain.Attachment
 import com.weave.attachment.dto.AttachmentResponse
@@ -21,6 +23,7 @@ import java.util.UUID
 class AttachmentService(
     private val attachmentRepository: AttachmentRepository,
     private val fileStorage: FileStorage,
+    private val activityRecorder: ActivityRecorder,
 ) {
     /** 파일·사진 올리기: 형식 확인 → 사진 메타데이터 제거 → 서버가 만든 이름으로 저장 */
     @Transactional
@@ -51,12 +54,16 @@ class AttachmentService(
         val saved = attachmentRepository.save(
             Attachment(userId, if (type.image) Attachment.IMAGE else Attachment.FILE, name, storageKey = key, contentType = type.contentType, sizeBytes = cleaned.size.toLong()),
         )
+        activityRecorder.record(userId, ActivityType.ATTACHMENT_UPLOADED, detail = mapOf("attachmentId" to saved.id, "name" to name, "contentType" to type.contentType, "size" to cleaned.size.toLong()))
         return AttachmentResponse.of(saved)
     }
 
     @Transactional
-    fun addLink(userId: Long, url: String): AttachmentResponse =
-        AttachmentResponse.of(attachmentRepository.save(Attachment(userId, Attachment.LINK, url.take(300), url = url)))
+    fun addLink(userId: Long, url: String): AttachmentResponse {
+        val saved = attachmentRepository.save(Attachment(userId, Attachment.LINK, url.take(300), url = url))
+        activityRecorder.record(userId, ActivityType.ATTACHMENT_LINK_ADDED, detail = mapOf("attachmentId" to saved.id, "url" to url))
+        return AttachmentResponse.of(saved)
+    }
 
     /** 내 첨부 파일 내려받기 — 링크·남의 첨부는 404 */
     @Transactional(readOnly = true)
@@ -73,6 +80,7 @@ class AttachmentService(
             ?: throw ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "첨부를 찾을 수 없어요.")
         attachment.storageKey?.let(fileStorage::delete)
         attachmentRepository.delete(attachment)
+        activityRecorder.record(userId, ActivityType.ATTACHMENT_DELETED, projectId = attachment.projectId, detail = mapOf("attachmentId" to attachment.id, "name" to attachment.name, "kind" to attachment.kind))
     }
 
     /**

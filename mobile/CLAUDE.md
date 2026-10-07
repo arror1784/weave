@@ -94,6 +94,7 @@ mobile/
     ├── queries/             # TanStack Query 훅 · query-client(온라인·포그라운드 연결) · use-toggle-task(완료 모달 연결) · use-today(서버 기준 오늘)
     ├── auth/                # AuthProvider — 앱 시작 시 세션 복구, 로그아웃·탈퇴·만료 시 기기 데이터 삭제
     ├── state/               # 등록 초안(DraftProvider) · 프로젝트 완료 모달 대기(CompletionPrompt)
+    ├── activity/            # ActivityTracker — 앱 열기·화면 보기 사용 기록(api/activity.ts가 모아서 서버로, 실패하면 다음에 다시)
     ├── widget/              # Android 홈 화면 위젯 (§2-18) — 백그라운드에서 서버 일정을 받아 그린다
     ├── test-utils/          # renderWithProviders · fixtures(예시 서버 응답) · expo-router 목
 ```

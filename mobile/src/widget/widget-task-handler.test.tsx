@@ -1,5 +1,6 @@
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
+import { flushActivity, logActivity } from '@/api/activity';
 import { refreshSession } from '@/api/client';
 import { getSchedule } from '@/api/projects';
 import { sampleSchedule } from '@/test-utils/fixtures';
@@ -8,6 +9,7 @@ import { widgetTaskHandler } from './widget-task-handler';
 
 jest.mock('react-native-android-widget', () => ({ FlexWidget: 'FlexWidget', TextWidget: 'TextWidget' }));
 jest.mock('@/api/projects');
+jest.mock('@/api/activity');
 jest.mock('@/api/client', () => ({ refreshSession: jest.fn(async () => true) }));
 const schedule = jest.mocked(getSchedule);
 const refresh = jest.mocked(refreshSession);
@@ -35,5 +37,20 @@ describe('위젯 처리기 (백그라운드)', () => {
     schedule.mockRejectedValueOnce(new Error('offline'));
     const rendered = await update();
     expect(rendered.props.data.emptyText).toBe('앱을 열면 오늘 할 일을 보여줘요');
+  });
+
+  it('위젯을 그리면 사용 기록(위젯 갱신·오늘 할 일 수)을 남겨 보낸다 — 기록이 실패해도 위젯은 그린다', async () => {
+    schedule.mockResolvedValueOnce(sampleSchedule('2026-09-30'));
+    jest.mocked(flushActivity).mockRejectedValueOnce(new Error('offline'));
+    const rendered = await update();
+    expect(rendered.props.data.tasks.length).toBeGreaterThan(0);
+    expect(logActivity).toHaveBeenCalledWith('WIDGET_RENDERED', { action: 'WIDGET_UPDATE', taskCount: rendered.props.data.tasks.length });
+    expect(flushActivity).toHaveBeenCalled();
+  });
+
+  it('일정을 받지 못한 위젯 갱신은 기록하지 않는다(로그인 전일 수 있다)', async () => {
+    schedule.mockRejectedValueOnce(new Error('offline'));
+    await update();
+    expect(logActivity).not.toHaveBeenCalled();
   });
 });
