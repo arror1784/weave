@@ -26,6 +26,12 @@ weave:
     root: ${WEAVE_STORAGE_ROOT:uploads}
   anthropic:
     api-key: ${ANTHROPIC_API_KEY:}
+    # 사용 기록의 AI 비용 계산 단가(USD, 100만 토큰당) — Claude Sonnet 5.5 공식 단가. 모델을 바꾸면 함께 바꾼다
+    price:
+      input-per-mtok: 2.0
+      output-per-mtok: 10.0
+      cache-write-per-mtok: 2.5
+      cache-read-per-mtok: 0.2
 
 spring.servlet.multipart:
   # 사용자 결정: 첨부 파일당 10MB

@@ -61,11 +61,12 @@ class ActivityExportService(
                 }
             }
             wb.createSheet("AI 대화").apply {
-                header("시각", "프로젝트", "차례", "보낸 답", "응답 종류", "AI 응답", "제안 작업 수", "걸린 시간(초)", "입력 토큰", "출력 토큰", "결과")
+                header("시각", "대화 번호", "프로젝트", "차례", "보낸 답", "응답 종류", "AI 응답", "제안 작업 수", "걸린 시간(초)", "모델", "입력 토큰", "출력 토큰", "캐시 읽기 토큰", "캐시 쓰기 토큰", "비용(USD)", "결과")
                 logs.filter { it.first.type == ActivityType.AI_CHAT.name || it.first.type == ActivityType.AI_CHAT_FAILED.name }.forEach { (l, d) ->
-                    row(TIME.format(l.occurredAt.atZone(SEOUL)), text(d, "projectName") ?: "", d.path("turn").asInt(0), text(d, "userMessage") ?: "(첫 질문 요청)",
+                    row(TIME.format(l.occurredAt.atZone(SEOUL)), text(d, "conversationId") ?: "", text(d, "projectName") ?: "", d.path("turn").asInt(0), text(d, "userMessage") ?: "(첫 질문 요청)",
                         when (text(d, "responseType")) { "tasks" -> "작업 제안"; "question" -> "질문"; else -> "" }, text(d, "aiMessage") ?: "",
-                        d.path("proposedTasks").size(), d.path("durationMs").asLong(0) / 1000.0, d.path("inputTokens").asLong(0), d.path("outputTokens").asLong(0),
+                        d.path("proposedTasks").size(), d.path("durationMs").asLong(0) / 1000.0, text(d, "model") ?: "",
+                        d.path("inputTokens").asLong(0), d.path("outputTokens").asLong(0), d.path("cacheReadTokens").asLong(0), d.path("cacheWriteTokens").asLong(0), d.path("costUsd").asDouble(0.0),
                         if (l.type == ActivityType.AI_CHAT_FAILED.name) "실패: ${text(d, "error")}" else "성공")
                 }
             }

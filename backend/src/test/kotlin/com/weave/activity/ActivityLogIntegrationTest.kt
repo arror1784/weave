@@ -44,7 +44,7 @@ class ActivityFakeAiConfiguration {
     @Primary
     fun activityFakeAiClient(): AiClient = object : AiClient {
         override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean) =
-            AiResult("팀원은 몇 명인가요?", null, inputTokens = 1200, outputTokens = 40)
+            AiResult("팀원은 몇 명인가요?", null, inputTokens = 1200, outputTokens = 40, model = "claude-sonnet-5-5", cacheReadTokens = 1000, cacheWriteTokens = 500)
     }
 }
 
@@ -174,6 +174,7 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
             mapOf(
                 "project" to mapOf("name" to "캡스톤", "description" to "", "deadline" to null),
                 "messages" to listOf(mapOf("role" to "assistant", "text" to "주제가 있나요?"), mapOf("role" to "user", "text" to "정해진 주제가 있어")),
+                "conversationId" to "c-20261007-abc",
             ),
         ).andExpect { status { isOk() } }
         val d = detailOf(tokens, "AI_CHAT")
@@ -185,6 +186,23 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         d["inputTokens"].asInt() shouldBe 1200
         d["outputTokens"].asInt() shouldBe 40
         d.has("durationMs") shouldBe true
+        // 대화 묶음 번호·모델·비용 (사용자 요청 2026-10-07) — 단가: 입력 $2 · 출력 $10 · 캐시 쓰기 $2.5 · 캐시 읽기 $0.2 (100만 토큰당)
+        d["conversationId"].asString() shouldBe "c-20261007-abc"
+        d["model"].asString() shouldBe "claude-sonnet-5-5"
+        d["cacheReadTokens"].asInt() shouldBe 1000
+        d["cacheWriteTokens"].asInt() shouldBe 500
+        d["costUsd"].asDouble() shouldBe 0.00425
+    }
+
+    test("프로젝트 등록·재요청 기록에도 같은 대화 번호를 남겨 AI 대화와 잇는다 — 대화 번호 형식이 틀리면 400") {
+        val tokens = newUser()
+        val body = project("캡스톤", listOf(task("a", "설계", 2.0))) + ("conversationId" to "c-1")
+        val id = api.read(json("POST", "/api/v1/projects", tokens, body).andExpect { status { isCreated() } }.andReturn().response.contentAsString)["project"]["id"].asLong()
+        detailOf(tokens, "PROJECT_CREATED")["conversationId"].asString() shouldBe "c-1"
+        json("POST", "/api/v1/projects/$id/replan-tasks", tokens, body + ("conversationId" to "c-2")).andExpect { status { isOk() } }
+        detailOf(tokens, "PROJECT_REPLANNED")["conversationId"].asString() shouldBe "c-2"
+        json("POST", "/api/v1/projects", tokens, body + ("conversationId" to "<script>")).andExpect { status { isBadRequest() } }
+        json("POST", "/api/v1/project-chat", tokens, mapOf("project" to mapOf("name" to "x"), "conversationId" to "a b")).andExpect { status { isBadRequest() } }
     }
 
     test("앱 사용 기록: 허용한 종류만 받고(앱 열기·화면 보기·위젯 갱신) 출처를 app으로 남긴다") {
@@ -218,6 +236,8 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
                 wb.getSheet("활동 기록").getRow(r).joinToString(" | ") { it.toString() }
             }
             text shouldContain "프로젝트 등록"
+            val ai = wb.getSheet("AI 대화").getRow(0).map { it.stringCellValue }
+            ai shouldContainAll listOf("대화 번호", "모델", "캐시 읽기 토큰", "캐시 쓰기 토큰", "비용(USD)")
             text shouldContain "내 프로젝트"
             (text.contains("남의 프로젝트")) shouldBe false
         }
