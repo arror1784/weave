@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ActivityTracker } from '@/activity/ActivityTracker';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { WidgetSync } from '@/widget/WidgetSync';
 import { ProjectCompleteDialog } from '@/components/ProjectCompleteDialog';
@@ -75,6 +76,8 @@ export default function RootLayout() {
       <AuthProvider>
         {/* 일정이 바뀔 때마다 홈 화면 위젯을 다시 그린다 */}
         <WidgetSync />
+        {/* 앱 열기·화면 보기 사용 기록 */}
+        <ActivityTracker />
         <DraftProvider>
           <CompletionPromptProvider>
             <ThemeProvider value={navigationTheme}>
