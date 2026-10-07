@@ -60,7 +60,7 @@ class ProjectService(
             detail = mapOf(
                 "name" to project.name, "deadline" to project.deadline?.toString(), "color" to project.color,
                 "taskCount" to tasks.size, "totalHours" to tasks.sumOf { it.estimatedHours ?: 0.0 },
-                "attachmentCount" to request.attachmentIds.size, "lateCount" to lateCount,
+                "attachmentCount" to request.attachmentIds.size, "lateCount" to lateCount, "conversationId" to request.conversationId,
             ),
         )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(project.id!!)), lateCount)
@@ -96,7 +96,7 @@ class ProjectService(
             detail = mapOf(
                 "name" to project.name, "deadline" to project.deadline?.toString(),
                 "keptDone" to kept.size, "removed" to removed.size, "added" to saved.size,
-                "addedHours" to saved.sumOf { it.estimatedHours ?: 0.0 }, "lateCount" to lateCount,
+                "addedHours" to saved.sumOf { it.estimatedHours ?: 0.0 }, "lateCount" to lateCount, "conversationId" to request.conversationId,
             ),
         )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(projectId)), lateCount)

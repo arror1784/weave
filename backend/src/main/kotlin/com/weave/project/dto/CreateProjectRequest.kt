@@ -35,6 +35,10 @@ data class CreateProjectRequest(
 
     @field:Size(max = 10, message = "첨부는 10개까지예요.")
     val attachmentIds: List<Long> = emptyList(),
+
+    /** 이 등록을 만든 AI 대화의 묶음 번호 — 사용 기록에서 대화와 등록을 잇는다 */
+    @field:Pattern(regexp = "[A-Za-z0-9_-]{1,64}", message = "대화 번호 형식이 올바르지 않아요.")
+    val conversationId: String? = null,
 ) {
     companion object {
         /** 프로젝트 색 7가지(회색은 뺐다 — 사용자 결정 2026-10-01) — 앱 src/theme/colors.ts와 같다 */

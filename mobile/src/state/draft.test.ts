@@ -3,6 +3,16 @@ import { canMoveTask, draftReducer, type Draft, type DraftTask } from './draft';
 const base: Draft = { name: '임베디드', description: '', deadline: '2026-10-09', deliverable: '', progress: '', color: 'teal', attachments: [], chat: [], tasks: [] };
 
 describe('등록 초안', () => {
+  it('등록(재요청) 흐름을 시작할 때마다 새 대화 번호를 만든다 — 사용 기록에서 AI 대화와 등록을 잇는다(2026-10-07)', () => {
+    const start = { type: 'start' as const, name: 'a', description: '', deadline: null, deliverable: '', progress: '', color: 'teal' as const, attachments: [] };
+    const one = draftReducer(null, start);
+    const two = draftReducer(null, start);
+    expect(one?.conversationId).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+    expect(two?.conversationId).not.toBe(one?.conversationId);
+    // 같은 초안 안에서는 바뀌지 않는다
+    expect(draftReducer(one, { type: 'setChat', chat: [] })?.conversationId).toBe(one?.conversationId);
+  });
+
   it('작업을 고치고, 지우면 그 작업을 선행으로 둔 연결도 끊고, 새 작업을 추가한다', () => {
     let d = draftReducer(base, {
       type: 'setTasks',

@@ -29,7 +29,7 @@ beforeEach(() => {
   projects.getSchedule.mockResolvedValue(sampleSchedule(TEST_TODAY));
 });
 
-const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '', color: 'violet', attachments: [], chat: [], tasks: [] };
+const draft: Draft = { name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '', color: 'violet', attachments: [], chat: [], tasks: [], conversationId: 'conv-1' };
 const proposed: ProposedTask[] = [
   { key: 'k1', title: '관련 개념 학습 (인터럽트)', description: 'NVIC·EXTI 개념 정리, 예제 1개 실행', estimatedHours: 2, dependsOnKey: null, prerequisite: true, aiDueDate: '2026-10-03' },
   { key: 'k2', title: '설계 문서 작성', description: '블록도와 시퀀스', estimatedHours: 3, dependsOnKey: 'k1', prerequisite: false, aiDueDate: '2026-10-05' },
@@ -155,7 +155,7 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
     chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '명세서를 읽었어요. 팀원은 몇 명인가요?' });
     await renderWithProviders(<ChatScreen />, { draft: { ...draft, attachments: [{ id: 21, kind: 'file', name: 'spec.pdf' }, { id: 22, kind: 'link', name: 'https://example.com', url: 'https://example.com' }] } });
     expect(await screen.findByText('명세서를 읽었어요. 팀원은 몇 명인가요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenCalledWith(expect.anything(), [], [21, 22]);
+    expect(chat.sendChat).toHaveBeenCalledWith(expect.anything(), [], [21, 22], 'conv-1');
   });
 
   it('처음 들어오면 기본 정보로 첫 질문을 받고, 답하면 대화 전체를 보내 다음 질문을 받는다', async () => {
@@ -164,7 +164,7 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
       .mockResolvedValueOnce({ type: 'question', message: '누가 보고서를 맡나요?' });
     await renderWithProviders(<ChatScreen />, { draft });
     expect(await screen.findByText('선행 지식이 있나요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '' }, [], []);
+    expect(chat.sendChat).toHaveBeenCalledWith({ name: '임베디드시스템 과제', description: 'STM32', deadline: '2026-10-09', deliverable: '보고서', progress: '' }, [], [], 'conv-1');
     // 질문 진행 표시(n/5)는 없앴다
     expect(screen.queryByText(/\/5$/)).toBeNull();
 
@@ -178,6 +178,7 @@ describe('등록 2/3 AI 챗봇 (서버가 Claude API 호출)', () => {
         { role: 'user', text: 'UART는 알아요' },
       ],
       [],
+      'conv-1',
     );
   });
 
@@ -342,6 +343,7 @@ describe('등록 3/3 작업 검토', () => {
       progress: '',
       tasks: proposed.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite })),
       attachmentIds: [21],
+      conversationId: 'conv-1',
     });
     expect(await screen.findByText('임베디드시스템 과제가 등록됐어요 · 마감 안에 끝내기 빠듯한 작업 1개')).toBeOnTheScreen();
     expect(mockRouter.dismissAll).toHaveBeenCalled();
@@ -407,7 +409,7 @@ describe('AI에게 재요청 (사용자 결정 2026-10-02 — 기존 프로젝�
     chat.sendChat.mockResolvedValueOnce({ type: 'question', message: '남은 기간은요?' });
     await renderWithProviders(<ChatScreen />, { draft: { ...draft, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
     expect(await screen.findByText('남은 기간은요?')).toBeOnTheScreen();
-    expect(chat.sendChat).toHaveBeenCalledWith(expect.objectContaining({ completedTasks: ['주제발표 자료 정리'] }), [], []);
+    expect(chat.sendChat).toHaveBeenCalledWith(expect.objectContaining({ completedTasks: ['주제발표 자료 정리'] }), [], [], 'conv-1');
   });
 
   it('등록 완료하면 새로 만들지 않고 기존 프로젝트의 작업을 바꾼 뒤 그 프로젝트 상세로 간다', async () => {
@@ -415,7 +417,7 @@ describe('AI에게 재요청 (사용자 결정 2026-10-02 — 기존 프로젝�
     await renderWithProviders(<ReviewScreen />, { draft: { ...draft, tasks: draftTasks, projectId: 1, completedTasks: ['주제발표 자료 정리'] } });
     await fireEvent.press(screen.getByRole('button', { name: '등록 완료' }));
     expect(projects.createProject).not.toHaveBeenCalled();
-    expect(projects.replaceProjectTasks).toHaveBeenCalledWith(1, expect.objectContaining({ name: '임베디드시스템 과제', deliverable: '보고서', tasks: expect.any(Array), attachmentIds: [] }));
+    expect(projects.replaceProjectTasks).toHaveBeenCalledWith(1, expect.objectContaining({ name: '임베디드시스템 과제', deliverable: '보고서', tasks: expect.any(Array), attachmentIds: [], conversationId: 'conv-1' }));
     expect(await screen.findByText('임베디드시스템 과제의 작업을 다시 나눴어요')).toBeOnTheScreen();
     expect(mockRouter.navigate).toHaveBeenCalledWith('/projects/1', { withAnchor: true });
   });

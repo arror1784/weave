@@ -18,7 +18,11 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.every
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
+import com.weave.global.config.WeaveProperties
 import io.mockk.mockk
+import io.mockk.verify
 import io.mockk.slot
 import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
@@ -28,12 +32,13 @@ import java.time.ZonedDateTime
 
 class ProjectChatServiceTest : FunSpec({
     val ai = mockk<AiClient>()
+    val recorder = mockk<ActivityRecorder>(relaxed = true)
     val loader = mockk<AttachmentContentLoader>()
     every { loader.load(any(), any()) } returns emptyList()
     // 한국 시간 10/2 새벽 5시 — 하루가 아침 6시에 바뀌므로 '오늘'은 10/1
     val seoul = ZoneId.of("Asia/Seoul")
     val clock = Clock.fixed(ZonedDateTime.of(2026, 10, 2, 5, 0, 0, 0, seoul).toInstant(), seoul)
-    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build(), TodayProvider(clock), mockk(relaxed = true))
+    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build(), TodayProvider(clock), recorder, WeaveProperties(WeaveProperties.Jwt("test-secret")))
     val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"), deliverable = "보고서, 발표자료", progress = "회로 구성은 끝냄")
     val proposal = mapOf(
         "tasks" to listOf(
@@ -139,5 +144,13 @@ class ProjectChatServiceTest : FunSpec({
         val intro = turns.captured.single().text
         intro shouldContain "이미 등록한 프로젝트의 남은 작업을 다시 나눌게요."
         intro shouldContain "이미 끝낸 작업: 인터럽트 개념 학습, 회로도 검토"
+    }
+
+    test("AI 호출이 실패해도 대화 번호·설정된 모델을 실패 기록에 남긴다") {
+        every { ai.converse(any(), any(), any(), any()) } throws RuntimeException("timeout")
+        runCatching { service.chat(7L, ProjectChatRequest(info, emptyList(), conversationId = "c-fail")) }
+        verify {
+            recorder.record(7L, ActivityType.AI_CHAT_FAILED, any(), any(), match { it["conversationId"] == "c-fail" && it["model"] == "claude-sonnet-5-5" && it["error"] == "RuntimeException" }, any(), any())
+        }
     }
 })

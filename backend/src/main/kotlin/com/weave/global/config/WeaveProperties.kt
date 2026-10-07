@@ -27,5 +27,18 @@ data class WeaveProperties(
         val apiKey: String = "",
         /** 사용자 결정: Claude Sonnet 5.5 */
         val model: String = "claude-sonnet-5-5",
+        /** 사용 기록의 비용 계산용 단가 (USD, 100만 토큰당) — 모델·가격이 바뀌면 application.yml에서 바꾼다 */
+        val price: Price = Price(),
     )
+
+    /** 기본값: Claude Sonnet 5.5 공식 단가(2026-09 기준) — 입력 $2 · 출력 $10 · 캐시 쓰기(5분) $2.5(입력의 1.25배) · 캐시 읽기 $0.2 */
+    data class Price(
+        val inputPerMtok: Double = 2.0,
+        val outputPerMtok: Double = 10.0,
+        val cacheWritePerMtok: Double = 2.5,
+        val cacheReadPerMtok: Double = 0.2,
+    ) {
+        fun costUsd(input: Long, output: Long, cacheWrite: Long, cacheRead: Long): Double =
+            Math.round((input * inputPerMtok + output * outputPerMtok + cacheWrite * cacheWritePerMtok + cacheRead * cacheReadPerMtok) / 1_000_000 * 1e8) / 1e8
+    }
 }

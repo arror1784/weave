@@ -18,6 +18,8 @@ export type NewProject = {
   progress: string;
   tasks: { key: string; title: string; estimatedHours: number; dependsOnKey: string | null; prerequisite: boolean }[];
   attachmentIds: number[];
+  /** 이 등록을 만든 AI 대화 번호 (사용 기록용) */
+  conversationId?: string;
 };
 
 /** 오늘·전체 일정·과부하·위젯이 함께 쓰는 스냅샷 (진행중 프로젝트와 그 작업) */

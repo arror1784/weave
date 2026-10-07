@@ -68,7 +68,12 @@ class ClaudeClient(private val weaveProperties: WeaveProperties) : AiClient {
                 it._input().convert(Map::class.java) as Map<String, Any?>
             }
         val usage = message.usage()
-        return AiResult(text, toolInput, usage.inputTokens(), usage.outputTokens())
+        return AiResult(
+            text, toolInput, usage.inputTokens(), usage.outputTokens(),
+            model = message.model().asString(),
+            cacheReadTokens = usage.cacheReadInputTokens().orElse(0L),
+            cacheWriteTokens = usage.cacheCreationInputTokens().orElse(0L),
+        )
     }
 
     /**

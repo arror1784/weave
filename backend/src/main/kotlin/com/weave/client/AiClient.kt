@@ -7,7 +7,17 @@ data class AiTurn(val role: String, val text: String, val attachments: List<AiAt
 data class AiTool(val name: String, val description: String, val inputSchema: Map<String, Any>)
 
 /** AI 응답: 글(text)과, 도구를 불렀다면 그 입력(toolInput). 토큰 사용량은 사용 기록용(모르면 null) */
-data class AiResult(val text: String, val toolInput: Map<String, Any?>?, val inputTokens: Long? = null, val outputTokens: Long? = null)
+data class AiResult(
+    val text: String,
+    val toolInput: Map<String, Any?>?,
+    val inputTokens: Long? = null,
+    val outputTokens: Long? = null,
+    /** 응답한 모델 이름 */
+    val model: String? = null,
+    /** 프롬프트 캐시에서 읽은 토큰 · 캐시에 새로 쓴 토큰 (inputTokens에는 들어 있지 않다) */
+    val cacheReadTokens: Long? = null,
+    val cacheWriteTokens: Long? = null,
+)
 
 /** AI 호출 창구. 실제 구현은 ClaudeClient 하나이고, 테스트에서는 가짜로 바꾼다. */
 interface AiClient {

@@ -9,6 +9,7 @@ import com.weave.ai.dto.ProjectChatRequest
 import com.weave.ai.dto.ProjectChatResponse
 import com.weave.ai.dto.ProposedTask
 import com.weave.client.AiClient
+import com.weave.global.config.WeaveProperties
 import com.weave.client.AiResult
 import com.weave.client.AiTool
 import com.weave.client.AiTurn
@@ -33,6 +34,7 @@ class ProjectChatService(
     private val objectMapper: ObjectMapper,
     private val todayProvider: TodayProvider,
     private val activityRecorder: ActivityRecorder,
+    private val weaveProperties: WeaveProperties,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -46,7 +48,7 @@ class ProjectChatService(
         val result = try {
             aiClient.converse(prompt.system(), turns, PROPOSE_TASKS, forceTool = forced)
         } catch (e: Exception) {
-            activityRecorder.record(userId, ActivityType.AI_CHAT_FAILED, detail = chatDetail(request, started) + mapOf("error" to e.javaClass.simpleName))
+            activityRecorder.record(userId, ActivityType.AI_CHAT_FAILED, detail = chatDetail(request, started) + mapOf("model" to weaveProperties.anthropic.model, "error" to e.javaClass.simpleName))
             if (e is ApiException) throw e
             // 서버 로그에는 대화 내용(개인정보 가능)을 남기지 않고 원인 종류만 남긴다(§3-16). 대화 본문은 사용자 본인의 사용 기록(DB)에만
             log.warn("AI 호출 실패: {}", e.javaClass.simpleName)
@@ -74,8 +76,14 @@ class ProjectChatService(
                 "aiMessage" to response.message,
                 "proposedTasks" to response.tasks?.map { mapOf("title" to it.title, "estimatedHours" to it.estimatedHours, "dependsOnKey" to it.dependsOnKey) },
                 "assumptions" to response.assumptions,
+                "model" to (result.model ?: weaveProperties.anthropic.model),
                 "inputTokens" to result.inputTokens,
                 "outputTokens" to result.outputTokens,
+                "cacheReadTokens" to result.cacheReadTokens,
+                "cacheWriteTokens" to result.cacheWriteTokens,
+                "costUsd" to result.inputTokens?.let {
+                    weaveProperties.anthropic.price.costUsd(it, result.outputTokens ?: 0, result.cacheWriteTokens ?: 0, result.cacheReadTokens ?: 0)
+                },
             ),
         )
     }
@@ -83,6 +91,7 @@ class ProjectChatService(
     private fun chatDetail(request: ProjectChatRequest, started: Long): Map<String, Any?> {
         val lastUser = request.messages.lastOrNull { it.role == "user" }
         return mapOf(
+            "conversationId" to request.conversationId,
             "projectName" to request.project.name,
             "replan" to request.project.completedTasks.isNotEmpty().takeIf { it },
             "turn" to request.messages.count { it.role == "user" },

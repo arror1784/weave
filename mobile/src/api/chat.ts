@@ -19,9 +19,10 @@ export type ChatProject = {
  * 등록 2단계 AI 챗봇 — 서버가 Claude API를 부른다(앱은 AI API를 직접 부르지 않는다, §3-11).
  * 서버는 대화를 저장하지 않아서 매번 전체 대화와 첨부 id를 보낸다.
  */
-export const sendChat = (project: ChatProject, messages: ChatTurn[], attachmentIds: number[]) =>
+/** conversationId: 같은 등록 흐름의 요청을 사용 기록에서 묶는 번호 */
+export const sendChat = (project: ChatProject, messages: ChatTurn[], attachmentIds: number[], conversationId?: string) =>
   request('/api/v1/project-chat', chatResponseSchema, {
     method: 'POST',
-    body: { project, messages: messages.map(({ role, text, tasks }) => (tasks ? { role, text, tasks } : { role, text })), attachmentIds },
+    body: { project, messages: messages.map(({ role, text, tasks }) => (tasks ? { role, text, tasks } : { role, text })), attachmentIds, ...(conversationId ? { conversationId } : {}) },
   });
 
