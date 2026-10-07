@@ -38,7 +38,7 @@ export default function ChatScreen() {
   // 첫 질문: 대화가 비어 있으면 기본 정보만 보내 받는다(화면에 들어오면 한 번)
   const first = useQuery({
     queryKey: ['project-chat-first', project, attachmentIds],
-    queryFn: () => sendChat(project!, [], attachmentIds),
+    queryFn: () => sendChat(project!, [], attachmentIds, draft?.conversationId),
     enabled: !!draft && draft.chat.length === 0 && draft.tasks.length === 0,
     staleTime: Infinity,
     retry: false,
@@ -60,7 +60,7 @@ export default function ChatScreen() {
     setSending(true);
     setSendError(undefined);
     try {
-      const r = await sendChat(project, history, attachmentIds);
+      const r = await sendChat(project, history, attachmentIds, draft?.conversationId);
       dispatch({ type: 'setChat', chat: [...history, assistantTurn(r)] });
       if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
     } catch (e) {

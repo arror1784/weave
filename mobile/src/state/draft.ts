@@ -22,6 +22,8 @@ export type Draft = {
   projectId?: number;
   /** 재요청 때 이미 끝낸 작업 제목 — AI가 다시 제안하지 않게 알린다 */
   completedTasks?: string[];
+  /** 대화 묶음 번호 — 등록(재요청) 흐름을 시작할 때 만들어 챗봇 요청·등록 완료에 함께 보낸다(사용 기록, 2026-10-07) */
+  conversationId?: string;
 };
 
 export type DraftAction =
@@ -58,6 +60,7 @@ export function draftReducer(draft: Draft | null, action: DraftAction): Draft | 
         attachments: action.attachments,
         chat: [],
         tasks: [],
+        conversationId: newConversationId(),
         ...(action.projectId !== undefined ? { projectId: action.projectId, completedTasks: action.completedTasks ?? [] } : {}),
       };
     case 'reset':
@@ -95,6 +98,11 @@ export function canMoveTask(tasks: DraftTask[], key: string, offset: -1 | 1): bo
   if (i < 0 || j < 0 || j >= tasks.length) return false;
   const [upper, lower] = offset < 0 ? [tasks[j], tasks[i]] : [tasks[i], tasks[j]];
   return lower.dependsOnKey !== upper.key;
+}
+
+/** 대화 묶음 번호 — 시각 + 무작위 (영문·숫자·하이픈, 서버 형식 [A-Za-z0-9_-]{1,64}) */
+export function newConversationId(): string {
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 let sequence = 0;

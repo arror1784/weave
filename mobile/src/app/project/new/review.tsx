@@ -51,7 +51,7 @@ export default function ReviewScreen() {
     // 서버가 임시 일정 알고리즘으로 작업 날짜를 배정한다(backend Scheduler)
     // 작업 마감일은 서버가 역산한다 — AI가 준 마감일(aiDueDate)은 참고용이라 보내지 않는다(사용자 결정)
     const tasks = d.tasks.map(({ key, title, description, estimatedHours, dependsOnKey, prerequisite }) => ({ key, title, description, estimatedHours, dependsOnKey, prerequisite }));
-    const body = { name: d.name, description: d.description, deadline: d.deadline, color: d.color, deliverable: d.deliverable, progress: d.progress, tasks, attachmentIds: d.attachments.map((a) => a.id) };
+    const body = { name: d.name, description: d.description, deadline: d.deadline, color: d.color, deliverable: d.deliverable, progress: d.progress, tasks, attachmentIds: d.attachments.map((a) => a.id), ...(d.conversationId ? { conversationId: d.conversationId } : {}) };
     // 재요청이면 새로 만들지 않고 기존 프로젝트의 미완료 작업을 바꾼다(사용자 결정 2026-10-02)
     const replanning = d.projectId !== undefined;
     const save = replanning ? replace : create;
@@ -76,7 +76,7 @@ export default function ReviewScreen() {
     const history: ChatTurn[] = [...d.chat, { role: 'user', text: '', tasks: toChatTasks(d.tasks) }];
     setRevising(true);
     try {
-      const r = await sendChat(chatProject(d), history, d.attachments.map((a) => a.id));
+      const r = await sendChat(chatProject(d), history, d.attachments.map((a) => a.id), d.conversationId);
       dispatch({ type: 'setChat', chat: [...history, assistantTurn(r)] });
       if (r.type === 'tasks' && r.tasks) dispatch({ type: 'setTasks', tasks: r.tasks });
       toast(r.message);
