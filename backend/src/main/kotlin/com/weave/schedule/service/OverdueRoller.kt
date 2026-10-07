@@ -1,5 +1,7 @@
 package com.weave.schedule.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.global.time.TodayProvider
 import com.weave.project.domain.Project
 import com.weave.project.repository.ProjectRepository
@@ -18,19 +20,28 @@ class OverdueRoller(
     private val projectRepository: ProjectRepository,
     private val taskRepository: TaskRepository,
     private val todayProvider: TodayProvider,
+    private val activityRecorder: ActivityRecorder,
 ) {
     @Transactional
     fun roll(userId: Long) {
         val today = todayProvider.today()
         val ids = projectRepository.findByUserIdAndStatus(userId, Project.ACTIVE).map { it.id!! }
         if (ids.isEmpty()) return
-        taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(ids).filter { it.isOverdue(today) }.forEach { it.moveToToday(today) }
+        val moved = taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(ids).filter { it.isOverdue(today) }
+        moved.forEach { it.moveToToday(today) }
+        // 옮긴 게 있을 때만 남긴다 — 일정 조회마다 불리므로
+        if (moved.isNotEmpty()) activityRecorder.record(userId, ActivityType.OVERDUE_MOVED, detail = mapOf("count" to moved.size, "titles" to moved.map { it.title }, "today" to today.toString()))
     }
 
     @Scheduled(cron = "0 5 6 * * *", zone = "Asia/Seoul")
     @Transactional
     fun rollAll() {
         val today = todayProvider.today()
-        taskRepository.findOverdueCandidates(today).filter { it.isOverdue(today) }.forEach { it.moveToToday(today) }
+        val moved = taskRepository.findOverdueCandidates(today).filter { it.isOverdue(today) }
+        moved.forEach { it.moveToToday(today) }
+        val owners = projectRepository.findAllById(moved.map { it.projectId }.toSet()).associate { it.id!! to it.userId }
+        moved.groupBy { owners.getValue(it.projectId) }.forEach { (userId, tasks) ->
+            activityRecorder.record(userId, ActivityType.OVERDUE_MOVED, detail = mapOf("count" to tasks.size, "titles" to tasks.map { it.title }, "today" to today.toString(), "by" to "6시 정기 작업"))
+        }
     }
 }

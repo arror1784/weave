@@ -1,5 +1,7 @@
 package com.weave.ai.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.ai.dto.ChatMessage
 import com.weave.ai.dto.ChatProjectInfo
 import com.weave.ai.dto.ChatTask
@@ -7,6 +9,7 @@ import com.weave.ai.dto.ProjectChatRequest
 import com.weave.ai.dto.ProjectChatResponse
 import com.weave.ai.dto.ProposedTask
 import com.weave.client.AiClient
+import com.weave.client.AiResult
 import com.weave.client.AiTool
 import com.weave.client.AiTurn
 import com.weave.global.error.ApiException
@@ -29,6 +32,7 @@ class ProjectChatService(
     private val attachmentContentLoader: AttachmentContentLoader,
     private val objectMapper: ObjectMapper,
     private val todayProvider: TodayProvider,
+    private val activityRecorder: ActivityRecorder,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -37,12 +41,14 @@ class ProjectChatService(
         val attachments = attachmentContentLoader.load(userId, request.attachmentIds)
         val turns = merge(listOf(AiTurn("user", introduce(request.project), attachments)) + request.messages.map(::toTurn))
 
+        val forced = mustPropose(request.messages)
+        val started = System.nanoTime()
         val result = try {
-            aiClient.converse(prompt.system(), turns, PROPOSE_TASKS, forceTool = mustPropose(request.messages))
-        } catch (e: ApiException) {
-            throw e
+            aiClient.converse(prompt.system(), turns, PROPOSE_TASKS, forceTool = forced)
         } catch (e: Exception) {
-            // 대화 내용(개인정보 가능)은 남기지 않고 원인 종류만 남긴다(§3-16)
+            activityRecorder.record(userId, ActivityType.AI_CHAT_FAILED, detail = chatDetail(request, started) + mapOf("error" to e.javaClass.simpleName))
+            if (e is ApiException) throw e
+            // 서버 로그에는 대화 내용(개인정보 가능)을 남기지 않고 원인 종류만 남긴다(§3-16). 대화 본문은 사용자 본인의 사용 기록(DB)에만
             log.warn("AI 호출 실패: {}", e.javaClass.simpleName)
             throw unavailable()
         }
@@ -52,10 +58,39 @@ class ProjectChatService(
             val tasks = toProposed(input["tasks"])
             if (tasks.isEmpty()) throw unavailable()
             val assumptions = (input["assumptions"] as? List<*>)?.mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }.orEmpty()
-            return ProjectChatResponse("tasks", result.text.ifBlank { "작업 목록을 정리했어요." }, tasks, assumptions)
+            return ProjectChatResponse("tasks", result.text.ifBlank { "작업 목록을 정리했어요." }, tasks, assumptions).also { recordChat(userId, request, started, result, forced, it) }
         }
         if (result.text.isBlank()) throw unavailable()
-        return ProjectChatResponse("question", result.text)
+        return ProjectChatResponse("question", result.text).also { recordChat(userId, request, started, result, forced, it) }
+    }
+
+    /** 사용 기록(사용자 결정 2026-10-07 — 대화 본문 포함): 보낸 답·AI 응답·제안 작업·걸린 시간·토큰 */
+    private fun recordChat(userId: Long, request: ProjectChatRequest, started: Long, result: AiResult, forced: Boolean, response: ProjectChatResponse) {
+        activityRecorder.record(
+            userId, ActivityType.AI_CHAT,
+            detail = chatDetail(request, started) + mapOf(
+                "forcedProposal" to forced.takeIf { it },
+                "responseType" to response.type,
+                "aiMessage" to response.message,
+                "proposedTasks" to response.tasks?.map { mapOf("title" to it.title, "estimatedHours" to it.estimatedHours, "dependsOnKey" to it.dependsOnKey) },
+                "assumptions" to response.assumptions,
+                "inputTokens" to result.inputTokens,
+                "outputTokens" to result.outputTokens,
+            ),
+        )
+    }
+
+    private fun chatDetail(request: ProjectChatRequest, started: Long): Map<String, Any?> {
+        val lastUser = request.messages.lastOrNull { it.role == "user" }
+        return mapOf(
+            "projectName" to request.project.name,
+            "replan" to request.project.completedTasks.isNotEmpty().takeIf { it },
+            "turn" to request.messages.count { it.role == "user" },
+            "userMessage" to lastUser?.text,
+            "editedTaskCount" to lastUser?.tasks?.size,
+            "attachmentCount" to request.attachmentIds.size,
+            "durationMs" to (System.nanoTime() - started) / 1_000_000,
+        )
     }
 
     /** 프롬프트 대화 규칙 1: 최초 제안은 5턴 안에 — 사용자 답이 5번 쌓였는데 아직 제안이 없으면 도구 호출을 강제한다 */

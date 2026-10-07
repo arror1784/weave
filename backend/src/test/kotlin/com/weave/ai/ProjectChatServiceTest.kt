@@ -33,7 +33,7 @@ class ProjectChatServiceTest : FunSpec({
     // 한국 시간 10/2 새벽 5시 — 하루가 아침 6시에 바뀌므로 '오늘'은 10/1
     val seoul = ZoneId.of("Asia/Seoul")
     val clock = Clock.fixed(ZonedDateTime.of(2026, 10, 2, 5, 0, 0, 0, seoul).toInstant(), seoul)
-    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build(), TodayProvider(clock))
+    val service = ProjectChatService(ai, ProjectBreakdownPrompt(), loader, JsonMapper.builder().build(), TodayProvider(clock), mockk(relaxed = true))
     val info = ChatProjectInfo("임베디드시스템 과제", "STM32 센서 수집", LocalDate.parse("2026-10-09"), deliverable = "보고서, 발표자료", progress = "회로 구성은 끝냄")
     val proposal = mapOf(
         "tasks" to listOf(

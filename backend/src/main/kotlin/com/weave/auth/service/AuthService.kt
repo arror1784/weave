@@ -1,5 +1,7 @@
 package com.weave.auth.service
 
+import com.weave.activity.domain.ActivityType
+import com.weave.activity.service.ActivityRecorder
 import com.weave.auth.dto.LoginRequest
 import com.weave.auth.dto.SignupRequest
 import com.weave.auth.dto.TokenResponse
@@ -21,12 +23,14 @@ class AuthService(
     private val tokenService: TokenService,
     private val passwordEncoder: PasswordEncoder,
     private val clock: Clock,
+    private val activityRecorder: ActivityRecorder,
 ) {
     @Transactional
     fun signup(request: SignupRequest): TokenResponse {
         val email = normalize(request.email)
         if (userRepository.existsByEmail(email)) throw ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "이미 가입한 이메일이에요.")
         val user = userRepository.save(User(email, passwordEncoder.encode(request.password)!!))
+        activityRecorder.record(user.id!!, ActivityType.SIGNUP)
         return tokenService.issue(user)
     }
 
@@ -35,6 +39,7 @@ class AuthService(
         val user = userRepository.findByEmail(normalize(request.email))
         // 이메일이 없는지 비밀번호가 틀렸는지 구분해 알려주지 않는다
         if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) throw invalidCredentials()
+        activityRecorder.record(user.id!!, ActivityType.LOGIN)
         return tokenService.issue(user)
     }
 
@@ -59,6 +64,7 @@ class AuthService(
     /** 로그아웃: 그 리프레시 토큰을 폐기한다. 다른 사람 토큰이면 조용히 무시한다. */
     @Transactional
     fun logout(userId: Long, rawToken: String) {
+        activityRecorder.record(userId, ActivityType.LOGOUT)
         val token = refreshTokenRepository.findByTokenHash(TokenService.hash(rawToken)) ?: return
         if (token.userId == userId) token.revoke(clock.instant())
     }
