@@ -142,10 +142,13 @@ class ProjectService(
 
     /**
      * 프로젝트 삭제 — 상시 프로젝트를 끝낼 때 등(사용자 결정 2026-10-01). 프로젝트·작업·첨부 행은 소프트 삭제, 첨부 파일은 디스크에서 지운다.
+     * 지운 뒤 남은 진행중 프로젝트의 미완료 작업을 등록 때처럼 오늘부터 다시 배치한다 — 밀린 작업은 그대로(사용자 결정 2026-10-08).
      */
     @Transactional
     fun delete(userId: Long, projectId: Long) {
         val project = owned(userId, projectId)
+        val user = userService.find(userId)
+        overdueRoller.roll(userId)
         val tasks = taskRepository.findByProjectIdOrderByPosition(projectId)
         activityRecorder.record(
             userId, ActivityType.PROJECT_DELETED, projectId = projectId,
@@ -154,6 +157,7 @@ class ProjectService(
         attachmentLinker.deleteOfProject(projectId)
         taskRepository.deleteAll(tasks)
         projectRepository.delete(project)
+        replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, includeDelayed = false)
     }
 
     private fun owned(userId: Long, projectId: Long) =

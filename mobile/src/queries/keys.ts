@@ -4,4 +4,5 @@ export const queryKeys = {
   projects: (status: 'active' | 'done') => ['projects', status] as const,
   projectsAll: ['projects'] as const,
   project: (id: number) => ['project', id] as const,
+  projectAll: ['project'] as const,
 };
