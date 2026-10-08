@@ -94,6 +94,25 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andExpect { jsonPath("$.tasks.length()") { value(0) } }
     }
 
+    test("프로젝트를 삭제하면 남은 작업을 오늘부터 다시 배치한다 — 밀린 작업은 그대로(사용자 결정 2026-10-08)") {
+        val tokens = newUser()
+        val far = createOk(tokens, name = "먼 마감", deadline = today.plusDays(20), tasks = listOf(task("a", "먼 작업", 3.0), task("b", "밀린 일", 1.0)))["project"]["tasks"]
+        val lateId = far[1]["id"].asLong()
+        jdbc.update("UPDATE tasks SET scheduled_date = ?, day_hours = '' WHERE id = ?", today.minusDays(2), lateId)
+        val near = createOk(tokens, name = "가까운 마감", deadline = today.plusDays(2), tasks = listOf(task("c", "급한 작업", 3.0)))
+        // 가까운 마감이 오늘을 차지해 먼 작업은 내일로 밀려 있다
+        val before = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)["tasks"]
+        before.asIterable().first { it["id"].asLong() == far[0]["id"].asLong() }["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
+
+        mockMvc.delete("/api/v1/projects/${near["project"]["id"].asLong()}") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNoContent() } }
+
+        val byId = api.read(mockMvc.get("/api/v1/schedule") { header("Authorization", api.bearer(tokens)) }.andReturn().response.contentAsString)["tasks"]
+            .asIterable().associateBy { it["id"].asLong() }
+        byId.getValue(far[0]["id"].asLong())["scheduledDate"].asString() shouldBe today.toString()
+        byId.getValue(lateId)["scheduledDate"].asString() shouldBe today.toString()
+        byId.getValue(lateId)["delayedFrom"].asString() shouldBe today.minusDays(2).toString()
+    }
+
     test("두 번째 프로젝트는 첫 프로젝트가 쓴 시간을 피해 배정한다") {
         val tokens = newUser()
         createOk(tokens, tasks = listOf(task("a", "하루 꽉 참", 3.0)))
