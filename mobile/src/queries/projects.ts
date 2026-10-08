@@ -57,7 +57,7 @@ export function useReplaceProjectTasks(id: number | undefined) {
   return useMutation({ mutationFn: (project: NewProject) => replaceProjectTasks(id!, project), onSuccess: () => invalidate(id) });
 }
 
-/** 삭제 — 지운 프로젝트의 상세 캐시는 버린다(다시 받으면 404) */
+/** 삭제 — 지운 프로젝트의 상세 캐시는 버린다(다시 받으면 404). 서버가 남은 작업을 다시 배치하므로 다른 프로젝트 상세도 새로 받는다 */
 export function useDeleteProject() {
   const client = useQueryClient();
   const invalidate = useInvalidateProjects();
@@ -65,7 +65,7 @@ export function useDeleteProject() {
     mutationFn: (id: number) => deleteProject(id),
     onSuccess: (_, id) => {
       client.removeQueries({ queryKey: queryKeys.project(id) });
-      return invalidate();
+      return Promise.all([invalidate(), client.invalidateQueries({ queryKey: queryKeys.projectAll })]);
     },
   });
 }
