@@ -110,7 +110,8 @@ export const personalEventSchema = z.object({
   endDate: dateKey.nullable(),
 });
 
-export const updateTaskResponseSchema = z.object({ task: taskSchema, projectAllDone: z.boolean() });
+/** projectReopened: 완료한 프로젝트의 작업 체크를 풀어 진행중으로 돌아갔다(2026-10-18 — 옛 서버엔 없음) */
+export const updateTaskResponseSchema = z.object({ task: taskSchema, projectAllDone: z.boolean(), projectReopened: z.boolean().optional() });
 
 export const proposedTaskSchema = z.object({
   key: z.string(),
