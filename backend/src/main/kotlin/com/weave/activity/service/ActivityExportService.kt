@@ -70,6 +70,30 @@ class ActivityExportService(
                         if (l.type == ActivityType.AI_CHAT_FAILED.name) "실패: ${text(d, "error")}" else "성공")
                 }
             }
+            wb.createSheet("작업 검토 비교").apply {
+                // 같은 대화 번호의 마지막 AI 제안과 확정 목록(재요청이면 새로 넣은 작업만) — 확정 목록을 남기기 시작한 2026-10-17 이후 등록만
+                header(
+                    "시각", "대화 번호", "프로젝트", "구분", "AI 제안 수", "확정 수", "AI 총 시간", "확정 총 시간",
+                    "그대로", "시간 바꿈", "선행 바꿈", "AI에만 있음(삭제·이름 바꿈)", "확정에만 있음(추가·이름 바꿈)", "순서 바꿈", "AI 제안", "확정",
+                )
+                val proposals = logs.filter { (l, d) -> l.type == ActivityType.AI_CHAT.name && d.path("proposedTasks").size() > 0 }
+                logs.filter { (l, d) -> l.type in REGISTRATIONS && d.has("tasks") }.forEach { (l, d) ->
+                    val conversation = text(d, "conversationId")
+                    val proposal = proposals.lastOrNull { (p, pd) -> conversation != null && text(pd, "conversationId") == conversation && !p.occurredAt.isAfter(l.occurredAt) }
+                    val ai = TaskReviewDiff.entries(proposal?.second?.path("proposedTasks"))
+                    val final = TaskReviewDiff.entries(d.path("tasks"))
+                    val diff = proposal?.let { TaskReviewDiff.of(ai, final) }
+                    row(
+                        TIME.format(l.occurredAt.atZone(SEOUL)), conversation ?: "", text(d, "name") ?: "",
+                        if (l.type == ActivityType.PROJECT_CREATED.name) "등록" else "재요청",
+                        proposal?.let { ai.size }, final.size, proposal?.let { ai.sumOf { it.hours } }, final.sumOf { it.hours },
+                        diff?.kept?.joinToString(", "), diff?.hoursChanged?.joinToString(", "), diff?.dependencyChanged?.joinToString(", "),
+                        diff?.onlyAi?.joinToString(", "), diff?.onlyFinal?.joinToString(", "),
+                        diff?.let { if (it.orderChanged) "예" else "아니요" } ?: "(AI 제안 기록 없음)",
+                        TaskReviewDiff.describe(ai), TaskReviewDiff.describe(final),
+                    )
+                }
+            }
             return ByteArrayOutputStream().also(wb::write).toByteArray()
         }
     }
@@ -121,5 +145,6 @@ class ActivityExportService(
         val SEOUL: ZoneId = ZoneId.of("Asia/Seoul")
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         val SOURCE = mapOf("server" to "서버", "app" to "앱", "backfill" to "기능 전 데이터")
+        private val REGISTRATIONS = setOf(ActivityType.PROJECT_CREATED.name, ActivityType.PROJECT_REPLANNED.name)
     }
 }

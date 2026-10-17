@@ -71,8 +71,8 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         "POST" -> mockMvc.post(path) { header("Authorization", api.bearer(tokens)); contentType = MediaType.APPLICATION_JSON; content = api.json(body) }
         else -> mockMvc.patch(path) { header("Authorization", api.bearer(tokens)); contentType = MediaType.APPLICATION_JSON; content = api.json(body) }
     }
-    fun task(key: String, title: String, hours: Double) =
-        mapOf("key" to key, "title" to title, "description" to "", "estimatedHours" to hours, "dependsOnKey" to null, "prerequisite" to false)
+    fun task(key: String, title: String, hours: Double, dependsOn: String? = null) =
+        mapOf("key" to key, "title" to title, "description" to "", "estimatedHours" to hours, "dependsOnKey" to dependsOn, "prerequisite" to false)
     fun project(name: String, tasks: List<Map<String, Any?>>, deadline: LocalDate? = today.plusDays(9)) = mapOf(
         "name" to name, "description" to "설명", "deadline" to deadline?.toString(), "color" to "teal",
         "deliverable" to "보고서", "progress" to "", "tasks" to tasks, "attachmentIds" to emptyList<Long>(),
@@ -216,6 +216,52 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         json("POST", "/api/v1/project-chat", tokens, mapOf("project" to mapOf("name" to "x"), "conversationId" to "a b")).andExpect { status { isBadRequest() } }
     }
 
+    test("등록·재요청 기록에 확정한 작업 목록(순서·이름·시간·선행 작업 이름·선행 지식)을 남긴다 — AI 제안과 비교하려고 (2026-10-17)") {
+        val tokens = newUser()
+        val tasks = listOf(task("a", "자료 조사", 2.0), task("b", "설계", 1.5, dependsOn = "a"))
+        val id = api.read(json("POST", "/api/v1/projects", tokens, project("캡스톤", tasks)).andExpect { status { isCreated() } }.andReturn().response.contentAsString)["project"]["id"].asLong()
+        detailOf(tokens, "PROJECT_CREATED")["tasks"].toString() shouldBe
+            """[{"title":"자료 조사","estimatedHours":2.0,"dependsOnTitle":null,"prerequisite":false},{"title":"설계","estimatedHours":1.5,"dependsOnTitle":"자료 조사","prerequisite":false}]"""
+        json("POST", "/api/v1/projects/$id/replan-tasks", tokens, project("캡스톤", listOf(task("n", "새 구현", 3.0)))).andExpect { status { isOk() } }
+        detailOf(tokens, "PROJECT_REPLANNED")["tasks"].toString() shouldBe
+            """[{"title":"새 구현","estimatedHours":3.0,"dependsOnTitle":null,"prerequisite":false}]"""
+    }
+
+    test("엑셀 '작업 검토 비교': 같은 대화의 마지막 AI 제안과 확정 목록을 나란히 — 그대로·시간 변경·삭제·추가·순서 변경") {
+        val tokens = newUser()
+        val userId = tokens["user"]["id"].asLong()
+        // AI 제안 기록(실제 Claude 호출 대신 기록을 직접 넣는다): 조사 2h → 설계 3h(조사 뒤) → 발표 1h
+        jdbc.update(
+            "INSERT INTO activity_logs (user_id, type, source, detail, occurred_at, created_at, updated_at) VALUES (?, 'AI_CHAT', 'server', ?, now() - interval '1 minute', now(), now())",
+            userId,
+            """{"conversationId":"c-cmp","responseType":"tasks","proposedTasks":[{"title":"조사","estimatedHours":2.0,"dependsOnTitle":null,"prerequisite":false},{"title":"설계","estimatedHours":3.0,"dependsOnTitle":"조사","prerequisite":false},{"title":"발표","estimatedHours":1.0,"dependsOnTitle":null,"prerequisite":false}]}""",
+        )
+        // 검토 화면에서: 발표를 지우고, 설계를 2.5h로, 순서를 설계·조사로(선행 연결은 풀고), 보고서 1h 추가
+        val tasks = listOf(task("b", "설계", 2.5), task("a", "조사", 2.0), task("r", "보고서", 1.0))
+        json("POST", "/api/v1/projects", tokens, project("캡스톤", tasks) + ("conversationId" to "c-cmp")).andExpect { status { isCreated() } }
+
+        val res = mockMvc.get("/api/v1/me/activity/export") { header("Authorization", api.bearer(tokens)) }.andReturn().response
+        XSSFWorkbook(res.contentAsByteArray.inputStream()).use { wb ->
+            val sheet = wb.getSheet("작업 검토 비교")!!
+            val header = sheet.getRow(0).map { it.stringCellValue }
+            val row = sheet.getRow(1).associateBy({ header[it.columnIndex] }) { it.toString() }
+            row["대화 번호"] shouldBe "c-cmp"
+            row["구분"] shouldBe "등록"
+            row["AI 제안 수"] shouldBe "3.0"
+            row["확정 수"] shouldBe "3.0"
+            row["AI 총 시간"] shouldBe "6.0"
+            row["확정 총 시간"] shouldBe "5.5"
+            row["그대로"] shouldBe "조사"
+            row["시간 바꿈"] shouldBe "설계 3.0→2.5"
+            row["선행 바꿈"] shouldBe "설계: 조사→없음"
+            row["AI에만 있음(삭제·이름 바꿈)"] shouldBe "발표"
+            row["확정에만 있음(추가·이름 바꿈)"] shouldBe "보고서"
+            row["순서 바꿈"] shouldBe "예"
+            row["AI 제안"] shouldContain "1. 조사 (2.0h)"
+            row["확정"] shouldContain "3. 보고서 (1.0h)"
+        }
+    }
+
     test("앱 사용 기록: 허용한 종류만 받고(앱 열기·화면 보기·위젯 갱신) 출처를 app으로 남긴다") {
         val tokens = newUser()
         json("POST", "/api/v1/activity/events", tokens, mapOf("events" to listOf(
@@ -232,7 +278,7 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
             .andExpect { status { isUnauthorized() } }
     }
 
-    test("엑셀 내보내기: 내 기록만, 시트 4개(활동 기록·날짜별 요약·프로젝트별·AI 대화)") {
+    test("엑셀 내보내기: 내 기록만, 시트 5개(활동 기록·날짜별 요약·프로젝트별·AI 대화·작업 검토 비교)") {
         val tokens = newUser()
         val other = newUser()
         create(tokens, name = "내 프로젝트")
@@ -242,7 +288,7 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         res.contentType shouldBe "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         res.getHeader("Content-Disposition")!! shouldContain "attachment"
         XSSFWorkbook(res.contentAsByteArray.inputStream()).use { wb ->
-            (0 until wb.numberOfSheets).map { wb.getSheetName(it) } shouldBe listOf("활동 기록", "날짜별 요약", "프로젝트별", "AI 대화")
+            (0 until wb.numberOfSheets).map { wb.getSheetName(it) } shouldBe listOf("활동 기록", "날짜별 요약", "프로젝트별", "AI 대화", "작업 검토 비교")
             val text = (0..wb.getSheet("활동 기록").lastRowNum).joinToString("\n") { r ->
                 wb.getSheet("활동 기록").getRow(r).joinToString(" | ") { it.toString() }
             }
