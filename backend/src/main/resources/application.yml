@@ -24,6 +24,9 @@ weave:
     secret: ${JWT_SECRET}
   storage:
     root: ${WEAVE_STORAGE_ROOT:uploads}
+  defaults:
+    # 새 가입자의 요일별·공휴일 가용 시간 처음 값(시간) — 개인 일정을 빼고 쓰므로 크게(사용자 결정 2026-10-17)
+    available-hours: 8
   holiday:
     # 공공데이터포털 "한국천문연구원_특일 정보" 키(디코딩된 키) — .env의 HOLIDAY_API_KEY. 없으면 공휴일 없이 배치한다
     api-key: ${HOLIDAY_API_KEY:}

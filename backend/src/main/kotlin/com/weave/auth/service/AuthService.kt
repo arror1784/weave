@@ -6,6 +6,7 @@ import com.weave.auth.dto.LoginRequest
 import com.weave.auth.dto.SignupRequest
 import com.weave.auth.dto.TokenResponse
 import com.weave.auth.repository.RefreshTokenRepository
+import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
 import com.weave.user.domain.User
 import com.weave.user.repository.UserRepository
@@ -24,12 +25,19 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val clock: Clock,
     private val activityRecorder: ActivityRecorder,
+    private val properties: WeaveProperties,
 ) {
     @Transactional
     fun signup(request: SignupRequest): TokenResponse {
         val email = normalize(request.email)
         if (userRepository.existsByEmail(email)) throw ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "이미 가입한 이메일이에요.")
-        val user = userRepository.save(User(email, passwordEncoder.encode(request.password)!!))
+        val user = userRepository.save(
+            User(email, passwordEncoder.encode(request.password)!!).apply {
+                val hours = properties.defaults.availableHours
+                weeklyAvailableHours = List(7) { hours }
+                holidayAvailableHours = hours
+            },
+        )
         activityRecorder.record(user.id!!, ActivityType.SIGNUP)
         return tokenService.issue(user)
     }

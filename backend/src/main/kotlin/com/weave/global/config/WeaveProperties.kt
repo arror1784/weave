@@ -10,7 +10,13 @@ data class WeaveProperties(
     val storage: Storage = Storage(),
     val anthropic: Anthropic = Anthropic(),
     val holiday: Holiday = Holiday(),
+    val defaults: Defaults = Defaults(),
 ) {
+    data class Defaults(
+        /** 새 가입자의 요일별·공휴일 가용 시간 처음 값 — 개인 일정을 빼고 쓰므로 크게(사용자 결정 2026-10-17: 8시간) */
+        val availableHours: Double = 8.0,
+    )
+
     data class Holiday(
         /** 공공데이터포털 특일 정보 API 키(디코딩된 키) — 비어 있으면 공휴일을 받지 않는다 */
         val apiKey: String = "",

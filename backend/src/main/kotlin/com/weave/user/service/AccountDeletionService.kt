@@ -1,6 +1,7 @@
 package com.weave.user.service
 
 import com.weave.activity.repository.ActivityLogRepository
+import com.weave.event.repository.PersonalEventRepository
 import com.weave.attachment.service.AttachmentStorageCleaner
 import com.weave.attachment.repository.AttachmentRepository
 import com.weave.auth.repository.RefreshTokenRepository
@@ -24,12 +25,14 @@ class AccountDeletionService(
     private val attachmentRepository: AttachmentRepository,
     private val attachmentStorageCleaner: AttachmentStorageCleaner,
     private val activityLogRepository: ActivityLogRepository,
+    private val personalEventRepository: PersonalEventRepository,
 ) {
     @Transactional
     fun delete(userId: Long) {
         userService.find(userId)
         attachmentStorageCleaner.deleteFilesOf(userId)
         activityLogRepository.hardDeleteByUserId(userId)
+        personalEventRepository.hardDeleteByUserId(userId)
         attachmentRepository.hardDeleteByUserId(userId)
         taskRepository.unlinkDependenciesByUserId(userId)
         taskRepository.hardDeleteByUserId(userId)

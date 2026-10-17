@@ -44,13 +44,15 @@ class ScheduleService(
         val projects = projectRepository.findByUserIdAndStatus(userId, Project.ACTIVE).sortedBy { it.id }
         val tasks = if (projects.isEmpty()) emptyList() else taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(projects.map { it.id!! })
         val today = todayProvider.today()
-        val holidays = availabilityService.holidays(today.minusDays(HOLIDAYS_BEFORE), today.plusDays(AvailabilityService.PLAN_DAYS))
+        val calendar = availabilityService.calendar(user, today.minusDays(HOLIDAYS_BEFORE), today.plusDays(AvailabilityService.PLAN_DAYS))
         return ScheduleResponse(
             today = today,
-            dailyAvailableHours = user.availableHoursOn(today, today in holidays),
+            dailyAvailableHours = calendar.availableHoursByDate.getValue(today),
             weeklyAvailableHours = user.weeklyAvailableHours,
             holidayAvailableHours = user.holidayAvailableHours,
-            holidays = holidays.sorted(),
+            holidays = calendar.holidays,
+            availableHoursByDate = calendar.availableHoursByDate,
+            events = calendar.events,
             projects = projects.map(ProjectBriefResponse::of),
             tasks = tasks.map(TaskResponse::of),
         )
