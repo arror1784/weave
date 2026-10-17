@@ -26,8 +26,10 @@ export async function logout(): Promise<void> {
 
 export const getMe = () => request('/api/v1/me', userSchema);
 
-export const updateSettings = (dailyAvailableHours: number) =>
-  request('/api/v1/me/settings', userSchema, { method: 'PATCH', body: { dailyAvailableHours } });
+export type SettingsChange = Partial<Pick<User, 'dailyAvailableHours' | 'standingSessionsPerWeek' | 'standingSessionHours'>>;
+
+/** 바꾼 값만 보낸다 */
+export const updateSettings = (changes: SettingsChange) => request('/api/v1/me/settings', userSchema, { method: 'PATCH', body: changes });
 
 /** 탈퇴 — 서버가 개인정보를 실제로 지운다. 이어서 기기 토큰도 지운다. */
 export async function deleteAccount(): Promise<void> {

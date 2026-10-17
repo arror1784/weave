@@ -11,7 +11,8 @@ import { SettingsGroup, SettingsRow } from '@/components/SettingsGroup';
 import { errorMessage } from '@/api/errors';
 import { useAuth } from '@/auth/AuthProvider';
 import { useToast } from '@/components/Toast';
-import { useMe, useUpdateDailyHours } from '@/queries/me';
+import { useMe, useUpdateSettings } from '@/queries/me';
+import type { SettingsChange } from '@/api/auth';
 import { useReplan } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 
@@ -25,16 +26,16 @@ export default function SettingsScreen() {
   const toast = useToast();
   const auth = useAuth();
   const me = useMe();
-  const updateHours = useUpdateDailyHours();
+  const update = useUpdateSettings();
   const replan = useReplan();
   const email = me.data?.email ?? auth.user?.email ?? '';
-  // 슬라이더를 움직이는 동안은 화면에만 보여주고, 손을 떼면 서버에 저장한다
-  const [dragging, setDragging] = useState<number | null>(null);
-  const hours = dragging ?? me.data?.dailyAvailableHours ?? auth.user?.dailyAvailableHours ?? 3;
+  const user = me.data ?? auth.user;
+  const daily = user?.dailyAvailableHours ?? 3;
+  const perWeek = user?.standingSessionsPerWeek ?? 2;
+  const sessionHours = user?.standingSessionHours ?? 1;
 
-  function saveHours(value: number) {
-    const rounded = Math.round(value * 2) / 2;
-    updateHours.mutate(rounded, { onError: (e) => toast(errorMessage(e), 'error'), onSettled: () => setDragging(null) });
+  function save(changes: SettingsChange, onSettled: () => void) {
+    update.mutate(changes, { onError: (e) => toast(errorMessage(e), 'error'), onSettled });
   }
 
   /** 작업이 몰렸을 때 사용자가 원하면 다시 배치(사용자 결정 2026-10-01) — 밀린 작업도 포함, 지연 표시는 남는다 */
@@ -76,28 +77,45 @@ export default function SettingsScreen() {
 
       {/* 하루 가용 시간(기본 3시간) — 사용자 결정 E. Figma는 주간 가용 시간 */}
       <SettingsGroup title="일정 기준">
-        <View style={styles.hours}>
-          <View style={styles.between}>
-            <AppText variant="small">하루 가용 시간</AppText>
-            <AppText variant="monoBold" color={colors.thread} style={styles.hoursValue}>{`${hours}시간`}</AppText>
-          </View>
-          <Slider
-            accessibilityLabel="하루 가용 시간"
-            minimumValue={1}
-            maximumValue={8}
-            step={0.5}
-            value={hours}
-            onValueChange={(v: number) => setDragging(Math.round(v * 2) / 2)}
-            onSlidingComplete={saveHours}
-            minimumTrackTintColor={colors.thread}
-            maximumTrackTintColor={colors.line}
-            thumbTintColor={colors.thread}
-            style={styles.slider}
-          />
-          <AppText variant="caption" tone="soft">
-            새 프로젝트의 작업을 하루에 이만큼까지 배정하고, 넘으면 과부하로 알려드려요
-          </AppText>
-        </View>
+        <SliderSetting
+          label="하루 가용 시간"
+          min={1}
+          max={8}
+          step={0.5}
+          value={daily}
+          format={(v) => `${v}시간`}
+          onSave={(v, done) => save({ dailyAvailableHours: v }, done)}
+          caption="새 프로젝트의 작업을 하루에 이만큼까지 배정하고, 넘으면 과부하로 알려드려요"
+        />
+      </SettingsGroup>
+
+      {/* 상시(마감 없는) 프로젝트는 떼어 둔 칸에만 배치한다 — 사용자 결정 2026-10-17. 범위: 주 0~7번, 0.5~하루 가용 시간 */}
+      <SettingsGroup title="상시 프로젝트 시간">
+        <SliderSetting
+          label="상시 프로젝트 주 횟수"
+          title="일주일에"
+          min={0}
+          max={7}
+          step={1}
+          value={perWeek}
+          format={(v) => (v === 0 ? '안 함' : `주 ${v}번`)}
+          onSave={(v, done) => save({ standingSessionsPerWeek: v }, done)}
+        />
+        <SliderSetting
+          label="상시 프로젝트 한 번 시간"
+          title="한 번에"
+          min={0.5}
+          max={daily}
+          step={0.5}
+          value={Math.min(sessionHours, daily)}
+          format={(v) => `${v}시간`}
+          onSave={(v, done) => save({ standingSessionHours: v }, done)}
+          caption={
+            perWeek === 0
+              ? '마감 없는 프로젝트의 작업은 배치하지 않아요'
+              : '마감 없는 프로젝트의 작업은 한 주에서 가장 한가한 날에 이 시간만큼만 넣어요. 바꾼 설정은 다음 등록이나 "작업 다시 배치" 때 반영돼요'
+          }
+        />
       </SettingsGroup>
 
       <SettingsGroup title="기타">
@@ -112,6 +130,62 @@ export default function SettingsScreen() {
         </AppText>
       </Pressable>
     </Screen>
+  );
+}
+
+/** 슬라이더 설정 한 줄 — 움직이는 동안은 화면에만 보여주고, 손을 떼면 서버에 저장한다 */
+function SliderSetting({
+  label,
+  title = label,
+  min,
+  max,
+  step,
+  value,
+  format,
+  onSave,
+  caption,
+}: {
+  label: string;
+  title?: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  format: (v: number) => string;
+  onSave: (v: number, done: () => void) => void;
+  caption?: string;
+}) {
+  const { colors } = useAppTheme();
+  const [dragging, setDragging] = useState<number | null>(null);
+  const snap = (v: number) => Math.round(v / step) * step;
+  const shown = dragging ?? value;
+  return (
+    <View style={styles.hours}>
+      <View style={styles.between}>
+        <AppText variant="small">{title}</AppText>
+        <AppText variant="monoBold" color={colors.thread} style={styles.hoursValue}>
+          {format(shown)}
+        </AppText>
+      </View>
+      <Slider
+        accessibilityLabel={label}
+        minimumValue={min}
+        maximumValue={max}
+        step={step}
+        value={shown}
+        onValueChange={(v: number) => setDragging(snap(v))}
+        onSlidingComplete={(v: number) => onSave(snap(v), () => setDragging(null))}
+        minimumTrackTintColor={colors.thread}
+        maximumTrackTintColor={colors.line}
+        thumbTintColor={colors.thread}
+        style={styles.slider}
+      />
+      {caption ? (
+        <AppText variant="caption" tone="soft">
+          {caption}
+        </AppText>
+      ) : null}
+    </View>
   );
 }
 
