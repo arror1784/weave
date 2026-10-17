@@ -1,4 +1,4 @@
-import { request } from './client';
+import { NetworkError, request } from './client';
 import { tokenStore } from './token-store';
 
 jest.mock('./token-store', () => {
@@ -37,5 +37,15 @@ describe('토큰 갱신 (앱 화면과 위젯이 함께 써도 안전하게)', (
     expect(calls.filter((u) => u.endsWith('/auth/refresh'))).toHaveLength(1);
     expect(tokenStore.setRefresh).toHaveBeenCalledWith('refresh-2');
     expect(tokenStore.getAccess()).toBe('new-access');
+  });
+});
+
+describe('연결 실패', () => {
+  it('fetch 자체가 실패하면(서버에 닿지 못함) NetworkError로 바꿔 던진다', async () => {
+    globalThis.fetch = jest.fn(async () => {
+      throw new TypeError('Network request failed');
+    }) as unknown as typeof fetch;
+
+    await expect(request('/api/v1/schedule', null)).rejects.toBeInstanceOf(NetworkError);
   });
 });

@@ -19,6 +19,13 @@ export class ApiError extends Error {
   }
 }
 
+/** 서버에 닿지 못함(오프라인·서버 꺼짐·adb reverse 끊김 등) — fetch 자체가 실패했을 때 */
+export class NetworkError extends Error {
+  constructor() {
+    super('network request failed');
+  }
+}
+
 /** 리프레시가 실패해 다시 로그인해야 할 때 부른다(AuthProvider가 등록) */
 let onSessionExpired: () => void = () => {};
 export function setSessionExpiredHandler(handler: () => void) {
@@ -33,7 +40,9 @@ export async function request<T>(path: string, schema: z.ZodType<T> | null, { me
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const token = tokenStore.getAccess();
     if (auth && token) headers.Authorization = `Bearer ${token}`;
-    return fetch(`${API_URL}${path}`, { method, headers, body: form ?? (body !== undefined ? JSON.stringify(body) : undefined) });
+    return fetch(`${API_URL}${path}`, { method, headers, body: form ?? (body !== undefined ? JSON.stringify(body) : undefined) }).catch(() => {
+      throw new NetworkError();
+    });
   };
 
   let response = await send();
