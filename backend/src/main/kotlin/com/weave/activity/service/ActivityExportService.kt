@@ -104,6 +104,7 @@ class ActivityExportService(
         "PROJECT_REPLANNED" -> "${text(d, "name")} · 완료 ${d.path("keptDone").asInt()}개 남김 · ${d.path("removed").asInt()}개 → ${d.path("added").asInt()}개"
         "PROJECT_COLOR_CHANGED" -> "${text(d, "from")} → ${text(d, "to")}"
         "PROJECT_COMPLETED", "PROJECT_DELETED" -> text(d, "name") ?: ""
+        "PROJECT_REOPENED" -> "${text(d, "name") ?: ""} — ${text(d, "taskTitle") ?: ""} 체크 해제"
         "TASK_DONE", "TASK_UNDONE" -> "${text(d, "title")}${d.path("estimatedHours").takeIf { it.isNumber }?.let { " (${it.asDouble()}h)" } ?: ""}"
         "OVERDUE_MOVED" -> "${d.path("count").asInt()}개: ${d.path("titles").joinToString(", ") { it.asString() }}"
         "SCHEDULE_REPLANNED" -> "작업 ${d.path("taskCount").asInt()}개 다시 배치"

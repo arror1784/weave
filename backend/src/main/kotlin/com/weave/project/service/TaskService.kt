@@ -33,7 +33,13 @@ class TaskService(
                 detail = mapOf("title" to task.title, "projectName" to project.name, "estimatedHours" to task.estimatedHours, "scheduledDate" to task.scheduledDate?.toString(), "delayedFrom" to task.delayedFrom?.toString()),
             )
         }
+        // 완료한 프로젝트의 작업 체크를 풀면 진행중으로 돌아간다(사용자 결정 2026-10-18). 다시 배치는 하지 않는다 — 체크·해제와 같은 규칙
+        val reopened = !request.done && project.status == Project.DONE
+        if (reopened) {
+            project.reopen()
+            activityRecorder.record(userId, ActivityType.PROJECT_REOPENED, projectId = project.id, detail = mapOf("name" to project.name, "taskTitle" to task.title))
+        }
         val allDone = project.status == Project.ACTIVE && taskRepository.findByProjectIdOrderByPosition(project.id!!).all { it.done }
-        return UpdateTaskResponse(TaskResponse.of(task), allDone)
+        return UpdateTaskResponse(TaskResponse.of(task), allDone, reopened)
     }
 }

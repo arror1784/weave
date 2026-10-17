@@ -38,7 +38,7 @@ export type ColorTokens = typeof colors;
 
 /**
  * 프로젝트별 색 — 사용자가 고른다. 경고색(주황/빨강)과 겹치지 않는 톤만.
- * 앞 3개는 Figma PROJECTS, 뒤 4개는 사용자 요청(5가지 이상)으로 추가한 임시안(사용자 확인 필요).
+ * 앞 3개는 Figma PROJECTS, 뒤 4개는 사용자 요청(5가지 이상)으로 추가 — 7가지 사용자 확정(2026-10-18).
  * Figma의 회색은 뺐다(사용자 결정 2026-10-01).
  */
 export const projectPaletteMap = {

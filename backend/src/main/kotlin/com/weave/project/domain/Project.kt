@@ -37,7 +37,7 @@ class Project(
     @Column(nullable = false)
     var progress: String = "",
 ) : BaseEntity() {
-    /** 'active' | 'done' — 완료 → 진행중 되돌리기는 미정이라 막는다 */
+    /** 'active' | 'done' — 완료 프로젝트의 작업 체크를 풀면 진행중으로 돌아간다(사용자 결정 2026-10-18) */
     @Column(nullable = false)
     var status: String = ACTIVE
         protected set
@@ -54,6 +54,10 @@ class Project(
 
     fun complete() {
         status = DONE
+    }
+
+    fun reopen() {
+        status = ACTIVE
     }
 
     companion object {
