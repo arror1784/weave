@@ -1,6 +1,6 @@
 import type { EventOccurrence, Project, Task } from '@/api/types';
 
-import { addDays, diffInDays, weekDays, type DateKey } from './date';
+import { addDays, DAY_START_HOUR, diffInDays, weekDays, type DateKey } from './date';
 import { taskEndDate, taskHoursOn } from './scheduler';
 
 // 일정 화면들이 쓰는 계산. 서버 스냅샷(GET /api/v1/schedule)을 그대로 받아 쓴다 — 날짜는 서버가 정한다.
@@ -154,6 +154,9 @@ export function selectGanttRange(today: DateKey): DateKey[] {
 }
 
 /** 그날 개인 일정(사용자 결정 2026-10-17 — 오늘 화면·달력에 보여준다), 시작 시각 순 */
+/** 하루(아침 6시~다음 날 6시) 안의 순서 — 새벽(0~6시)에 시작한 일정은 밤 일정 뒤(사용자 결정 2026-10-18) */
+const dayOrder = (time: string) => `${Number(time.slice(0, 2)) < DAY_START_HOUR ? 1 : 0}${time}`;
+
 export function selectDayEvents(data: ScheduleData, date: DateKey): EventOccurrence[] {
-  return (data.events ?? []).filter((e) => e.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.eventId - b.eventId);
+  return (data.events ?? []).filter((e) => e.date === date).sort((a, b) => dayOrder(a.startTime).localeCompare(dayOrder(b.startTime)) || a.eventId - b.eventId);
 }

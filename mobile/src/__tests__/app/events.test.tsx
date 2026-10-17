@@ -5,7 +5,7 @@ import { ApiError } from '@/api/client';
 import * as eventsApi from '@/api/events';
 import * as projectsApi from '@/api/projects';
 import type { PersonalEvent } from '@/api/types';
-import EventsScreen from '@/app/events/index';
+import EventsScreen, { describeEvent } from '@/app/events/index';
 import NewEventScreen from '@/app/events/new';
 import { sampleSchedule } from '@/test-utils/fixtures';
 import { renderWithProviders, TEST_TODAY } from '@/test-utils/render';
@@ -33,6 +33,7 @@ describe('개인 일정 목록 (사용자 결정 2026-10-17)', () => {
     expect(await screen.findByText('운영체제 수업')).toBeOnTheScreen();
     expect(screen.getByText('매주 월·수 · 10:00~12:00')).toBeOnTheScreen();
     expect(screen.getByText('10월 24일 토요일 · 18:00~21:00')).toBeOnTheScreen();
+    expect(describeEvent({ ...weekly, weekdays: [5], startTime: '22:00', endTime: '01:00' })).toBe('매주 금 · 22:00~다음 날 01:00');
     expect(screen.getByText(/다음 등록이나 "작업 다시 배치" 때 일정에 반영돼요/)).toBeOnTheScreen();
   });
 
@@ -96,7 +97,7 @@ describe('개인 일정 추가', () => {
     expect(api.createEvent).toHaveBeenCalledWith(expect.objectContaining({ title: '동아리 모임', repeat: 'once', date: '2026-09-29', weekdays: [] }));
   });
 
-  it('검증: 이름 없음·요일 없음·끝이 시작보다 이르면 저장하지 않고 알려준다', async () => {
+  it('검증: 이름 없음·요일 없음·끝과 시작이 같으면 저장하지 않고 알려준다', async () => {
     await renderWithProviders(<NewEventScreen />);
     await screen.findByLabelText('일정 이름');
     await fireEvent.press(screen.getByRole('button', { name: '저장' }));
@@ -107,8 +108,22 @@ describe('개인 일정 추가', () => {
     await fireEvent.press(screen.getByRole('checkbox', { name: '월요일' }));
     for (let i = 0; i < 2; i++) await fireEvent.press(screen.getByRole('button', { name: '끝나는 시각 30분 이르게' }));
     await fireEvent.press(screen.getByRole('button', { name: '저장' }));
-    expect(screen.getByText('끝나는 시각이 시작 시각보다 뒤여야 해요.')).toBeOnTheScreen();
+    expect(screen.getByText('끝나는 시각이 시작 시각과 같아요.')).toBeOnTheScreen();
     expect(api.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('끝이 시작보다 이르면 다음 날까지로 알리고 그대로 저장한다 (사용자 결정 2026-10-18)', async () => {
+    api.createEvent.mockResolvedValue(weekly);
+    await renderWithProviders(<NewEventScreen />);
+    await fillTitle('밤 모임');
+    await fireEvent.press(screen.getByRole('checkbox', { name: '금요일' }));
+    // 09:00 → 22:00, 10:00 → 01:00
+    for (let i = 0; i < 26; i++) await fireEvent.press(screen.getByRole('button', { name: '시작 시각 30분 늦게' }));
+    for (let i = 0; i < 18; i++) await fireEvent.press(screen.getByRole('button', { name: '끝나는 시각 30분 이르게' }));
+    expect(screen.getByLabelText('끝나는 시각, 다음 날 01:00')).toBeOnTheScreen();
+    expect(screen.getByText('다음 날')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '저장' }));
+    expect(api.createEvent).toHaveBeenCalledWith(expect.objectContaining({ weekdays: [5], startTime: '22:00', endTime: '01:00' }));
   });
 
   it('서버가 거절하면 그 이유를 보여준다', async () => {

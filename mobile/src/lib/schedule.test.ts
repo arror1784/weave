@@ -146,6 +146,18 @@ describe('일정 계산', () => {
     expect(selectDayEvents(data, T)).toEqual([]);
   });
 
+  it('그날 개인 일정은 하루(아침 6시~다음 날 6시) 흐름 순 — 새벽 일정은 밤 일정 뒤 (사용자 결정 2026-10-18)', () => {
+    const withEvents = {
+      ...data,
+      events: [
+        { eventId: 3, date: T, title: '새벽', startTime: '01:00', endTime: '02:00' },
+        { eventId: 2, date: T, title: '밤', startTime: '23:00', endTime: '00:30' },
+        { eventId: 1, date: T, title: '아침', startTime: '06:00', endTime: '07:00' },
+      ],
+    };
+    expect(selectDayEvents(withEvents, T).map((e) => e.title)).toEqual(['아침', '밤', '새벽']);
+  });
+
   it('요일별 값이 없는 옛 응답이면 하루 가용 시간을 쓴다', () => {
     expect(capacityOn(data, T)).toBe(5);
   });
