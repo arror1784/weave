@@ -2,6 +2,7 @@ package com.weave.project.service
 
 import com.weave.activity.domain.ActivityType
 import com.weave.activity.service.ActivityRecorder
+import com.weave.activity.service.TaskLog
 import com.weave.global.time.TodayProvider
 import com.weave.attachment.service.AttachmentLinker
 import com.weave.global.error.ApiException
@@ -61,6 +62,7 @@ class ProjectService(
                 "name" to project.name, "deadline" to project.deadline?.toString(), "color" to project.color,
                 "taskCount" to tasks.size, "totalHours" to tasks.sumOf { it.estimatedHours ?: 0.0 },
                 "attachmentCount" to request.attachmentIds.size, "lateCount" to lateCount, "conversationId" to request.conversationId,
+                "tasks" to taskLog(tasks),
             ),
         )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(project.id!!)), lateCount)
@@ -97,9 +99,16 @@ class ProjectService(
                 "name" to project.name, "deadline" to project.deadline?.toString(),
                 "keptDone" to kept.size, "removed" to removed.size, "added" to saved.size,
                 "addedHours" to saved.sumOf { it.estimatedHours ?: 0.0 }, "lateCount" to lateCount, "conversationId" to request.conversationId,
+                "tasks" to taskLog(saved.sortedBy { it.position }),
             ),
         )
         return CreateProjectResponse(ProjectDetailResponse.of(project, tasks, attachmentLinker.ofProject(projectId)), lateCount)
+    }
+
+    /** 사용 기록용 확정 작업 목록 — 검토 화면에서 고친 것을 AI 제안과 비교하려고(2026-10-17) */
+    private fun taskLog(tasks: List<Task>): List<Map<String, Any?>> {
+        val titles = tasks.associate { it.id!! to it.title }
+        return tasks.map { TaskLog.entry(it.title, it.estimatedHours, it.dependsOnId?.let(titles::get), it.prerequisite) }
     }
 
     /** 작업을 저장하고 선행 작업을 key로 잇는다 — id는 저장 후에야 생기므로 두 번에 나눈다 */

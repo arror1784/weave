@@ -2,6 +2,7 @@ package com.weave.ai.service
 
 import com.weave.activity.domain.ActivityType
 import com.weave.activity.service.ActivityRecorder
+import com.weave.activity.service.TaskLog
 import com.weave.ai.dto.ChatMessage
 import com.weave.ai.dto.ChatProjectInfo
 import com.weave.ai.dto.ChatTask
@@ -74,7 +75,7 @@ class ProjectChatService(
                 "forcedProposal" to forced.takeIf { it },
                 "responseType" to response.type,
                 "aiMessage" to response.message,
-                "proposedTasks" to response.tasks?.map { mapOf("title" to it.title, "estimatedHours" to it.estimatedHours, "dependsOnKey" to it.dependsOnKey) },
+                "proposedTasks" to response.tasks?.let { tasks -> tasks.map { TaskLog.entry(it.title, it.estimatedHours, tasks.find { t -> t.key == it.dependsOnKey }?.title, it.prerequisite) } },
                 "assumptions" to response.assumptions,
                 "model" to (result.model ?: weaveProperties.anthropic.model),
                 "inputTokens" to result.inputTokens,

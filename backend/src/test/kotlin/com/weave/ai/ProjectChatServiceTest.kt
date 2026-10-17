@@ -81,6 +81,24 @@ class ProjectChatServiceTest : FunSpec({
         response.assumptions shouldBe listOf("팀원 3명으로 가정했어요")
     }
 
+    test("작업 제안 기록에는 선행 작업을 key 대신 제목으로, 선행 지식 여부와 함께 남긴다 — 검토 화면에서 고친 목록과 비교하려고 (2026-10-17)") {
+        every { ai.converse(any(), any(), any(), any()) } returns AiResult("정리했어요.", proposal)
+        service.chat(3L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "선행 지식?"), ChatMessage("user", "처음이에요"))))
+        verify {
+            recorder.record(
+                3L, ActivityType.AI_CHAT, any(), any(),
+                match {
+                    it["proposedTasks"] == listOf(
+                        mapOf("title" to "인터럽트 개념 학습", "estimatedHours" to 2.0, "dependsOnTitle" to null, "prerequisite" to true),
+                        mapOf("title" to "설계 문서 작성", "estimatedHours" to 3.0, "dependsOnTitle" to "인터럽트 개념 학습", "prerequisite" to false),
+                        mapOf("title" to "발표자료 제작", "estimatedHours" to 4.0, "dependsOnTitle" to null, "prerequisite" to false),
+                    )
+                },
+                any(), any(),
+            )
+        }
+    }
+
     test("사용자 답이 5번 쌓였는데 아직 제안이 없으면 도구 호출을 강제한다 (최초 제안은 5턴 안에)") {
         val force = slot<Boolean>()
         every { ai.converse(any(), any(), any(), capture(force)) } returns AiResult("", proposal)
