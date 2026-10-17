@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+/* 글꼴은 앱과 같은 파일(OFL)을 직접 둔다 — 외부 CDN에 요청하지 않는다 */
+@font-face { font-family: 'Pretendard'; font-weight: 400; font-display: swap; src: url('/fonts/Pretendard-Regular.otf') format('opentype'); }
+@font-face { font-family: 'Pretendard'; font-weight: 500; font-display: swap; src: url('/fonts/Pretendard-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Pretendard'; font-weight: 600; font-display: swap; src: url('/fonts/Pretendard-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Pretendard'; font-weight: 700 900; font-display: swap; src: url('/fonts/Pretendard-Bold.otf') format('opentype'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400 600; font-display: swap; src: url('/fonts/JetBrainsMono-SemiBold.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-display: swap; src: url('/fonts/JetBrainsMono-Bold.ttf') format('truetype'); }
+
+/* 색·글꼴 단일 소스 — 값은 앱 theme(mobile/src/theme/colors.ts)과 같다. 밝은 테마만 */
+@theme {
+  --font-sans: 'Pretendard', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-ink: #1c1d22;
+  --color-ink-soft: #6b6f7a;
+  --color-ink-faint: #a2a6b0;
+  --color-line: #ecedf1;
+  --color-surface: #ffffff;
+  --color-canvas: #f7f7f9;
+  --color-control: #8a8e99;
+  --color-thread: #2b4c8c;
+  --color-thread-hover: #24407a;
+  --color-thread-soft: #ebf0f8;
+  --color-thread-soft-hover: #dfe7f4;
+  --color-thread-light: #9db8ec;
+  --color-warn-text: #b84a1a;
+  --color-warn-soft: #fbede6;
+  --color-danger-text: #c4384c;
+  --color-danger-soft: #fdecef;
+  --color-danger-line: #f4c9d0;
+}
+
+:root { color-scheme: light; }
+
+body {
+  margin: 0;
+  min-width: 960px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible { outline: 2px solid var(--color-thread); outline-offset: 2px; }
+.num { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
+
+@keyframes web-spin { to { transform: rotate(360deg); } }
+.web-spin { animation: web-spin 0.8s linear infinite; }
+@keyframes web-pulse { 50% { opacity: 0.45; } }
+.web-skel { background: var(--color-line); border-radius: 8px; animation: web-pulse 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .web-spin, .web-skel { animation: none; }
+}
