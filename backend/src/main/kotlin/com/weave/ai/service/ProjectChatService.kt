@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
 
 /**
- * 등록 2단계 AI 챗봇 — 사용자 프롬프트(docs/Weave — AI 작업 분할 시스템 프롬프트.md)대로 질문하다가
+ * 등록 2단계 AI 챗봇 — 사용자 프롬프트(docs/Weave-AI 작업 분할 시스템 프롬프트.md)대로 질문하다가
  * propose_tasks 도구로 작업 목록을 제안하고, 확정(등록 완료) 전까지 대화·직접 수정으로 다시 제안한다.
  * 서버는 대화를 저장하지 않는다(앱이 매번 전체 대화를 보낸다).
  */

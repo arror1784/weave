@@ -66,6 +66,14 @@ describe('오늘의 일정', () => {
     await waitFor(() => expect(api.getSchedule).toHaveBeenCalledTimes(2));
   });
 
+  it('체크가 실패하면 체크를 되돌리고 오류 알림을 띄운다 (사용자 결정 2026-10-17)', async () => {
+    api.setTaskDone.mockRejectedValueOnce(new ApiError(404, 'NOT_FOUND', '작업을 찾을 수 없어요.'));
+    await renderWithProviders(<TodayScreen />);
+    await fireEvent.press(await screen.findByRole('checkbox', { name: '후원사 제안서 수정 완료' }));
+    expect(await screen.findByText('작업을 찾을 수 없어요.')).toBeOnTheScreen();
+    expect(screen.getByRole('checkbox', { name: '후원사 제안서 수정 완료' })).not.toBeChecked();
+  });
+
   it('고정 일정은 보여주지 않는다 (지금은 입력하지 않기로 함)', async () => {
     await renderWithProviders(<TodayScreen />);
     await screen.findByRole('header', { name: '9월 30일 수요일' });

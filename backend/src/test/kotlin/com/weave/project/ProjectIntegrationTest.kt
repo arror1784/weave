@@ -78,6 +78,14 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         body["project"]["tasks"][0]["description"].asString() shouldBe "블록도와 시퀀스 다이어그램, 리뷰 1회"
     }
 
+    test("이미 지난 마감일로도 등록할 수 있다 — 작업은 오늘부터 몰아 배치하고 빠듯함으로 센다(사용자 결정 2026-10-17)") {
+        val body = createOk(newUser(), deadline = today.minusDays(3), tasks = listOf(task("a", "늦은 일", 2.0), task("b", "더 늦은 일", 2.0)))
+        val tasks = body["project"]["tasks"]
+        tasks.asIterable().map { it["scheduledDate"].asString() } shouldBe listOf(today.toString(), today.toString())
+        tasks.asIterable().map { it["dueDate"].asString() } shouldBe listOf(today.toString(), today.toString())
+        body["lateCount"].asInt() shouldBe 1 // 2h + 2h > 하루 3h — 두 번째 작업만 가용 시간을 넘어 몰았다
+    }
+
     test("상시(마감 없는) 프로젝트의 작업은 마감일이 없다") {
         val tasks = createOk(newUser(), deadline = null, tasks = listOf(task("a", "꾸준히 할 일", 2.0)))["project"]["tasks"]
         tasks[0]["dueDate"].isNull shouldBe true

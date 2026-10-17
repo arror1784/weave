@@ -57,7 +57,7 @@ backend/
     │   └── {feature}/{controller,dto,service,repository,domain}/
     ├── main/resources/
     │   ├── application.yml
-    │   │                                # AI 시스템 프롬프트는 여기 두지 않는다 — 빌드할 때 ../docs/Weave — AI 작업 분할 시스템 프롬프트.md를 prompts/project-breakdown.md로 복사(build.gradle.kts)
+    │   │                                # AI 시스템 프롬프트는 여기 두지 않는다 — 빌드할 때 ../docs/Weave-AI 작업 분할 시스템 프롬프트.md를 prompts/project-breakdown.md로 복사(build.gradle.kts)
     │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description · V6 tasks.day_hours(날짜별 배정 시간) · V7 회색 프로젝트 색 제거(회색 → 청록) · V8 projects.deliverable·progress · V9 activity_logs·tasks.done_at · V10 기능 전 데이터로 사용 기록 채우기(backfill)
     └── test/kotlin/com/weave/           # main과 같은 패키지 구조
         ├── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용

@@ -1,6 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
-import { ApiError } from '@/api/client';
+import { ApiError, NetworkError } from '@/api/client';
 import LoginScreen from '@/app/(auth)/login';
 import SignupScreen from '@/app/(auth)/signup';
 import { mockRouter, resetRouterMock } from '@/test-utils/router';
@@ -44,7 +44,7 @@ describe('로그인', () => {
   });
 
   it('서버에 연결할 수 없으면 연결 안내를 보여준다', async () => {
-    const signIn = jest.fn().mockRejectedValueOnce(new TypeError('Network request failed'));
+    const signIn = jest.fn().mockRejectedValueOnce(new NetworkError());
     await renderWithProviders(<LoginScreen />, { auth: { signIn } });
     await fireEvent.changeText(screen.getByLabelText('이메일'), 'me@example.com');
     await fireEvent.changeText(screen.getByLabelText('비밀번호'), 'weave2026!');
