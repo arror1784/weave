@@ -95,6 +95,12 @@ describe('설정', () => {
     expect(await screen.findByText('작업을 다시 배치했어요')).toBeOnTheScreen();
   });
 
+  it('개인 일정 화면으로 간다 (사용자 결정 2026-10-17)', async () => {
+    await renderWithProviders(<SettingsScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: '개인 일정' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/events');
+  });
+
   it('홈 화면 위젯 미리보기로 간다', async () => {
     await renderWithProviders(<SettingsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '홈 화면 위젯' }));

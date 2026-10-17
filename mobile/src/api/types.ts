@@ -89,8 +89,25 @@ export const scheduleSchema = z.object({
   weeklyAvailableHours: z.array(z.number()).length(7).optional(),
   holidayAvailableHours: z.number().optional(),
   holidays: z.array(dateKey).optional(),
+  /** 서버가 계산한 날짜별 가용 시간(요일·공휴일 − 개인 일정) */
+  availableHoursByDate: z.record(z.string(), z.number()).optional(),
+  /** 날짜별 개인 일정(오늘 화면·달력 표시용) */
+  events: z.array(z.object({ eventId: z.number(), date: dateKey, title: z.string(), startTime: z.string(), endTime: z.string() })).optional(),
   projects: z.array(projectBriefSchema),
   tasks: z.array(taskSchema),
+});
+
+/** 개인 일정(사용자 결정 2026-10-17) — 매주 반복(weekdays: 월 1 … 일 7, 기간) 또는 한 번(date). 시각은 HH:mm */
+export const personalEventSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  repeat: z.enum(['weekly', 'once']),
+  weekdays: z.array(z.number()),
+  date: dateKey.nullable(),
+  startTime: z.string(),
+  endTime: z.string(),
+  startDate: dateKey.nullable(),
+  endDate: dateKey.nullable(),
 });
 
 export const updateTaskResponseSchema = z.object({ task: taskSchema, projectAllDone: z.boolean() });
@@ -124,4 +141,6 @@ export type Attachment = z.infer<typeof attachmentSchema>;
 export type Schedule = z.infer<typeof scheduleSchema>;
 export type ProposedTask = z.infer<typeof proposedTaskSchema>;
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
+export type PersonalEvent = z.infer<typeof personalEventSchema>;
+export type EventOccurrence = NonNullable<Schedule['events']>[number];
 export type Page<T> = { items: T[]; page: number; size: number; totalElements: number; totalPages: number };

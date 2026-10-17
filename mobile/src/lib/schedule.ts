@@ -1,4 +1,4 @@
-import type { Project, Task } from '@/api/types';
+import type { EventOccurrence, Project, Task } from '@/api/types';
 
 import { addDays, diffInDays, weekDays, type DateKey } from './date';
 import { taskEndDate, taskHoursOn } from './scheduler';
@@ -13,16 +13,22 @@ export type ScheduleData = {
   weeklyAvailableHours?: number[];
   holidayAvailableHours?: number;
   holidays?: DateKey[];
+  /** 서버가 계산한 날짜별 가용 시간(요일·공휴일 − 개인 일정) — 있으면 이 값이 우선 */
+  availableHoursByDate?: Record<DateKey, number>;
+  /** 날짜별 개인 일정(표시용) */
+  events?: EventOccurrence[];
 };
 export type Tone = 'soft' | 'near' | 'over';
 
 const hoursOf = (t: Task) => t.estimatedHours ?? 0;
 
 /**
- * 그날 가용 시간(사용자 결정 2026-10-17): 공휴일이면 공휴일 값, 아니면 요일 값(월요일부터 7개). 0이면 쉬는 날.
- * 서버 일정 알고리즘(backend User.availableHoursOn)과 같은 기준.
+ * 그날 가용 시간(사용자 결정 2026-10-17): 서버가 계산해 준 날짜별 값(요일·공휴일 − 개인 일정, backend AvailabilityService)을 쓴다.
+ * 그 범위 밖이거나 옛 응답이면: 공휴일이면 공휴일 값, 아니면 요일 값(월요일부터 7개). 0이면 쉬는 날.
  */
 export function capacityOn(data: ScheduleData, date: DateKey): number {
+  const fromServer = data.availableHoursByDate?.[date];
+  if (fromServer !== undefined) return fromServer;
   const weekly = data.weeklyAvailableHours;
   if (!weekly || weekly.length !== 7) return data.dailyAvailableHours;
   if (data.holidays?.includes(date) && data.holidayAvailableHours !== undefined) return data.holidayAvailableHours;
@@ -145,4 +151,9 @@ export function selectWeekDays(data: ScheduleData, today: DateKey): WeekDay[] {
 /** 프로젝트 일정(간트)에 보여줄 날짜 범위: 오늘 이틀 전부터 9일 */
 export function selectGanttRange(today: DateKey): DateKey[] {
   return Array.from({ length: 9 }, (_, i) => addDays(today, i - 2));
+}
+
+/** 그날 개인 일정(사용자 결정 2026-10-17 — 오늘 화면·달력에 보여준다), 시작 시각 순 */
+export function selectDayEvents(data: ScheduleData, date: DateKey): EventOccurrence[] {
+  return (data.events ?? []).filter((e) => e.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.eventId - b.eventId);
 }
