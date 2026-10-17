@@ -111,6 +111,8 @@ class ActivityExportService(
             if (d.has("weeklyTo")) "요일별 가용 ${hoursList(d.path("weeklyFrom"))} → ${hoursList(d.path("weeklyTo"))} · 공휴일 ${d.path("holidayFrom").asDouble()}h → ${d.path("holidayTo").asDouble()}h"
             else "하루 가용 ${d.path("from").asDouble()}h → ${d.path("to").asDouble()}h"
         "STANDING_SLOTS_CHANGED" -> "상시 칸 주 ${d.path("fromPerWeek").asInt()}번 × ${d.path("fromHours").asDouble()}h → 주 ${d.path("toPerWeek").asInt()}번 × ${d.path("toHours").asDouble()}h"
+        "EVENT_ADDED" -> "${text(d, "title")} · ${text(d, "date") ?: d.path("weekdays").joinToString(",") { "월화수목금토일"[it.asInt() - 1].toString() }} ${text(d, "startTime")}~${text(d, "endTime")}"
+        "EVENT_DELETED" -> text(d, "title") ?: ""
         "ATTACHMENT_UPLOADED" -> "${text(d, "name")} (${text(d, "contentType") ?: ""}, ${d.path("size").asLong()}B)"
         "ATTACHMENT_LINK_ADDED" -> text(d, "url") ?: text(d, "name") ?: ""
         "ATTACHMENT_DELETED" -> text(d, "name") ?: ""

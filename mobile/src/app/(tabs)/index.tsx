@@ -9,7 +9,7 @@ import { SectionLabel } from '@/components/SectionLabel';
 import { TaskCard } from '@/components/TaskCard';
 import { formatDateLabel, formatMonthEyebrow } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { selectTodayTasks, selectTodayWork } from '@/lib/schedule';
+import { selectDayEvents, selectTodayTasks, selectTodayWork } from '@/lib/schedule';
 import { useSchedule } from '@/queries/schedule';
 import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
@@ -45,6 +45,7 @@ export default function TodayScreen() {
   const tasks = selectTodayTasks(data, today);
   const left = tasks.filter((t) => !t.done).length;
   const work = selectTodayWork(data, today);
+  const events = selectDayEvents(data, today);
   const accent = work.over ? colors.warn : colors.thread;
   const scale = Math.max(work.total, work.capacity);
   const pct = (h: number) => `${Math.min(100, (h / scale) * 100)}%` as const;
@@ -98,6 +99,23 @@ export default function TodayScreen() {
         </Pressable>
       ) : null}
 
+      {/* 오늘 개인 일정(사용자 결정 2026-10-17 — 입력한 수업·모임을 보여준다). 없으면 칸을 숨긴다 */}
+      {events.length > 0 ? (
+        <View accessible={false} accessibilityLabel="오늘 일정">
+          <SectionLabel>오늘 일정</SectionLabel>
+          <View style={styles.list}>
+            {events.map((e) => (
+              <View key={`${e.eventId}-${e.startTime}`} style={[styles.event, { borderColor: colors.line, borderRadius: radius.card, backgroundColor: colors.surface }]}>
+                <AppText variant="mono" tone="soft">{`${e.startTime}~${e.endTime}`}</AppText>
+                <AppText variant="small" style={styles.flex}>
+                  {e.title}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <View>
         <SectionLabel>오늘 할 일</SectionLabel>
         {tasks.length === 0 ? (
@@ -127,6 +145,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120, gap: 20 },
   header: { gap: 4 },
   overload: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  flex: { flex: 1 },
+  event: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   between: { justifyContent: 'space-between' },
   small: { fontSize: 14 },

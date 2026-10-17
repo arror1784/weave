@@ -1,6 +1,6 @@
 import type { Project, Task } from '@/api/types';
 
-import { capacityOn, isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
+import { capacityOn, isOverdue, selectDayEvents, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
 
 const T = '2026-09-30'; // 수요일
 
@@ -124,6 +124,26 @@ describe('일정 계산', () => {
     expect(days.map((d) => d.capacity)).toEqual([1, 0, 3, 2, 5]);
     expect(days.map((d) => d.over)).toEqual([true, true, true, false, false]); // 4.75>1 · 1>0 · 4>3
     expect(selectTodayWork(weekly, T).capacity).toBe(1);
+  });
+
+  it('개인 일정(사용자 결정 2026-10-17): 서버가 날짜별로 계산한 가용 시간(요일·공휴일 − 개인 일정)이 있으면 그 값을 쓴다', () => {
+    const withEvents = { ...data, weeklyAvailableHours: [3, 3, 3, 3, 3, 3, 3], holidayAvailableHours: 3, holidays: [], availableHoursByDate: { [T]: 1 } };
+    expect(capacityOn(withEvents, T)).toBe(1);
+    expect(capacityOn(withEvents, '2026-10-01')).toBe(3); // 범위 밖이면 요일 값
+    expect(selectTodayWork(withEvents, T).capacity).toBe(1);
+  });
+
+  it('그날 개인 일정: 시작 시각 순', () => {
+    const withEvents = {
+      ...data,
+      events: [
+        { eventId: 2, date: T, title: '동아리', startTime: '18:00', endTime: '21:00' },
+        { eventId: 1, date: T, title: '수업', startTime: '10:00', endTime: '12:00' },
+        { eventId: 1, date: '2026-10-01', title: '수업', startTime: '10:00', endTime: '12:00' },
+      ],
+    };
+    expect(selectDayEvents(withEvents, T).map((e) => e.title)).toEqual(['수업', '동아리']);
+    expect(selectDayEvents(data, T)).toEqual([]);
   });
 
   it('요일별 값이 없는 옛 응답이면 하루 가용 시간을 쓴다', () => {

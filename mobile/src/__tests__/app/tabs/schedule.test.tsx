@@ -58,6 +58,16 @@ describe('전체 일정', () => {
     expect(legendName.props.ellipsizeMode).toBe('tail');
   });
 
+  it('주간 타임라인과 날짜 시트에 그날 개인 일정을 보여준다 (사용자 결정 2026-10-17)', async () => {
+    api.getSchedule.mockResolvedValue({ ...sampleSchedule(TEST_TODAY), events: [{ eventId: 1, date: '2026-09-29', title: '운영체제 수업', startTime: '10:00', endTime: '12:00' }] });
+    await renderWithProviders(<ScheduleScreen />);
+    await screen.findByText('9/28 – 10/4');
+    expect(screen.getByLabelText('개인 일정, 운영체제 수업, 10:00~12:00')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('tab', { name: '월간 캘린더' }));
+    await fireEvent.press(screen.getByRole('button', { name: /^9월 29일 화요일/ }));
+    expect(within(screen.getByLabelText('9월 29일 일정')).getByLabelText('개인 일정, 운영체제 수업, 10:00~12:00')).toBeOnTheScreen();
+  });
+
   it('프로젝트 범례를 보여준다', async () => {
     await renderWithProviders(<ScheduleScreen />);
     await screen.findByText('9/28 – 10/4');

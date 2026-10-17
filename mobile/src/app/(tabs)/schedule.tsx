@@ -8,10 +8,10 @@ import { IconWarn } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
 import { dayOfMonth, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, monthOf, weekDays, weekdayLabel, type DateKey } from '@/lib/date';
-import type { Project } from '@/api/types';
+import type { EventOccurrence, Project } from '@/api/types';
 import { LoadError, Loading } from '@/components/QueryStatus';
 import { formatHours } from '@/lib/korean';
-import { selectDayItems, selectDayLoad, type DayItem } from '@/lib/schedule';
+import { selectDayEvents, selectDayItems, selectDayLoad, type DayItem } from '@/lib/schedule';
 import { useSchedule } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
@@ -171,11 +171,14 @@ function WeekView() {
                   <AppText variant="micro" color={colors.warnText}>{`${formatHours(load.hours - load.capacity)} 초과`}</AppText>
                 </View>
               ) : null}
-              {items.length === 0 ? (
+              {items.length === 0 && selectDayEvents(state, d).length === 0 ? (
                 <AppText variant="caption" tone="soft" style={styles.empty}>
                   비어 있음
                 </AppText>
               ) : null}
+              {selectDayEvents(state, d).map((e) => (
+                <EventChip key={`${e.eventId}-${e.startTime}`} event={e} />
+              ))}
               {items.map((x, j) => (
                 <WeekChip key={j} item={x} project={state.projects.find((p) => p.id === x.projectId)!} />
               ))}
@@ -183,6 +186,22 @@ function WeekView() {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/** 개인 일정(사용자 결정 2026-10-17) — 프로젝트 색이 아닌 회색으로, 시각과 함께 */
+function EventChip({ event }: { event: EventOccurrence }) {
+  const { colors } = useAppTheme();
+  const time = `${event.startTime}~${event.endTime}`;
+  return (
+    <View accessible accessibilityLabel={`개인 일정, ${event.title}, ${time}`} style={[styles.chip, { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line }]}>
+      <AppText variant="small" tone="soft" numberOfLines={1} style={styles.flex}>
+        {event.title}
+      </AppText>
+      <AppText variant="mono" tone="soft" style={styles.micro}>
+        {time}
+      </AppText>
     </View>
   );
 }
@@ -224,6 +243,14 @@ function DayDetail({ date, project }: { date: DateKey; project: (id: number) => 
           {`${formatHours(load.hours)} / ${formatHours(load.capacity)}`}
         </AppText>
       </View>
+      {/* 그날 개인 일정 — 작업과 따로, 위에 */}
+      {selectDayEvents(state, date).length > 0 ? (
+        <View style={styles.sheetList}>
+          {selectDayEvents(state, date).map((e) => (
+            <EventChip key={`${e.eventId}-${e.startTime}`} event={e} />
+          ))}
+        </View>
+      ) : null}
       {items.length === 0 ? (
         <AppText variant="small" tone="soft" style={styles.sheetEmpty}>
           예정된 작업이 없어요. 여유로운 날!

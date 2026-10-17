@@ -1,5 +1,6 @@
 package com.weave.schedule.dto
 
+import com.weave.event.dto.EventOccurrenceResponse
 import com.weave.project.dto.TaskResponse
 import java.time.LocalDate
 
@@ -14,6 +15,10 @@ data class ScheduleResponse(
     val holidayAvailableHours: Double,
     /** 오늘 앞뒤 공휴일 날짜(약 2달 전 ~ 1년 뒤) — 공휴일은 요일보다 우선 */
     val holidays: List<LocalDate>,
+    /** 날짜별 가용 시간(요일·공휴일 − 개인 일정) — 앱은 이 값으로 과부하를 계산한다 */
+    val availableHoursByDate: Map<LocalDate, Double>,
+    /** 날짜별 개인 일정 — 오늘 화면·달력 표시용 */
+    val events: List<EventOccurrenceResponse>,
     val projects: List<ProjectBriefResponse>,
     val tasks: List<TaskResponse>,
 )

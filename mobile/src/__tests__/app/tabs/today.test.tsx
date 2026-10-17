@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 import { ApiError } from '@/api/client';
 import * as projectsApi from '@/api/projects';
@@ -74,10 +74,25 @@ describe('오늘의 일정', () => {
     expect(screen.getByRole('checkbox', { name: '후원사 제안서 수정 완료' })).not.toBeChecked();
   });
 
-  it('고정 일정은 보여주지 않는다 (지금은 입력하지 않기로 함)', async () => {
+  it('오늘 개인 일정을 시각 순으로 보여준다 (사용자 결정 2026-10-17 — 개인 일정을 입력하고 보여주기로 바뀜)', async () => {
+    api.getSchedule.mockResolvedValue({
+      ...sampleSchedule(TEST_TODAY),
+      events: [
+        { eventId: 2, date: TEST_TODAY, title: '동아리 모임', startTime: '18:00', endTime: '21:00' },
+        { eventId: 1, date: TEST_TODAY, title: '운영체제 수업', startTime: '10:00', endTime: '12:00' },
+        { eventId: 1, date: '2026-10-05', title: '운영체제 수업', startTime: '10:00', endTime: '12:00' },
+      ],
+    });
+    await renderWithProviders(<TodayScreen />);
+    const section = await screen.findByLabelText('오늘 일정');
+    expect(within(section).getAllByText(/~/).map((n) => n.props.children)).toEqual(['10:00~12:00', '18:00~21:00']);
+    expect(within(section).getByText('운영체제 수업')).toBeOnTheScreen();
+  });
+
+  it('오늘 개인 일정이 없으면 그 칸을 보여주지 않는다', async () => {
     await renderWithProviders(<TodayScreen />);
     await screen.findByRole('header', { name: '9월 30일 수요일' });
-    expect(screen.queryByText('일정')).toBeNull();
+    expect(screen.queryByLabelText('오늘 일정')).toBeNull();
   });
 
   it('떠 있는 + 버튼으로 새 프로젝트를 등록한다', async () => {

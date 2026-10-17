@@ -5,7 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
-import { IconCal, IconChevron, IconUser, IconWidget } from '@/components/icons';
+import { IconCal, IconChevron, IconClock, IconUser, IconWidget } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { SettingsGroup, SettingsRow } from '@/components/SettingsGroup';
 import { errorMessage } from '@/api/errors';
@@ -127,7 +127,9 @@ export default function SettingsScreen() {
       </SettingsGroup>
 
       <SettingsGroup title="기타">
-        <SettingsRow icon={(c) => <IconCal size={18} color={c} />} label="작업 다시 배치" onPress={confirmReplan} />
+        {/* 개인 일정(수업·모임) — 그날 가용 시간에서 뺀다(사용자 결정 2026-10-17) */}
+        <SettingsRow icon={(c) => <IconClock size={18} color={c} />} label="개인 일정" onPress={() => router.push('/events')} right={<IconChevron size={16} color={colors.inkSoft} />} />
+        <SettingsRow divider icon={(c) => <IconCal size={18} color={c} />} label="작업 다시 배치" onPress={confirmReplan} />
         <SettingsRow divider icon={(c) => <IconWidget size={18} color={c} />} label="홈 화면 위젯" onPress={() => router.push('/widgets')} right={<IconChevron size={16} color={colors.inkSoft} />} />
         <SettingsRow icon={(c) => <IconUser size={18} color={c} />} label="로그아웃" onPress={() => auth.signOut()} divider />
       </SettingsGroup>
