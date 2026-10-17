@@ -27,7 +27,7 @@ describe('토큰 갱신 (앱 화면과 위젯이 함께 써도 안전하게)', (
     const calls: string[] = [];
     globalThis.fetch = jest.fn(async (url: string, init?: RequestInit) => {
       calls.push(url);
-      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new-access', refreshToken: 'refresh-2', expiresIn: 900, user: { id: 1, email: 'me@example.com', dailyAvailableHours: 3, standingSessionsPerWeek: 2, standingSessionHours: 1 } });
+      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new-access', refreshToken: 'refresh-2', expiresIn: 900, user: { id: 1, email: 'me@example.com', dailyAvailableHours: 3, weeklyAvailableHours: [3, 3, 3, 3, 3, 3, 3], holidayAvailableHours: 3, standingSessionsPerWeek: 2, standingSessionHours: 1 } });
       const auth = (init?.headers as Record<string, string>)?.Authorization;
       return auth === 'Bearer new-access' ? json(200, { ok: true }) : json(401, { code: 'UNAUTHORIZED', message: 'x' });
     }) as unknown as typeof fetch;

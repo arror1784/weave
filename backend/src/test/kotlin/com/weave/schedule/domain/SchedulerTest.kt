@@ -159,6 +159,34 @@ class SchedulerTest : FunSpec({
             Placement("a", days("2026-09-30" to 5.0), t, true)
     }
 
+    // ── 요일별·공휴일 가용 시간 — 사용자 결정 2026-10-17 ──
+    //   날짜마다 가용 시간이 다르다(0시간 = 쉬는 날, 작업을 넣지 않는다). t(9/30)는 수요일.
+    val weekly = { date: LocalDate ->
+        when (date.dayOfWeek) {
+            java.time.DayOfWeek.THURSDAY -> 0.0
+            java.time.DayOfWeek.SATURDAY, java.time.DayOfWeek.SUNDAY -> 5.0
+            else -> 3.0
+        }
+    }
+
+    test("날짜마다 그날 가용 시간만큼 채우고, 0시간인 날은 건너뛴다") {
+        Scheduler.plan(listOf(project("p", far, NewTask("a", 8.0, null))), t, weekly).single().days shouldBe
+            days("2026-09-30" to 3.0, "2026-10-02" to 3.0, "2026-10-03" to 2.0)
+    }
+
+    test("작업 마감일 역산도 날짜별 가용 시간으로 — 뒤 작업이 그 전날까지 끝나도록") {
+        // 마감 10/5(월): b 8h는 10/5(3h)·10/4(일, 5h)면 끝나므로 시작일은 10/4 → a의 마감일은 10/3
+        //   (하루 3h로 고정하면 3일이 걸려 10/2가 된다)
+        val p = project("p", d("2026-10-05"), NewTask("a", 1.0, null), NewTask("b", 8.0, "a"))
+        Scheduler.plan(listOf(p), t, weekly).associate { it.key to it.dueDate } shouldBe mapOf("a" to d("2026-10-03"), "b" to d("2026-10-05"))
+    }
+
+    test("상시 칸은 0시간인 날에 넣지 않고, 칸 시간이 그날 가용보다 크면 그날 가용만큼") {
+        // 이번 주(수~일): 목요일은 0시간 → 한가한 날 중 이른 날 수(9/30)·금(10/2). 칸 4h는 평일 가용 3h로 줄어든다
+        Scheduler.plan(listOf(project("s", null, NewTask("a", 6.0, null))), t, weekly, StandingSlots(2, 4.0)).single().days shouldBe
+            days("2026-09-30" to 3.0, "2026-10-02" to 3.0)
+    }
+
     test("하루 몫: 날짜별 배정 시간이 있으면 그대로 쓴다") {
         val task = ScheduledTask(d("2026-09-29"), 3, 5.0, false, days("2026-09-29" to 3.0, "2026-10-01" to 2.0))
         Scheduler.hoursOn(task, d("2026-09-29")) shouldBe 3.0

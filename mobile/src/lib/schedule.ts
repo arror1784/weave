@@ -5,10 +5,30 @@ import { taskEndDate, taskHoursOn } from './scheduler';
 
 // 일정 화면들이 쓰는 계산. 서버 스냅샷(GET /api/v1/schedule)을 그대로 받아 쓴다 — 날짜는 서버가 정한다.
 
-export type ScheduleData = { projects: Project[]; tasks: Task[]; dailyAvailableHours: number };
+/** 요일별·공휴일 값이 없으면(옛 서버 응답) 오늘 가용 시간(dailyAvailableHours)을 매일 쓴다 */
+export type ScheduleData = {
+  projects: Project[];
+  tasks: Task[];
+  dailyAvailableHours: number;
+  weeklyAvailableHours?: number[];
+  holidayAvailableHours?: number;
+  holidays?: DateKey[];
+};
 export type Tone = 'soft' | 'near' | 'over';
 
 const hoursOf = (t: Task) => t.estimatedHours ?? 0;
+
+/**
+ * 그날 가용 시간(사용자 결정 2026-10-17): 공휴일이면 공휴일 값, 아니면 요일 값(월요일부터 7개). 0이면 쉬는 날.
+ * 서버 일정 알고리즘(backend User.availableHoursOn)과 같은 기준.
+ */
+export function capacityOn(data: ScheduleData, date: DateKey): number {
+  const weekly = data.weeklyAvailableHours;
+  if (!weekly || weekly.length !== 7) return data.dailyAvailableHours;
+  if (data.holidays?.includes(date) && data.holidayAvailableHours !== undefined) return data.holidayAvailableHours;
+  const [y, m, d] = date.split('-').map(Number);
+  return weekly[(new Date(y, m - 1, d).getDay() + 6) % 7];
+}
 const round = (n: number) => Number(n.toFixed(2));
 
 /**
@@ -73,7 +93,7 @@ export function selectDayLoad(data: ScheduleData, date: DateKey, { includeOverdu
   const planned = data.tasks.filter((t) => !t.done).reduce((a, t) => a + taskHoursOn(t, date), 0);
   const overdue = includeOverdue ? data.tasks.filter((t) => isUnmoved(t, date)).reduce((a, t) => a + hoursOf(t), 0) : 0;
   const hours = round(planned + overdue);
-  const capacity = data.dailyAvailableHours;
+  const capacity = capacityOn(data, date);
   return { hours, capacity, over: hours > capacity };
 }
 
@@ -87,7 +107,7 @@ export function selectTodayWork(data: ScheduleData, today: DateKey) {
   const all = [...planned, ...overdue];
   const total = round(all.reduce((a, x) => a + x.hours, 0));
   const done = round(all.filter((x) => x.done).reduce((a, x) => a + x.hours, 0));
-  const capacity = data.dailyAvailableHours;
+  const capacity = capacityOn(data, today);
   return { total, done, remaining: round(total - done), capacity, over: total > capacity };
 }
 
@@ -107,7 +127,7 @@ export function selectDayItems(data: ScheduleData, date: DateKey): DayItem[] {
 export type WeekDay = { date: DateKey; hours: number; capacity: number; over: boolean; tasks: { task: Task; hours: number }[] };
 
 /**
- * 이번 주 날짜별 부하(오늘~일요일): 하루씩 그날 몫 vs 하루 가용 시간(사용자 결정 2026-10-01 — 주간 합계 비교에서 바꿈).
+ * 이번 주 날짜별 부하(오늘~일요일): 하루씩 그날 몫 vs 그날 가용 시간(사용자 결정 2026-10-01 — 주간 합계 비교에서 바꿈, 2026-10-17 요일별).
  * 오늘엔 아직 서버가 옮기기 전인 밀린 작업 시간도 더한다(오늘 화면과 같은 기준). 작업은 그날 드는 시간이 큰 순.
  */
 export function selectWeekDays(data: ScheduleData, today: DateKey): WeekDay[] {

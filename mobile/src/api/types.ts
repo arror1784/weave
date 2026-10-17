@@ -9,7 +9,12 @@ export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'blue', '
 export const userSchema = z.object({
   id: z.number(),
   email: z.string(),
+  /** 오늘 요일의 가용 시간(요일별 전 앱용) */
   dailyAvailableHours: z.number(),
+  /** 요일별 가용 시간 — 월요일부터 7개, 0이면 쉬는 날(사용자 결정 2026-10-17) */
+  weeklyAvailableHours: z.array(z.number()).length(7),
+  /** 공휴일 가용 시간 — 공휴일은 요일보다 우선 */
+  holidayAvailableHours: z.number(),
   standingSessionsPerWeek: z.number(),
   standingSessionHours: z.number(),
 });
@@ -78,7 +83,12 @@ export const pageSchema = <T extends z.ZodType>(item: T) =>
 
 export const scheduleSchema = z.object({
   today: dateKey,
+  /** 오늘 가용 시간(공휴일이면 공휴일 값) */
   dailyAvailableHours: z.number(),
+  /** 날짜별 가용 시간 계산용(lib/schedule capacityOn) — 월요일부터 7개 · 공휴일 값 · 앞뒤 공휴일 날짜 */
+  weeklyAvailableHours: z.array(z.number()).length(7).optional(),
+  holidayAvailableHours: z.number().optional(),
+  holidays: z.array(dateKey).optional(),
   projects: z.array(projectBriefSchema),
   tasks: z.array(taskSchema),
 });

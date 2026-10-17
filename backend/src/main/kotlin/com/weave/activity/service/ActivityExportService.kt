@@ -107,7 +107,9 @@ class ActivityExportService(
         "TASK_DONE", "TASK_UNDONE" -> "${text(d, "title")}${d.path("estimatedHours").takeIf { it.isNumber }?.let { " (${it.asDouble()}h)" } ?: ""}"
         "OVERDUE_MOVED" -> "${d.path("count").asInt()}개: ${d.path("titles").joinToString(", ") { it.asString() }}"
         "SCHEDULE_REPLANNED" -> "작업 ${d.path("taskCount").asInt()}개 다시 배치"
-        "SETTINGS_CHANGED" -> "하루 가용 ${d.path("from").asDouble()}h → ${d.path("to").asDouble()}h"
+        "SETTINGS_CHANGED" ->
+            if (d.has("weeklyTo")) "요일별 가용 ${hoursList(d.path("weeklyFrom"))} → ${hoursList(d.path("weeklyTo"))} · 공휴일 ${d.path("holidayFrom").asDouble()}h → ${d.path("holidayTo").asDouble()}h"
+            else "하루 가용 ${d.path("from").asDouble()}h → ${d.path("to").asDouble()}h"
         "STANDING_SLOTS_CHANGED" -> "상시 칸 주 ${d.path("fromPerWeek").asInt()}번 × ${d.path("fromHours").asDouble()}h → 주 ${d.path("toPerWeek").asInt()}번 × ${d.path("toHours").asDouble()}h"
         "ATTACHMENT_UPLOADED" -> "${text(d, "name")} (${text(d, "contentType") ?: ""}, ${d.path("size").asLong()}B)"
         "ATTACHMENT_LINK_ADDED" -> text(d, "url") ?: text(d, "name") ?: ""
@@ -118,6 +120,9 @@ class ActivityExportService(
         "WIDGET_RENDERED" -> d.path("taskCount").takeIf { !it.isMissingNode }?.let { "오늘 할 일 ${it.asInt()}개" } ?: ""
         else -> ""
     }
+
+    /** 월~일 가용 시간 — 예: 월3 화1 수3 목3 금2 토5 일0 */
+    private fun hoursList(node: JsonNode) = node.toList().mapIndexed { i, h -> "${"월화수목금토일"[i]}${h.asDouble().let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }}" }.joinToString(" ")
 
     private fun text(d: JsonNode, key: String): String? = d.get(key)?.takeIf { !it.isNull }?.asString()
 

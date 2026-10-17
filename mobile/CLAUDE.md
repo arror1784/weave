@@ -63,7 +63,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 19. **프로젝트는 고유 색으로 구분한다** — `Project.color`(7색, 사용자가 등록 때 고르고 상세에서 바꾼다 — 기본값은 안 쓴 색부터)와 `projectPaletteFor()`. 색 고르기는 `ColorPicker`로만. 배지·막대·점에 쓰고, 색만으로 구분하지 않도록 항상 프로젝트 이름을 함께 쓴다(§4-4).
 20. **아이콘은 `src/components/icons.tsx`(react-native-svg)만** — Figma의 선 아이콘(24 그리드, 1.6 선) 경로를 그대로 옮겼다. 새 아이콘도 같은 규칙으로 추가한다. 아이콘은 장식이라 의미는 글자나 `accessibilityLabel`로 전한다.
 21. **Figma와 다른 부분은 주석으로 남긴다** — 예: 입력칸의 보이는 라벨(§4-3, Figma는 placeholder만), 대비 보정 색, Google 로그인·알림 설정 제외, 작업 수정·미루기·고정 일정 제외(사용자 결정 — 바뀔 수 있음).
-22. **작업 날짜는 서버가 정한다** — 일정 알고리즘은 백엔드 `schedule/domain/Scheduler.kt`. 앱은 날짜를 만들지 않고 부하 계산만 한다(`lib/scheduler.ts`의 `taskHoursOn`·`taskEndDate`, `lib/schedule.ts`의 선택 함수). 하루 몫은 서버가 보낸 날짜별 배정 시간(`Task.days`)을 그대로 쓴다(없을 때만 기간에 똑같이 나눔). 오늘은 서버 일정의 `today`를 쓰고, 못 받았을 때만 `todayKey()`(하루는 아침 6시에 바뀐다 — 서버와 같은 기준).
+22. **작업 날짜는 서버가 정한다** — 일정 알고리즘은 백엔드 `schedule/domain/Scheduler.kt`. 앱은 날짜를 만들지 않고 부하 계산만 한다(`lib/scheduler.ts`의 `taskHoursOn`·`taskEndDate`, `lib/schedule.ts`의 선택 함수). 그날 가용 시간은 `capacityOn`(요일별 7개 + 공휴일 우선 — 서버 `User.availableHoursOn`과 같은 기준)으로만 구한다. 하루 몫은 서버가 보낸 날짜별 배정 시간(`Task.days`)을 그대로 쓴다(없을 때만 기간에 똑같이 나눔). 오늘은 서버 일정의 `today`를 쓰고, 못 받았을 때만 `todayKey()`(하루는 아침 6시에 바뀐다 — 서버와 같은 기준).
 
 23. **화면 키보드 회피는 공통 `Screen`이 Android에서도 `behavior="padding"`으로 한다** — 앱이 화면 끝까지 그리는(edge-to-edge) 방식이라 `adjustResize`가 화면을 줄여 주지 않는다. (Android에서 꺼 두었더니 챗봇 입력칸이 키보드에 가려졌다, 2026-10-01)
 24. **파일 업로드는 `bytes()`가 있는 값으로 `FormData`에 넣는다** — SDK 57은 전역 `fetch`를 Expo 구현으로 바꿔서 React Native식 `{ uri, name, type }`을 보내지 못한다("Unsupported FormDataPart implementation"). 파일 이름은 Expo가 퍼센트 인코딩해 보내므로 서버가 되돌린다. (첨부가 "서버에 연결할 수 없어요"로 실패했다, 2026-10-01)

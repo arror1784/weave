@@ -16,10 +16,11 @@ beforeEach(() => {
 });
 
 describe('이번 주 날짜별 과부하', () => {
-  it('오늘부터 일요일까지 날마다 그날 소요를 하루 가용 시간과 비교한다', async () => {
+  it('오늘부터 일요일까지 날마다 그날 소요를 그날 가용 시간과 비교한다', async () => {
     await renderWithProviders(<OverloadScreen />);
     await screen.findByRole('header', { name: '이번 주 과부하' });
-    expect(screen.getByText('하루 가용 3h를 넘는 날이 1일 있어요.')).toBeOnTheScreen();
+    expect(screen.getByText('그날 가용 시간을 넘는 날이 1일 있어요.')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('day-2026-09-30')).getByText('가용 3h')).toBeOnTheScreen();
     expect(screen.getByLabelText('오늘 9월 30일 수요일 7.5시간')).toBeOnTheScreen();
     expect(screen.getByLabelText('10월 1일 목요일 1.5시간')).toBeOnTheScreen();
     expect(screen.getByLabelText('10월 4일 일요일 0.67시간')).toBeOnTheScreen();
@@ -42,7 +43,17 @@ describe('이번 주 날짜별 과부하', () => {
     expect(screen.queryByRole('button', { name: '일정에 반영하기' })).toBeNull();
   });
 
-  it('모든 날이 하루 가용 시간 안이면 여유 있다고 알려준다', async () => {
+  it('요일별·공휴일 가용 시간(사용자 결정 2026-10-17): 0시간인 날은 "쉬는 날", 그날 작업이 있으면 과부하', async () => {
+    // 월~일 8시간, 목요일만 0시간 — 목(10/1)에는 여러 날 작업 몫 1.5h가 있다
+    api.getSchedule.mockResolvedValue({ ...sampleSchedule(TEST_TODAY), weeklyAvailableHours: [8, 8, 8, 0, 8, 8, 8], holidayAvailableHours: 8, holidays: [] });
+    await renderWithProviders(<OverloadScreen />);
+    const thu = await screen.findByTestId('day-2026-10-01');
+    expect(within(thu).getByText('쉬는 날')).toBeOnTheScreen();
+    expect(within(thu).getByText('1.5h 초과')).toBeOnTheScreen();
+    expect(screen.getByText('그날 가용 시간을 넘는 날이 1일 있어요.')).toBeOnTheScreen();
+  });
+
+  it('모든 날이 그날 가용 시간 안이면 여유 있다고 알려준다', async () => {
     api.getSchedule.mockResolvedValue({ ...sampleSchedule(TEST_TODAY), dailyAvailableHours: 8 });
     await renderWithProviders(<OverloadScreen />);
     expect(await screen.findByRole('header', { name: '이번 주는 여유가 있어요' })).toBeOnTheScreen();

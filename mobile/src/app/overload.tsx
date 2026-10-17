@@ -34,8 +34,8 @@ export default function OverloadScreen() {
   const state = schedule.data;
   const days = selectWeekDays(state, state.today);
   const overDays = days.filter((d) => d.over).length;
-  const capacity = state.dailyAvailableHours;
-  const max = Math.max(capacity, ...days.map((d) => d.hours));
+  // 가용 시간은 날마다 다르다(요일별·공휴일, 사용자 결정 2026-10-17)
+  const max = Math.max(...days.map((d) => Math.max(d.capacity, d.hours)), 1);
 
   return (
     <Screen header={<TopBar title="이번 주" onBack={() => router.back()} />} contentStyle={styles.content}>
@@ -48,7 +48,7 @@ export default function OverloadScreen() {
             {overDays ? '이번 주 과부하' : '이번 주는 여유가 있어요'}
           </AppText>
           <AppText variant="bodyRegular" tone="soft">
-            {overDays ? `하루 가용 ${formatHours(capacity)}를 넘는 날이 ${overDays}일 있어요.` : `매일 하루 가용 ${formatHours(capacity)} 안에서 진행하고 있어요.`}
+            {overDays ? `그날 가용 시간을 넘는 날이 ${overDays}일 있어요.` : '날마다 그날 가용 시간 안에서 진행하고 있어요.'}
           </AppText>
         </View>
       </View>
@@ -58,11 +58,16 @@ export default function OverloadScreen() {
         return (
           <Card key={day.date} testID={`day-${day.date}`} style={styles.card}>
             <TimeBar label={label} hours={day.hours} max={max} color={day.over ? colors.warn : colors.thread} textColor={day.over ? colors.warnText : colors.thread} />
-            {day.over ? (
-              <AppText variant="caption" color={colors.warnText} style={styles.excess}>
-                {`${formatHours(day.hours - day.capacity)} 초과`}
+            <View style={styles.dayMeta}>
+              <AppText variant="caption" tone="soft">
+                {day.capacity === 0 ? '쉬는 날' : `가용 ${formatHours(day.capacity)}`}
               </AppText>
-            ) : null}
+              {day.over ? (
+                <AppText variant="caption" color={colors.warnText}>
+                  {`${formatHours(day.hours - day.capacity)} 초과`}
+                </AppText>
+              ) : null}
+            </View>
             <View style={styles.list}>
               {day.tasks.length === 0 ? (
                 <AppText variant="caption" tone="soft">
@@ -100,7 +105,7 @@ const styles = StyleSheet.create({
   warnIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 20 },
   card: { padding: 16 },
-  excess: { marginTop: 6 },
+  dayMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   list: { gap: 8, marginTop: 12 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   flex: { flex: 1, gap: 6 },

@@ -9,7 +9,13 @@ data class WeaveProperties(
     val jwt: Jwt,
     val storage: Storage = Storage(),
     val anthropic: Anthropic = Anthropic(),
+    val holiday: Holiday = Holiday(),
 ) {
+    data class Holiday(
+        /** 공공데이터포털 특일 정보 API 키(디코딩된 키) — 비어 있으면 공휴일을 받지 않는다 */
+        val apiKey: String = "",
+    )
+
     data class Jwt(
         /** HS256 서명 키 — 32바이트 이상 */
         val secret: String,

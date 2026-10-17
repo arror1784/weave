@@ -142,11 +142,16 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         detailOf(tokens, "OVERDUE_MOVED")["count"].asInt() shouldBe 1
     }
 
-    test("하루 가용 시간 변경(전→후)과 작업 다시 배치를 기록한다") {
+    test("가용 시간 변경(요일별 전→후)과 작업 다시 배치를 기록한다") {
         val tokens = newUser()
         json("PATCH", "/api/v1/me/settings", tokens, mapOf("dailyAvailableHours" to 4.5))
         mockMvc.post("/api/v1/schedule/replan") { header("Authorization", api.bearer(tokens)) }
-        detailOf(tokens, "SETTINGS_CHANGED").let { it["from"].asDouble() shouldBe 3.0; it["to"].asDouble() shouldBe 4.5 }
+        // 요일별 가용 시간(2026-10-17)부터 전→후를 요일별 목록으로 남긴다 — 하루 값을 보내면 7요일·공휴일이 모두 그 값
+        detailOf(tokens, "SETTINGS_CHANGED").let {
+            it["weeklyFrom"].toString() shouldBe "[3.0,3.0,3.0,3.0,3.0,3.0,3.0]"
+            it["weeklyTo"].toString() shouldBe "[4.5,4.5,4.5,4.5,4.5,4.5,4.5]"
+            it["holidayTo"].asDouble() shouldBe 4.5
+        }
         types(tokens) shouldContainAll listOf("SETTINGS_CHANGED", "SCHEDULE_REPLANNED")
     }
 

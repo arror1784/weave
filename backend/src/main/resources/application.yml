@@ -24,6 +24,9 @@ weave:
     secret: ${JWT_SECRET}
   storage:
     root: ${WEAVE_STORAGE_ROOT:uploads}
+  holiday:
+    # 공공데이터포털 "한국천문연구원_특일 정보" 키(디코딩된 키) — .env의 HOLIDAY_API_KEY. 없으면 공휴일 없이 배치한다
+    api-key: ${HOLIDAY_API_KEY:}
   anthropic:
     api-key: ${ANTHROPIC_API_KEY:}
     # 사용 기록의 AI 비용 계산 단가(USD, 100만 토큰당) — Claude Sonnet 5.5 공식 단가. 모델을 바꾸면 함께 바꾼다

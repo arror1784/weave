@@ -2,7 +2,6 @@ package com.weave.schedule.domain
 
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -38,8 +37,8 @@ data class Placement(val key: String, val days: List<DayHours>, val dueDate: Loc
  *   2. 마감이 가까운 프로젝트부터 채운다. 마감이 같으면 먼저 등록한 프로젝트부터. 상시(마감 없음)는 7번.
  *   3. 프로젝트 안에서는 선행 작업 먼저, 그 밖엔 AI 제안(검토 화면에서 고친) 순서대로.
  *   4. 하루에 최대한 채워 앞당긴다: 시작 가능일(오늘, 선행 작업이 있으면 그 작업이 끝나는 날)부터 날마다 남은 가용 시간만큼 넣는다.
- *      (4시간·하루 3시간 → 3 + 1) 주말도 쓴다.
- *   5. 작업 마감일 = 프로젝트 마감에서 거꾸로(뒤따르는 작업 마감 − 그 작업을 하루 가용으로 끝내는 데 드는 날 수, 오늘보다 앞서지 않음).
+ *      (4시간·하루 3시간 → 3 + 1) 가용 시간은 날마다 다르다 — 요일별 7개 + 공휴일(사용자 결정 2026-10-17), 0시간이면 쉬는 날.
+ *   5. 작업 마감일 = 프로젝트 마감에서 거꾸로(뒤따르는 작업이 그 마감까지 끝나려면 시작해야 하는 날의 전날 — 날짜별 가용 시간으로 센다, 오늘보다 앞서지 않음).
  *      상시 프로젝트의 작업은 마감일이 없다.
  *   6. 가용 시간 안에서 작업 마감일까지 못 끝내면, 과부하가 걸려도 마감을 지킨다: 마감일까지 남은 시간을 채우고
  *      나머지(초과분)는 가장 이른 날에 얹는다. 이런 작업을 late(빠듯함)로 표시해 등록 알림에 개수를 알린다.
@@ -68,17 +67,20 @@ object Scheduler {
         return if (offset in 0 until span) (task.estimatedHours ?: 0.0) / span else 0.0
     }
 
-    /** 결과는 입력 순서(프로젝트 순서 → 작업 순서)대로 */
-    fun plan(projects: List<PlanProject>, today: LocalDate, capacity: Double, standing: StandingSlots = StandingSlots.DEFAULT): List<Placement> {
+    /** 매일 같은 가용 시간 */
+    fun plan(projects: List<PlanProject>, today: LocalDate, capacity: Double, standing: StandingSlots = StandingSlots.DEFAULT): List<Placement> =
+        plan(projects, today, { capacity }, standing)
+
+    /** 결과는 입력 순서(프로젝트 순서 → 작업 순서)대로. capacityOn: 그날 가용 시간(요일별·공휴일, 0이면 쉬는 날) */
+    fun plan(projects: List<PlanProject>, today: LocalDate, capacityOn: (LocalDate) -> Double, standing: StandingSlots = StandingSlots.DEFAULT): List<Placement> {
         val used = HashMap<LocalDate, Double>()
-        fun free(date: LocalDate) = max(0.0, capacity - (used[date] ?: 0.0))
-        fun daysNeeded(t: NewTask) = max(1, ceil(t.hours / capacity - EPSILON).toInt())
+        fun free(date: LocalDate) = max(0.0, capacityOn(date) - (used[date] ?: 0.0))
 
         val placed = HashMap<String, Placement>()
         val priority = projects.filter { it.deadline != null }.sortedWith(compareBy<PlanProject> { it.deadline }.thenBy { it.order })
         for (project in priority) {
             val byKey = project.tasks.associateBy { it.key }
-            val due = dueDates(project, today, ::daysNeeded)
+            val due = dueDates(project, today, capacityOn)
             fun place(t: NewTask, visiting: MutableSet<String>) {
                 if (t.key in placed) return
                 visiting += t.key
@@ -99,26 +101,27 @@ object Scheduler {
             project.tasks.forEach { place(it, mutableSetOf()) }
         }
         // 7. 상시 프로젝트 — 마감 작업 배치가 끝난 부하(used)를 보고 칸을 고른다
-        placeStanding(projects.filter { it.deadline == null }.sortedBy { it.order }, today, capacity, standing, used)
+        placeStanding(projects.filter { it.deadline == null }.sortedBy { it.order }, today, capacityOn, standing, used)
             .forEach { placed[it.key] = it }
         return projects.flatMap { p -> p.tasks.map { placed.getValue(it.key) } }
     }
 
-    private fun placeStanding(projects: List<PlanProject>, today: LocalDate, capacity: Double, standing: StandingSlots, used: MutableMap<LocalDate, Double>): List<Placement> {
+    private fun placeStanding(projects: List<PlanProject>, today: LocalDate, capacityOn: (LocalDate) -> Double, standing: StandingSlots, used: MutableMap<LocalDate, Double>): List<Placement> {
         // 프로젝트마다 선행 작업 먼저 놓은 순서의 남은 시간 대기열
         val queues = projects.map { p -> ArrayDeque(inDependencyOrder(p).map { it.key to it.hours }) }
         val days = projects.flatMap { it.tasks }.associate { it.key to mutableListOf<DayHours>() }
-        val slotHours = min(standing.hours, capacity)
-        if (standing.perWeek > 0 && slotHours > EPSILON) {
+        if (standing.perWeek > 0 && standing.hours > EPSILON) {
             var turn = 0
             var monday = today.minusDays(today.dayOfWeek.value - 1L)
             while (queues.any { it.isNotEmpty() } && ChronoUnit.DAYS.between(today, monday) < SEARCH_DAYS) {
-                val week = (0L..6L).map(monday::plusDays).filter { !it.isBefore(today) }
+                // 0시간인 날(쉬는 날)은 칸을 넣지 않는다
+                val week = (0L..6L).map(monday::plusDays).filter { !it.isBefore(today) && capacityOn(it) > EPSILON }
                 val chosen = week.sortedWith(compareBy<LocalDate> { used[it] ?: 0.0 }.thenBy { it }).take(standing.perWeek).sorted()
                 for (date in chosen) {
-                    val amount = min(slotHours, queues.sumOf { q -> q.sumOf { it.second } })
+                    // 칸 시간이 그날 가용보다 크면 그날 가용만큼(사용자 결정 2026-10-17)
+                    val amount = min(min(standing.hours, capacityOn(date)), queues.sumOf { q -> q.sumOf { it.second } })
                     if (amount <= EPSILON) break
-                    if ((used[date] ?: 0.0) + amount > capacity + EPSILON) continue // 칸을 넣으면 가용을 넘는 날은 건너뛴다
+                    if ((used[date] ?: 0.0) + amount > capacityOn(date) + EPSILON) continue // 칸을 넣으면 가용을 넘는 날은 건너뛴다
                     // 번갈아: 이번 차례 프로젝트부터, 작업이 다 끝난 프로젝트는 건너뛰고 다음 프로젝트가 남은 시간을 쓴다
                     var left = amount
                     for (i in queues.indices) {
@@ -186,7 +189,7 @@ object Scheduler {
     }
 
     /** 5. 작업 마감일 — 프로젝트 마감에서 거꾸로. 상시 프로젝트는 없음 */
-    private fun dueDates(project: PlanProject, today: LocalDate, daysNeeded: (NewTask) -> Int): Map<String, LocalDate?> {
+    private fun dueDates(project: PlanProject, today: LocalDate, capacityOn: (LocalDate) -> Double): Map<String, LocalDate?> {
         val deadline = project.deadline ?: return project.tasks.associate { it.key to null }
         val due = HashMap<String, LocalDate>()
         fun dueOf(t: NewTask, visiting: MutableSet<String>): LocalDate {
@@ -194,7 +197,7 @@ object Scheduler {
             visiting += t.key
             var latest: LocalDate = deadline
             for (next in project.tasks.filter { it.dependsOnKey == t.key && it.key !in visiting }) {
-                val candidate = dueOf(next, visiting).minusDays(daysNeeded(next).toLong())
+                val candidate = startToFinish(next.hours, dueOf(next, visiting), capacityOn).minusDays(1)
                 if (candidate.isBefore(latest)) latest = candidate
             }
             val result = if (latest.isBefore(today)) today else latest
@@ -202,6 +205,19 @@ object Scheduler {
             return result
         }
         return project.tasks.associate { it.key to dueOf(it, mutableSetOf()) }
+    }
+
+    /** 마감일(finish)에 끝내려면 언제 시작해야 하나 — 그날부터 거꾸로 날마다 가용 시간을 빼 간다(0시간인 날은 건너뜀). 최소 하루 */
+    private fun startToFinish(hours: Double, finish: LocalDate, capacityOn: (LocalDate) -> Double): LocalDate {
+        var remaining = hours - capacityOn(finish)
+        var start = finish
+        var steps = 0
+        while (remaining > EPSILON && steps < SEARCH_DAYS) {
+            start = start.minusDays(1)
+            remaining -= capacityOn(start)
+            steps++
+        }
+        return start
     }
 
     private fun round(h: Double) = Math.round(h * 100) / 100.0
