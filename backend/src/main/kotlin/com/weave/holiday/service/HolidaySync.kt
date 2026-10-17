@@ -36,7 +36,12 @@ class HolidaySync(
         val byDate = existing.associateBy { it.date }
         fetched.values.forEach { item ->
             val holiday = byDate[item.date]
-            if (holiday == null) repository.save(Holiday(item.date, item.name.take(100))) else holiday.name = item.name.take(100)
+            // 명시적으로 저장한다 — refresh()가 같은 클래스의 syncYear()를 부르면 @Transactional이 걸리지 않아
+            // 바꾼 이름이 반영되지 않았다(깨진 공휴일 이름이 남은 버그, 2026-10-17)
+            when {
+                holiday == null -> repository.save(Holiday(item.date, item.name.take(100)))
+                holiday.name != item.name.take(100) -> repository.save(holiday.also { it.name = item.name.take(100) })
+            }
         }
         return fetched.size
     }

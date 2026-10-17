@@ -11,14 +11,17 @@ import javax.xml.parsers.DocumentBuilderFactory
 object HolidayXml {
     private val DATE = DateTimeFormatter.BASIC_ISO_DATE
 
-    fun parse(xml: String): List<HolidayItem> {
+    fun parse(xml: String): List<HolidayItem> = parse(xml.toByteArray(Charsets.UTF_8))
+
+    /** 바이트 그대로 읽는다 — 문자 인코딩은 XML 머리말을 따른다(API가 응답 헤더에 charset을 주지 않아 문자열로 받으면 한글이 깨졌다) */
+    fun parse(xml: ByteArray): List<HolidayItem> {
         val factory = DocumentBuilderFactory.newInstance().apply {
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
             isExpandEntityReferences = false
             isXIncludeAware = false
         }
-        val doc = factory.newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
+        val doc = factory.newDocumentBuilder().parse(ByteArrayInputStream(xml))
         val code = doc.getElementsByTagName("resultCode").item(0)?.textContent?.trim()
         check(code == "00") { "공휴일 API 오류: $code ${doc.getElementsByTagName("resultMsg").item(0)?.textContent?.trim().orEmpty()}" }
         val items = doc.getElementsByTagName("item")

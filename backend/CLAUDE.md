@@ -96,4 +96,7 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /a
 - PostgreSQL은 준비된 문장 하나에 SQL 두 개를 못 넣는다 — `@Modifying` 네이티브 쿼리는 문장마다 메서드를 나눈다.
 - `@Email`은 앞뒤 공백이 있으면 실패한다 — 앱이 trim해서 보낸다.
 - 앱(Expo fetch)이 업로드 파일 이름을 퍼센트 인코딩해 보내고, 폰은 한글을 자모 분해(NFD)해서 준다 — `AttachmentService.displayName`이 되돌리고 합친다(NFC).
+- **외부 API 응답은 바이트로 받아 형식이 정한 인코딩으로 읽는다** — 공공데이터 API가 `Content-Type: application/xml`에 charset을 주지 않아 `body(String)`이 ISO-8859-1로 읽었고, 공휴일 이름이 깨진 채 저장됐다(2026-10-17). XML은 바이트를 파서에 넘기면 머리말의 encoding을 따른다.
+- **같은 클래스 안에서 부른 `@Transactional` 메서드는 트랜잭션이 걸리지 않는다**(프록시를 거치지 않음) — 엔티티 값을 바꿔 두기만 하면 저장되지 않는다. 정기 작업이 자기 메서드를 부를 땐 `repository.save`로 명시적으로 저장한다(공휴일 이름이 안 고쳐진 버그, 2026-10-17).
+- 테스트 프로필은 외부 API 키를 비운다(`application-test.yml`) — `.env`를 테스트도 읽어서, 키를 넣자 테스트 서버가 뜰 때마다 실제 공휴일 API를 부를 뻔했다.
 - 요청 횟수 제한은 지금 없다(사용자 결정 — 배포 때 다시 고려). 넣을 때는 서버가 여러 대일 수 있으니 공유 저장소 기준으로, 통합 테스트는 모두 같은 IP라는 점을 고려한다.
