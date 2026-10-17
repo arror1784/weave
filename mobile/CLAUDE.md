@@ -159,7 +159,7 @@ adb -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.ap
 adb -s emulator-5554 reverse tcp:8081 tcp:8081        # 개발 서버 연결 → 앱에서 http://localhost:8081
 ```
 - 폰과 에뮬레이터가 둘 다 연결돼 있으면 `adb` 명령에 `-s <기기ID>`를 붙인다(`adb devices`로 확인). `npx expo run:android`는 어느 기기에 설치할지 묻는다.
-Android 빌드 환경(Expo SDK 57 문서 기준, macOS): **JDK 17**(`brew install --cask zulu@17`, `JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home`) · Android Studio에서 **Android SDK Platform 36** + Build-Tools · `ANDROID_HOME=$HOME/Library/Android/sdk`, `PATH`에 `$ANDROID_HOME/platform-tools`·`$ANDROID_HOME/emulator`. 백엔드는 `jvmToolchain(25)`로 JDK 25를 따로 쓰므로 `JAVA_HOME`이 17이어도 된다.
+Android 빌드 환경(Expo SDK 57 문서 기준, macOS): **JDK 17**(배포판 무관, `JAVA_HOME=$(/usr/libexec/java_home -v 17)` — 경로를 직접 적지 않는다. zulu-17 경로를 박아 두었다가 JDK를 바꾼 뒤 `expo run:android`가 "JAVA_HOME is set to an invalid directory"로 실패했다, 2026-10-17) · Android Studio에서 **Android SDK Platform 36** + Build-Tools · `ANDROID_HOME=$HOME/Library/Android/sdk`, `PATH`에 `$ANDROID_HOME/platform-tools`·`$ANDROID_HOME/emulator`. 백엔드는 `jvmToolchain(25)`로 JDK 25를 따로 쓰므로 `JAVA_HOME`이 17이어도 된다.
 폰: 설정 → 휴대전화 정보 → 소프트웨어 정보 → 빌드 번호 7번 탭 → 개발자 옵션 → USB 디버깅 켜기 → 케이블 연결 후 "USB 디버깅 허용".
 
 > 네이티브 모듈은 테스트에서 목으로 바꾼다(`jest.setup.ts` 또는 테스트 파일의 `jest.mock(...)`). 목 없이 import하면 "native module is null".
