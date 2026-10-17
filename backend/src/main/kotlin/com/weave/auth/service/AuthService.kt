@@ -34,12 +34,13 @@ class AuthService(
         return tokenService.issue(user)
     }
 
+    /** client: 사용 기록에 남길 접속 수단 — 앱은 기록하지 않던 그대로(null), PC 웹은 "web" */
     @Transactional
-    fun login(request: LoginRequest): TokenResponse {
+    fun login(request: LoginRequest, client: String? = null): TokenResponse {
         val user = userRepository.findByEmail(normalize(request.email))
         // 이메일이 없는지 비밀번호가 틀렸는지 구분해 알려주지 않는다
         if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) throw invalidCredentials()
-        activityRecorder.record(user.id!!, ActivityType.LOGIN)
+        activityRecorder.record(user.id!!, ActivityType.LOGIN, detail = client?.let { mapOf("client" to it) } ?: emptyMap())
         return tokenService.issue(user)
     }
 
@@ -67,6 +68,14 @@ class AuthService(
         activityRecorder.record(userId, ActivityType.LOGOUT)
         val token = refreshTokenRepository.findByTokenHash(TokenService.hash(rawToken)) ?: return
         if (token.userId == userId) token.revoke(clock.instant())
+    }
+
+    /** 웹 로그아웃 — 쿠키의 리프레시 토큰만으로 폐기한다(액세스 토큰이 만료됐어도 로그아웃되게). 모르는 토큰은 조용히 무시한다 */
+    @Transactional
+    fun logoutByToken(rawToken: String, client: String? = null) {
+        val token = refreshTokenRepository.findByTokenHash(TokenService.hash(rawToken)) ?: return
+        activityRecorder.record(token.userId, ActivityType.LOGOUT, detail = client?.let { mapOf("client" to it) } ?: emptyMap())
+        token.revoke(clock.instant())
     }
 
     private fun invalidCredentials() = ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 맞지 않아요.")
