@@ -85,7 +85,7 @@ mobile/
     │   │   └── projects/    # 탭 안 스택: index(04 목록) · [id](04-a/b 상세 — 탭이 보인다)
     │   ├── project/new/     # index(02-b-i 기본 정보) → chat(02-b-ii 챗봇) → review(02-b-iii 작업 검토)
     │   ├── overload.tsx     # 04-c 이번 주 과부하(날짜별)
-    │   ├── events/          # 개인 일정(설정에서 진입): index 목록·삭제 · new 추가(반복·한 번, 시각 30분 −/+)
+    │   ├── events/          # 개인 일정(설정에서 진입): index 목록·삭제 · new 추가(반복·한 번, 시각 30분 −/+, 끝 < 시작이면 '다음 날')
     │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
     ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트) · Dialog · ProjectCompleteDialog · icons

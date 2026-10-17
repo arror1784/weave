@@ -25,7 +25,7 @@ data class ScheduledTask(val scheduledDate: LocalDate?, val spanDays: Int, val e
 
 /** 배치 결과 — days: 날짜별 배정 시간, dueDate: 상시 프로젝트면 null, late: 가용 시간 안에 마감을 못 지켜 압축한 작업(빠듯함) */
 data class Placement(val key: String, val days: List<DayHours>, val dueDate: LocalDate?, val late: Boolean) {
-    /** 배치하지 못한 상시 작업(주 0번 설정 등)은 날짜가 없다 */
+    /** 배치하지 못한 상시 작업은 날짜가 없다 */
     val scheduledDate: LocalDate? get() = days.firstOrNull()?.date
     val spanDays: Int get() = if (days.isEmpty()) 1 else (ChronoUnit.DAYS.between(days.first().date, days.last().date) + 1).toInt()
 }
@@ -46,8 +46,8 @@ data class Placement(val key: String, val days: List<DayHours>, val dueDate: Loc
  *      주는 월~일. 그 주에서 가장 한가한 날(같으면 이른 날)부터, 하루에 한 칸까지 — 이번 주에 남은 날이 적으면 남은 날 수만큼만.
  *      칸을 넣으면 하루 가용을 넘는 날은 건너뛴다(마감 작업은 밀지 않는다). 칸 시간이 하루 가용보다 크면 하루 가용만큼(Claude 해석).
  *      상시 프로젝트가 여럿이면 칸을 번갈아(먼저 등록한 프로젝트부터) 쓰고, 칸보다 긴 작업은 여러 칸에 나눠 넣는다.
- *      칸에 남는 시간은 같은 프로젝트의 다음 작업이, 그 프로젝트 작업이 다 끝났으면 다음 상시 프로젝트가 쓴다(Claude 해석).
- *      주 0번이면 배치하지 않는다(날짜 없음).
+ *      칸에 남는 시간은 같은 프로젝트의 다음 작업이, 그 프로젝트 작업이 다 끝났으면 다음 상시 프로젝트가 쓴다(사용자 확인 2026-10-18).
+ *      주 0번이면 배치하지 않는다(날짜 없음) — 설정은 주 1번 이상만 받지만(2026-10-18) 알고리즘은 0번도 안전하게 넘긴다.
  *   밀린 작업은 따로(OverdueRoller): 오늘로 옮기고 원래 끝나는 날을 기억해 "지연"으로 보여준다. 다른 작업 자리를 차지하지 않는 추가 작업이다.
  */
 object Scheduler {

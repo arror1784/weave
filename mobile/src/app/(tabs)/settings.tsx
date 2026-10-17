@@ -97,16 +97,16 @@ export default function SettingsScreen() {
         </View>
       </SettingsGroup>
 
-      {/* 상시(마감 없는) 프로젝트는 떼어 둔 칸에만 배치한다 — 사용자 결정 2026-10-17. 범위: 주 0~7번, 0.5~가장 긴 요일의 가용 시간 */}
+      {/* 상시(마감 없는) 프로젝트는 떼어 둔 칸에만 배치한다 — 사용자 결정 2026-10-17. 범위: 주 1~7번(0번은 막음, 2026-10-18), 0.5~가장 긴 요일의 가용 시간 */}
       <SettingsGroup title="상시 프로젝트 시간">
         <SliderSetting
           label="상시 프로젝트 주 횟수"
           title="일주일에"
-          min={0}
+          min={1}
           max={7}
           step={1}
           value={perWeek}
-          format={(v) => (v === 0 ? '안 함' : `주 ${v}번`)}
+          format={(v) => `주 ${v}번`}
           onSave={(v, done) => save({ standingSessionsPerWeek: v }, done)}
         />
         <SliderSetting
@@ -118,11 +118,7 @@ export default function SettingsScreen() {
           value={Math.min(sessionHours, Math.max(longest, 0.5))}
           format={(v) => `${v}시간`}
           onSave={(v, done) => save({ standingSessionHours: v }, done)}
-          caption={
-            perWeek === 0
-              ? '마감 없는 프로젝트의 작업은 배치하지 않아요'
-              : '마감 없는 프로젝트의 작업은 한 주에서 가장 한가한 날에 이 시간만큼만 넣어요. 바꾸면 일정을 바로 다시 배치해요'
-          }
+          caption="마감 없는 프로젝트의 작업은 한 주에서 가장 한가한 날에 이 시간만큼만 넣어요. 바꾸면 일정을 바로 다시 배치해요"
         />
       </SettingsGroup>
 

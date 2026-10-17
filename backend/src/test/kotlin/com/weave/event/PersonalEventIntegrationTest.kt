@@ -66,10 +66,10 @@ class PersonalEventIntegrationTest(private val mockMvc: MockMvc, objectMapper: O
         mockMvc.get("/api/v1/me/events").andExpect { status { isUnauthorized() } }
     }
 
-    test("입력 검증: 이름 없음·끝이 시작보다 이름·반복인데 요일 없음·한 번인데 날짜 없음·잘못된 요일·시각 형식 오류는 400") {
+    test("입력 검증: 이름 없음·끝과 시작이 같음·반복인데 요일 없음·한 번인데 날짜 없음·잘못된 요일·시각 형식 오류는 400") {
         val tokens = newUser()
         add(tokens, once("", "10:00", "11:00")).andExpect { status { isBadRequest() } }
-        add(tokens, once("모임", "12:00", "11:00")).andExpect { status { isBadRequest() } }
+        add(tokens, once("모임", "11:00", "11:00")).andExpect { status { isBadRequest() } }
         add(tokens, mapOf("title" to "수업", "repeat" to "weekly", "weekdays" to emptyList<Int>(), "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
         add(tokens, mapOf("title" to "수업", "repeat" to "weekly", "weekdays" to listOf(8), "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
         add(tokens, mapOf("title" to "모임", "repeat" to "once", "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
@@ -88,6 +88,18 @@ class PersonalEventIntegrationTest(private val mockMvc: MockMvc, objectMapper: O
 
         add(tokens, once("하루 종일", "09:00", "17:00", today.plusDays(1))).andExpect { status { isCreated() } }
         schedule(tokens)["availableHoursByDate"][today.plusDays(1).toString()].asDouble() shouldBe 0.0
+    }
+
+    test("자정을 넘기는 일정(끝 < 시작)도 받는다 · 새벽에 시작하는 일정은 앞날(하루는 6시에 바뀐다)에서 빼고 앞날에 보여준다 (사용자 결정 2026-10-18)") {
+        val tokens = newUser() // 테스트 프로필 기본 가용 3시간
+        add(tokens, once("밤 모임", "23:00", "01:00", today.plusDays(1))).andExpect { status { isCreated() } }
+        add(tokens, once("새벽 일", "01:00", "02:00", today.plusDays(3))).andExpect { status { isCreated() } }
+        val s = schedule(tokens)
+        s["availableHoursByDate"][today.plusDays(1).toString()].asDouble() shouldBe 1.0
+        s["availableHoursByDate"][today.plusDays(2).toString()].asDouble() shouldBe 2.0 // 3일 뒤 01:00 → 이틀 뒤 몫
+        s["availableHoursByDate"][today.plusDays(3).toString()].asDouble() shouldBe 3.0
+        s["events"].asIterable().map { "${it["date"].asString()} ${it["startTime"].asString()}~${it["endTime"].asString()}" } shouldBe
+            listOf("${today.plusDays(1)} 23:00~01:00", "${today.plusDays(2)} 01:00~02:00")
     }
 
     test("반복 일정은 요일과 기간 안에서만 — 기간이 끝나면 빼지 않는다") {

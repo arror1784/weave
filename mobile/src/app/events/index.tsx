@@ -18,9 +18,10 @@ import { useAppTheme } from '@/theme';
 
 const WEEKDAY = ['월', '화', '수', '목', '금', '토', '일'];
 
-/** 반복: '매주 월·수 · 10:00~12:00' (기간이 있으면 덧붙임) · 한 번: '10월 24일 토요일 · 18:00~21:00' */
+/** 반복: '매주 월·수 · 10:00~12:00' (기간이 있으면 덧붙임) · 한 번: '10월 24일 토요일 · 18:00~21:00' · 자정을 넘기면 '22:00~다음 날 01:00' */
 export function describeEvent(e: PersonalEvent): string {
-  const time = `${e.startTime}~${e.endTime}`;
+  // 끝이 시작보다 이르면 자정을 넘겨 다음 날까지(사용자 결정 2026-10-18)
+  const time = `${e.startTime}~${e.endTime <= e.startTime ? '다음 날 ' : ''}${e.endTime}`;
   if (e.repeat === 'once') return `${e.date ? formatDateLabel(e.date) : ''} · ${time}`;
   const period = e.startDate || e.endDate ? ` · ${e.startDate ?? '처음'}부터 ${e.endDate ?? '계속'}${e.endDate ? '까지' : ''}` : '';
   return `매주 ${e.weekdays.map((d) => WEEKDAY[d - 1]).join('·')} · ${time}${period}`;

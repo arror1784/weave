@@ -89,7 +89,7 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /a
 
 **정기 작업**(`@EnableScheduling`, 한국 시간): 6시 5분 밀린 작업을 오늘로(하루가 6시에 바뀐다)(`OverdueRoller` — 일정 조회·등록 직전에도 그 사용자 것을 한 번 더) · 4시 연결 안 된 첨부 정리(`OrphanAttachmentCleaner`) · 매달 1일 4시 30분과 서버 시작 때 올해·내년 공휴일 맞추기(`HolidaySync` ← `client/DataGoKrHolidayClient`, XML은 XXE를 막고 읽는다).
 
-**일정 규칙**(`schedule/domain/Scheduler.kt` 머리 주석이 기준 — 바꾸면 주석과 `SchedulerTest`를 함께): 상시(마감 없는) 프로젝트는 사용자 설정의 칸(기본 주 2번 × 1시간)에만 배치한다(2026-10-17). 가용 시간은 날짜마다 다르다 — `AvailabilityService.capacityOn`(요일별 + 공휴일 우선 − 개인 일정, 겹치면 한 번·0 밑으로 안 내려감)을 `Scheduler.plan`에 넘긴다. 일정 응답의 `availableHoursByDate`·`events`가 같은 계산이라 앱은 다시 계산하지 않는다. 새 가입자 기본 가용 시간은 `weave.defaults.available-hours`(운영 8, 테스트 프로필 3). 작업마다 날짜별 배정 시간(`Task.dayHours`, 응답 `days`)을 저장한다. 오늘은 `LocalDate.now`가 아닌 `TodayProvider.today()`로만 구한다(아침 6시 전이면 전날).
+**일정 규칙**(`schedule/domain/Scheduler.kt` 머리 주석이 기준 — 바꾸면 주석과 `SchedulerTest`를 함께): 상시(마감 없는) 프로젝트는 사용자 설정의 칸(기본 주 2번 × 1시간)에만 배치한다(2026-10-17). 가용 시간은 날짜마다 다르다 — `AvailabilityService.capacityOn`(요일별 + 공휴일 우선 − 개인 일정, 겹치면 한 번·0 밑으로 안 내려감)을 `Scheduler.plan`에 넘긴다. 개인 일정은 **시작 시각이 속한 하루**(6시 기준 — 새벽에 시작하면 앞날)에 넣고, 끝 < 시작이면 자정을 넘겨 다음 날까지로 본다(`PersonalEvent.occursOn`·`startOffsetMinutes`·`durationMinutes`, 2026-10-18). 상시 칸은 주 1~7번(2026-10-18). 일정 응답의 `availableHoursByDate`·`events`가 같은 계산이라 앱은 다시 계산하지 않는다. 새 가입자 기본 가용 시간은 `weave.defaults.available-hours`(운영 8, 테스트 프로필 3). 작업마다 날짜별 배정 시간(`Task.dayHours`, 응답 `days`)을 저장한다. 오늘은 `LocalDate.now`가 아닌 `TodayProvider.today()`로만 구한다(아침 6시 전이면 전날).
 
 **겪은 함정**
 - Jackson 3의 `JsonNode.map(...)`은 코틀린 컬렉션 `map`이 아니다(노드 자체를 변환) — 테스트에서 배열을 돌 땐 `asIterable().map`.

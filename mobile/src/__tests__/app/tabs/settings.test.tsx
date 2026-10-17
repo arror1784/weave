@@ -62,7 +62,7 @@ describe('설정', () => {
     expect(screen.getByText('1시간')).toBeOnTheScreen();
 
     const perWeek = screen.getByLabelText('상시 프로젝트 주 횟수');
-    expect(perWeek.props.minimumValue).toBe(0);
+    expect(perWeek.props.minimumValue).toBe(1); // 주 0번은 막는다(사용자 결정 2026-10-18)
     expect(perWeek.props.maximumValue).toBe(7);
     await act(async () => perWeek.props.onValueChange(3));
     expect(screen.getByText('주 3번')).toBeOnTheScreen();
@@ -75,13 +75,6 @@ describe('설정', () => {
     expect(hours.props.maximumValue).toBe(4);
     await act(async () => hours.props.onSlidingComplete(1.5));
     expect(auth.updateSettings).toHaveBeenLastCalledWith({ standingSessionHours: 1.5 });
-  });
-
-  it('주 0번이면 상시 작업을 배치하지 않는다고 알려준다', async () => {
-    auth.getMe.mockResolvedValue(me({ standingSessionsPerWeek: 0 }));
-    await renderWithProviders(<SettingsScreen />);
-    expect(await screen.findByText('안 함')).toBeOnTheScreen();
-    expect(screen.getByText(/마감 없는 프로젝트의 작업은 배치하지 않아요/)).toBeOnTheScreen();
   });
 
   it('작업 다시 배치: 확인을 받은 뒤 서버에 다시 배치를 요청하고 알린다', async () => {

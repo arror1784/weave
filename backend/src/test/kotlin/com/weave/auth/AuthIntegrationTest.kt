@@ -105,7 +105,7 @@ class AuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapp
         }.andExpect { status { isBadRequest() } }
     }
 
-    test("상시 칸 설정: 기본 주 2번 × 1시간, 주 0~7번 · 0.5~하루 가용 시간(0.5 단위)으로 바꾼다 (사용자 결정 2026-10-17)") {
+    test("상시 칸 설정: 기본 주 2번 × 1시간, 주 1~7번(2026-10-18) · 0.5~하루 가용 시간(0.5 단위)으로 바꾼다 (사용자 결정 2026-10-17)") {
         val tokens = api.signup(email())
         val settings = { body: Map<String, Any?> ->
             mockMvc.patch("/api/v1/me/settings") {
@@ -116,9 +116,9 @@ class AuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapp
         }
         mockMvc.get("/api/v1/me") { header("Authorization", api.bearer(tokens)) }
             .andExpect { status { isOk() }; jsonPath("$.standingSessionsPerWeek") { value(2) }; jsonPath("$.standingSessionHours") { value(1.0) } }
-        settings(mapOf("standingSessionsPerWeek" to 0, "standingSessionHours" to 1.5)).andExpect {
+        settings(mapOf("standingSessionsPerWeek" to 1, "standingSessionHours" to 1.5)).andExpect {
             status { isOk() }
-            jsonPath("$.standingSessionsPerWeek") { value(0) }
+            jsonPath("$.standingSessionsPerWeek") { value(1) }
             jsonPath("$.standingSessionHours") { value(1.5) }
             jsonPath("$.dailyAvailableHours") { value(3.0) } // 보내지 않은 값은 그대로
         }

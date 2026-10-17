@@ -27,7 +27,7 @@ type Picking = 'date' | 'startDate' | 'endDate' | null;
 
 /**
  * 개인 일정 추가(사용자 결정 2026-10-17): 이름 + 시작~끝 시각 + 매주 반복(요일, 기간 — 비우면 계속) 또는 한 번(날짜).
- * 시각은 30분 단위 −/+ (시각 고르기 네이티브 모듈 없이). 검증은 서버도 다시 한다.
+ * 시각은 30분 단위 −/+ (시각 고르기 네이티브 모듈 없이). 끝이 시작보다 이르면 다음 날까지(자정 넘김, 2026-10-18). 검증은 서버도 다시 한다.
  */
 export default function NewEventScreen() {
   const router = useRouter();
@@ -57,8 +57,8 @@ export default function NewEventScreen() {
         ? '반복할 요일을 하나 이상 골라 주세요.'
         : repeat === 'once' && !date
           ? '날짜를 골라 주세요.'
-          : end <= start
-            ? '끝나는 시각이 시작 시각보다 뒤여야 해요.'
+          : end === start
+            ? '끝나는 시각이 시작 시각과 같아요.'
             : null;
     setError(problem);
     if (problem) return;
@@ -164,7 +164,7 @@ export default function NewEventScreen() {
         <DateField label="날짜" value={date} emptyText="날짜를 골라 주세요" onPress={() => setPicking('date')} />
       )}
       <TimeStepper label="시작 시각" minutes={start} onChange={setStart} />
-      <TimeStepper label="끝나는 시각" minutes={end} onChange={setEnd} />
+      <TimeStepper label="끝나는 시각" minutes={end} onChange={setEnd} nextDay={end < start} />
       {error ? (
         <View accessible accessibilityRole="alert" accessibilityLiveRegion="polite">
           <AppText variant="small" color={colors.dangerText}>
@@ -176,7 +176,7 @@ export default function NewEventScreen() {
   );
 }
 
-function TimeStepper({ label, minutes, onChange }: { label: string; minutes: number; onChange: (m: number) => void }) {
+function TimeStepper({ label, minutes, onChange, nextDay = false }: { label: string; minutes: number; onChange: (m: number) => void; nextDay?: boolean }) {
   const { colors, radius } = useAppTheme();
   const button = (name: string, delta: number, text: string, disabled: boolean) => (
     <Pressable
@@ -196,7 +196,12 @@ function TimeStepper({ label, minutes, onChange }: { label: string; minutes: num
         {label}
       </AppText>
       {button('30분 이르게', -STEP, '−', minutes - STEP < 0)}
-      <View accessible accessibilityLabel={`${label}, ${toText(minutes)}`}>
+      <View accessible accessibilityLabel={`${label}, ${nextDay ? '다음 날 ' : ''}${toText(minutes)}`} style={styles.timeBox}>
+        {nextDay ? (
+          <AppText variant="caption" tone="soft">
+            다음 날
+          </AppText>
+        ) : null}
         <AppText variant="monoBold" color={colors.thread} style={styles.time}>
           {toText(minutes)}
         </AppText>
@@ -213,5 +218,6 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
   flex: { flex: 1 },
   step: { width: 44, height: 44, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  timeBox: { alignItems: 'center' },
   time: { fontSize: 18, lineHeight: 24, minWidth: 64, textAlign: 'center' },
 });

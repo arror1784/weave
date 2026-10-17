@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import * as attachmentsApi from '@/api/attachments';
@@ -93,6 +93,25 @@ describe('W3 기본 정보', () => {
     expect(draftRef.current?.attachments).toEqual([{ id: 11, kind: 'file', name: '공지.pdf', size: 1200 }]);
   });
 
+  it('올리는 동안 진행률(%)을 막대와 숫자로 보여준다 (사용자 결정 2026-10-18)', async () => {
+    let report: ((p: number) => void) | undefined;
+    let finish: ((a: { id: number; kind: 'file'; name: string; size: number }) => void) | undefined;
+    attachments.uploadAttachment.mockImplementation((_file, onProgress) => {
+      report = onProgress;
+      return new Promise((resolve) => (finish = resolve));
+    });
+    renderWithProviders(<AppRoutes />, { route: '/new' });
+    await fillName();
+    await userEvent.upload(screen.getByLabelText('파일 고르기'), [new File(['a'], '큰 자료.pdf', { type: 'application/pdf' })]);
+    expect(await screen.findByText('올리는 중 0%')).toBeInTheDocument();
+    act(() => report?.(40));
+    expect(screen.getByText('올리는 중 40%')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '큰 자료.pdf 올리는 중' })).toHaveAttribute('aria-valuenow', '40');
+    await act(async () => finish?.({ id: 31, kind: 'file', name: '큰 자료.pdf', size: 9 }));
+    expect(await screen.findByRole('button', { name: '큰 자료.pdf 삭제' })).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
   it('파일을 끌어다 놓아도 올린다', async () => {
     attachments.uploadAttachment.mockResolvedValue({ id: 12, kind: 'image', name: '캡처.png', size: 10 });
     renderWithProviders(<AppRoutes />, { route: '/new' });
@@ -101,7 +120,7 @@ describe('W3 기본 정보', () => {
     fireEvent.drop(zone, { dataTransfer: { files: [new File(['c'], '캡처.png', { type: 'image/png' })] } });
     // 올리는 동안 "올리는 중", 다 올리면 삭제할 수 있는 첨부가 된다
     expect(await screen.findByRole('button', { name: '캡처.png 삭제' })).toBeInTheDocument();
-    expect(attachments.uploadAttachment).toHaveBeenCalledWith(expect.objectContaining({ name: '캡처.png' }));
+    expect(attachments.uploadAttachment).toHaveBeenCalledWith(expect.objectContaining({ name: '캡처.png' }), expect.any(Function));
   });
 
   it('링크를 추가하고(https만), 첨부를 지운다', async () => {

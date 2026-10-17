@@ -17,7 +17,7 @@ function fromDateKey(key: DateKey): Date {
 }
 
 /** 하루가 바뀌는 시각 — 자정이 아닌 아침 6시(사용자 결정 2026-10-01, 서버 TodayProvider와 같은 기준) */
-const DAY_START_HOUR = 6;
+export const DAY_START_HOUR = 6;
 
 /** 기기 시계 기준 오늘 — 서버 일정의 today를 못 받았을 때만 쓴다 */
 export function todayKey(now: Date = new Date()): DateKey {

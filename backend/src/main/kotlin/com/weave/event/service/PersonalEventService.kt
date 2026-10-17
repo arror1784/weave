@@ -32,7 +32,8 @@ class PersonalEventService(
     fun create(userId: Long, request: CreatePersonalEventRequest): PersonalEventResponse {
         val start = LocalTime.parse(request.startTime)
         val end = LocalTime.parse(request.endTime)
-        if (!end.isAfter(start)) badRequest("끝나는 시각이 시작 시각보다 뒤여야 해요.")
+        // 끝이 시작보다 이르면 자정을 넘겨 다음 날까지(사용자 결정 2026-10-18) — 같으면 길이가 없다
+        if (end == start) badRequest("끝나는 시각이 시작 시각과 같아요.")
         val weekly = request.repeat == PersonalEvent.WEEKLY
         if (weekly && (request.weekdays.isEmpty() || request.weekdays.any { it !in 1..7 })) badRequest("반복할 요일을 하나 이상 골라 주세요.")
         if (!weekly && request.date == null) badRequest("날짜를 골라 주세요.")
