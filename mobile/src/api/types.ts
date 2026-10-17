@@ -5,7 +5,14 @@ import { z } from 'zod';
 const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const projectColorSchema = z.enum(['teal', 'magenta', 'violet', 'blue', 'green', 'amber', 'brown']);
 
-export const userSchema = z.object({ id: z.number(), email: z.string(), dailyAvailableHours: z.number() });
+/** standingSessions…: 상시(마감 없는) 프로젝트에 떼어 두는 칸 — 주 몇 번 × 한 번에 몇 시간(사용자 결정 2026-10-17) */
+export const userSchema = z.object({
+  id: z.number(),
+  email: z.string(),
+  dailyAvailableHours: z.number(),
+  standingSessionsPerWeek: z.number(),
+  standingSessionHours: z.number(),
+});
 export const tokenSchema = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), user: userSchema });
 
 /** 서버가 날짜별로 배정한 작업 시간 */

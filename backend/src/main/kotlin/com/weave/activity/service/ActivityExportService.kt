@@ -84,6 +84,7 @@ class ActivityExportService(
         "OVERDUE_MOVED" -> "${d.path("count").asInt()}개: ${d.path("titles").joinToString(", ") { it.asString() }}"
         "SCHEDULE_REPLANNED" -> "작업 ${d.path("taskCount").asInt()}개 다시 배치"
         "SETTINGS_CHANGED" -> "하루 가용 ${d.path("from").asDouble()}h → ${d.path("to").asDouble()}h"
+        "STANDING_SLOTS_CHANGED" -> "상시 칸 주 ${d.path("fromPerWeek").asInt()}번 × ${d.path("fromHours").asDouble()}h → 주 ${d.path("toPerWeek").asInt()}번 × ${d.path("toHours").asDouble()}h"
         "ATTACHMENT_UPLOADED" -> "${text(d, "name")} (${text(d, "contentType") ?: ""}, ${d.path("size").asLong()}B)"
         "ATTACHMENT_LINK_ADDED" -> text(d, "url") ?: text(d, "name") ?: ""
         "ATTACHMENT_DELETED" -> text(d, "name") ?: ""

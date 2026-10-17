@@ -17,7 +17,7 @@ export const completionRef: { current: { projectId: number; name: string; taskId
 
 export const testAuth = {
   status: 'signedIn' as 'signedIn' | 'signedOut' | 'loading',
-  user: { id: 1, email: 'me@example.com', dailyAvailableHours: 3 } as User | null,
+  user: { id: 1, email: 'me@example.com', dailyAvailableHours: 3, standingSessionsPerWeek: 2, standingSessionHours: 1 } as User | null,
   signIn: jest.fn(async () => {}),
   signUp: jest.fn(async () => {}),
   signOut: jest.fn(async () => {}),

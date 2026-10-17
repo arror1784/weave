@@ -17,7 +17,7 @@ const projects = jest.mocked(projectsApi);
 beforeEach(() => {
   resetRouterMock();
   jest.clearAllMocks();
-  auth.getMe.mockResolvedValue({ id: 1, email: 'me@example.com', dailyAvailableHours: 3 });
+  auth.getMe.mockResolvedValue({ id: 1, email: 'me@example.com', dailyAvailableHours: 3, standingSessionsPerWeek: 2, standingSessionHours: 1 });
   projects.getSchedule.mockResolvedValue(sampleSchedule(TEST_TODAY));
 });
 
@@ -28,15 +28,44 @@ describe('설정', () => {
   });
 
   it('하루 가용 시간(서버 값 3시간)을 옮기고 손을 떼면 서버에 저장한다', async () => {
-    auth.updateSettings.mockResolvedValueOnce({ id: 1, email: 'me@example.com', dailyAvailableHours: 4.5 });
+    auth.updateSettings.mockResolvedValueOnce({ id: 1, email: 'me@example.com', dailyAvailableHours: 4.5, standingSessionsPerWeek: 2, standingSessionHours: 1 });
     await renderWithProviders(<SettingsScreen />);
     expect(await screen.findByText('3시간')).toBeOnTheScreen();
-    const slider = screen.getByTestId('slider');
+    const slider = screen.getByLabelText('하루 가용 시간');
     await act(async () => slider.props.onValueChange(4.5));
     expect(screen.getByText('4.5시간')).toBeOnTheScreen();
     expect(auth.updateSettings).not.toHaveBeenCalled();
     await act(async () => slider.props.onSlidingComplete(4.5));
-    expect(auth.updateSettings).toHaveBeenCalledWith(4.5);
+    expect(auth.updateSettings).toHaveBeenCalledWith({ dailyAvailableHours: 4.5 });
+  });
+
+  it('상시 프로젝트 칸(서버 값 주 2번 × 1시간)을 보여주고, 바꾸면 그 값만 서버에 저장한다 (사용자 결정 2026-10-17)', async () => {
+    auth.updateSettings.mockResolvedValue({ id: 1, email: 'me@example.com', dailyAvailableHours: 3, standingSessionsPerWeek: 3, standingSessionHours: 1 });
+    await renderWithProviders(<SettingsScreen />);
+    expect(await screen.findByText('주 2번')).toBeOnTheScreen();
+    expect(screen.getByText('1시간')).toBeOnTheScreen();
+
+    const perWeek = screen.getByLabelText('상시 프로젝트 주 횟수');
+    expect(perWeek.props.minimumValue).toBe(0);
+    expect(perWeek.props.maximumValue).toBe(7);
+    await act(async () => perWeek.props.onValueChange(3));
+    expect(screen.getByText('주 3번')).toBeOnTheScreen();
+    await act(async () => perWeek.props.onSlidingComplete(3));
+    expect(auth.updateSettings).toHaveBeenLastCalledWith({ standingSessionsPerWeek: 3 });
+
+    // 한 번에 0.5시간~하루 가용 시간(3시간)
+    const hours = screen.getByLabelText('상시 프로젝트 한 번 시간');
+    expect(hours.props.minimumValue).toBe(0.5);
+    expect(hours.props.maximumValue).toBe(3);
+    await act(async () => hours.props.onSlidingComplete(1.5));
+    expect(auth.updateSettings).toHaveBeenLastCalledWith({ standingSessionHours: 1.5 });
+  });
+
+  it('주 0번이면 상시 작업을 배치하지 않는다고 알려준다', async () => {
+    auth.getMe.mockResolvedValue({ id: 1, email: 'me@example.com', dailyAvailableHours: 3, standingSessionsPerWeek: 0, standingSessionHours: 1 });
+    await renderWithProviders(<SettingsScreen />);
+    expect(await screen.findByText('안 함')).toBeOnTheScreen();
+    expect(screen.getByText(/마감 없는 프로젝트의 작업은 배치하지 않아요/)).toBeOnTheScreen();
   });
 
   it('작업 다시 배치: 확인을 받은 뒤 서버에 다시 배치를 요청하고 알린다', async () => {
