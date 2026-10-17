@@ -15,6 +15,7 @@ enum class ActivityType(val label: String, val app: Boolean = false) {
     OVERDUE_MOVED("밀린 작업 오늘로 옮김"),
     SCHEDULE_REPLANNED("작업 다시 배치"),
     SETTINGS_CHANGED("하루 가용 시간 변경"),
+    STANDING_SLOTS_CHANGED("상시 칸 설정 변경"),
     ATTACHMENT_UPLOADED("첨부 올리기"),
     ATTACHMENT_LINK_ADDED("링크 첨부"),
     ATTACHMENT_DELETED("첨부 삭제"),

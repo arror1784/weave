@@ -78,6 +78,28 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         body["project"]["tasks"][0]["description"].asString() shouldBe "블록도와 시퀀스 다이어그램, 리뷰 1회"
     }
 
+    test("상시 프로젝트 작업은 내 설정의 칸(주 n번 × n시간)에만 배치한다 — 주 0번이면 날짜 없음 (사용자 결정 2026-10-17)") {
+        val tokens = newUser()
+        val settings = { body: Map<String, Any?> ->
+            mockMvc.patch("/api/v1/me/settings") {
+                header("Authorization", api.bearer(tokens))
+                contentType = MediaType.APPLICATION_JSON
+                content = api.json(body)
+            }.andExpect { status { isOk() } }
+        }
+        // 주 7번이면 요일과 상관없이 날마다 한 칸
+        settings(mapOf("standingSessionsPerWeek" to 7, "standingSessionHours" to 1.0))
+        val days = createOk(tokens, name = "상시", deadline = null, tasks = listOf(task("a", "꾸준히", 3.0)))["project"]["tasks"][0]["days"]
+        days.asIterable().map { it["date"].asString() to it["hours"].asDouble() } shouldBe
+            listOf(today to 1.0, today.plusDays(1) to 1.0, today.plusDays(2) to 1.0).map { it.first.toString() to it.second }
+
+        settings(mapOf("standingSessionsPerWeek" to 0))
+        val schedule = api.read(mockMvc.post("/api/v1/schedule/replan") { header("Authorization", api.bearer(tokens)) }
+            .andExpect { status { isOk() } }.andReturn().response.contentAsString)
+        schedule["tasks"][0]["scheduledDate"].isNull shouldBe true
+        schedule["tasks"][0]["days"].size() shouldBe 0
+    }
+
     test("이미 지난 마감일로도 등록할 수 있다 — 작업은 오늘부터 몰아 배치하고 빠듯함으로 센다(사용자 결정 2026-10-17)") {
         val body = createOk(newUser(), deadline = today.minusDays(3), tasks = listOf(task("a", "늦은 일", 2.0), task("b", "더 늦은 일", 2.0)))
         val tasks = body["project"]["tasks"]
@@ -124,7 +146,7 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
     test("두 번째 프로젝트는 첫 프로젝트가 쓴 시간을 피해 배정한다") {
         val tokens = newUser()
         createOk(tokens, tasks = listOf(task("a", "하루 꽉 참", 3.0)))
-        val second = createOk(tokens, name = "두 번째", deadline = null, tasks = listOf(task("b", "다음 날로", 1.0)))
+        val second = createOk(tokens, name = "두 번째", deadline = today.plusDays(30), tasks = listOf(task("b", "다음 날로", 1.0)))
         second["project"]["tasks"][0]["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
     }
 
@@ -178,7 +200,7 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
 
     test("작업 다시 배치(설정 버튼): 밀린 작업도 포함해 오늘부터 다시 배치하고 지연 표시는 남긴다, 완료한 작업은 그대로") {
         val tokens = newUser()
-        val tasks = createOk(tokens, deadline = null, tasks = listOf(task("a", "밀린 일", 3.0), task("b", "끝낸 일", 1.0), task("c", "다른 일", 3.0)))["project"]["tasks"]
+        val tasks = createOk(tokens, deadline = today.plusDays(30), tasks = listOf(task("a", "밀린 일", 3.0), task("b", "끝낸 일", 1.0), task("c", "다른 일", 3.0)))["project"]["tasks"]
         val lateId = tasks[0]["id"].asLong()
         val doneId = tasks[1]["id"].asLong()
         jdbc.update("UPDATE tasks SET scheduled_date = ?, day_hours = '' WHERE id = ?", today.minusDays(2), lateId)

@@ -105,6 +105,45 @@ class AuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapp
         }.andExpect { status { isBadRequest() } }
     }
 
+    test("상시 칸 설정: 기본 주 2번 × 1시간, 주 0~7번 · 0.5~하루 가용 시간(0.5 단위)으로 바꾼다 (사용자 결정 2026-10-17)") {
+        val tokens = api.signup(email())
+        val settings = { body: Map<String, Any?> ->
+            mockMvc.patch("/api/v1/me/settings") {
+                header("Authorization", api.bearer(tokens))
+                contentType = MediaType.APPLICATION_JSON
+                content = api.json(body)
+            }
+        }
+        mockMvc.get("/api/v1/me") { header("Authorization", api.bearer(tokens)) }
+            .andExpect { status { isOk() }; jsonPath("$.standingSessionsPerWeek") { value(2) }; jsonPath("$.standingSessionHours") { value(1.0) } }
+        settings(mapOf("standingSessionsPerWeek" to 0, "standingSessionHours" to 1.5)).andExpect {
+            status { isOk() }
+            jsonPath("$.standingSessionsPerWeek") { value(0) }
+            jsonPath("$.standingSessionHours") { value(1.5) }
+            jsonPath("$.dailyAvailableHours") { value(3.0) } // 보내지 않은 값은 그대로
+        }
+        settings(mapOf("standingSessionsPerWeek" to 8)).andExpect { status { isBadRequest() } }
+        settings(mapOf("standingSessionHours" to 3.5)).andExpect { status { isBadRequest() } } // 하루 가용 3시간보다 큼
+        settings(mapOf("standingSessionHours" to 0.75)).andExpect { status { isBadRequest() } }
+        settings(emptyMap()).andExpect { status { isBadRequest() } }
+    }
+
+    test("하루 가용 시간을 칸 시간보다 줄이면 칸 시간도 하루 가용으로 줄인다") {
+        val tokens = api.signup(email())
+        val settings = { body: Map<String, Any?> ->
+            mockMvc.patch("/api/v1/me/settings") {
+                header("Authorization", api.bearer(tokens))
+                contentType = MediaType.APPLICATION_JSON
+                content = api.json(body)
+            }
+        }
+        settings(mapOf("standingSessionHours" to 3.0)).andExpect { status { isOk() } }
+        settings(mapOf("dailyAvailableHours" to 2.0)).andExpect {
+            status { isOk() }
+            jsonPath("$.standingSessionHours") { value(2.0) }
+        }
+    }
+
     test("리프레시: 새 토큰 쌍을 받고, 이미 쓴(교체된) 토큰을 다시 쓰면 그 사용자의 토큰을 모두 폐기한다") {
         val first = api.signup(email())
         val refresh = { token: String ->

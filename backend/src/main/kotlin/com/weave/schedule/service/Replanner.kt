@@ -8,6 +8,7 @@ import com.weave.schedule.domain.NewTask
 import com.weave.schedule.domain.Placement
 import com.weave.schedule.domain.PlanProject
 import com.weave.schedule.domain.Scheduler
+import com.weave.schedule.domain.StandingSlots
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -25,7 +26,7 @@ class Replanner(
 ) {
     /** 반환: 작업 id → 배치 결과 */
     @Transactional
-    fun replan(userId: Long, today: LocalDate, capacity: Double, includeDelayed: Boolean): Map<Long, Placement> {
+    fun replan(userId: Long, today: LocalDate, capacity: Double, standing: StandingSlots, includeDelayed: Boolean): Map<Long, Placement> {
         val projects = projectRepository.findByUserIdAndStatus(userId, Project.ACTIVE).sortedBy { it.id }
         if (projects.isEmpty()) return emptyMap()
         val tasks = taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(projects.map { it.id!! })
@@ -42,6 +43,7 @@ class Replanner(
             },
             today,
             capacity,
+            standing,
         ).associateBy { it.key.toLong() }
         movable.forEach { t -> plan[t.id!!]?.let(t::reschedule) }
         return plan

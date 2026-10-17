@@ -29,7 +29,7 @@ class ScheduleService(
     fun replan(userId: Long): ScheduleResponse {
         val user = userService.find(userId)
         overdueRoller.roll(userId)
-        val placements = replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, includeDelayed = true)
+        val placements = replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, user.standingSlots(), includeDelayed = true)
         activityRecorder.record(userId, ActivityType.SCHEDULE_REPLANNED, detail = mapOf("taskCount" to placements.size, "lateCount" to placements.values.count { it.late }, "dailyAvailableHours" to user.dailyAvailableHours))
         return snapshot(userId)
     }

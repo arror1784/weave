@@ -150,6 +150,17 @@ class ActivityLogIntegrationTest(private val mockMvc: MockMvc, objectMapper: Obj
         types(tokens) shouldContainAll listOf("SETTINGS_CHANGED", "SCHEDULE_REPLANNED")
     }
 
+    test("상시 칸 설정 변경(전→후)을 기록하고, 하루 가용만 바꾸면 남기지 않는다") {
+        val tokens = newUser()
+        json("PATCH", "/api/v1/me/settings", tokens, mapOf("dailyAvailableHours" to 4.0))
+        types(tokens) shouldNotContain "STANDING_SLOTS_CHANGED"
+        json("PATCH", "/api/v1/me/settings", tokens, mapOf("standingSessionsPerWeek" to 3, "standingSessionHours" to 1.5))
+        detailOf(tokens, "STANDING_SLOTS_CHANGED").let {
+            it["fromPerWeek"].asInt() shouldBe 2; it["toPerWeek"].asInt() shouldBe 3
+            it["fromHours"].asDouble() shouldBe 1.0; it["toHours"].asDouble() shouldBe 1.5
+        }
+    }
+
     test("첨부 올리기·링크·지우기를 기록한다 (파일 이름·형식·크기)") {
         val tokens = newUser()
         val pdf = "%PDF-1.7\n%%EOF".toByteArray()
