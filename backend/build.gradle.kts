@@ -69,8 +69,11 @@ tasks.withType<Test> {
 }
 
 // AI 시스템 프롬프트의 원본은 사용자가 쓴 docs/ 문서 하나 — 빌드할 때 서버 리소스로 복사한다(코드에 따로 두지 않는다)
+// 원본이 없으면 빌드를 멈춘다 — from()은 없는 파일을 조용히 건너뛰어 서버가 시작할 때에야 실패했다(문서 이름을 바꿨을 때, 2026-10-17)
+val breakdownPrompt = rootProject.file("../docs/Weave-AI 작업 분할 시스템 프롬프트.md")
 tasks.processResources {
-    from(rootProject.file("../docs/Weave — AI 작업 분할 시스템 프롬프트.md")) {
+    inputs.file(breakdownPrompt)
+    from(breakdownPrompt) {
         into("prompts")
         rename { "project-breakdown.md" }
     }
