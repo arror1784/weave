@@ -6,15 +6,15 @@ import type { Attachment } from '@/api/types';
 import { linkSchema } from '@/lib/validation';
 
 import { IFile, ILink, IUpload, IX, ITrash } from './icons';
-import { Btn, Card, inputClass, Label, Spinner } from './ui';
+import { Btn, Card, inputClass, Label } from './ui';
 
 /** 올리는 중·실패한 파일(아직 서버 첨부가 아님) */
-type Pending = { localId: number; name: string; file: File; error?: string };
+type Pending = { localId: number; name: string; file: File; progress: number; error?: string };
 
 /**
  * 참고자료 — 고르는(끌어다 놓는) 즉시 서버에 올리고, 등록할 때 id로 연결한다(앱과 같다).
  * 형식·크기·사진 위치정보는 서버가 검사하고, 거절하면 그 이유를 보여준다.
- * 진행률(%)은 fetch로 알 수 없어 "올리는 중"만 보여준다.
+ * 올리는 동안 진행률(%)을 막대와 숫자로 보여준다(사용자 결정 2026-10-18 — 업로드만 XMLHttpRequest).
  */
 export function AttachPanel({ attachments, onChange }: { attachments: Attachment[]; onChange: (update: (list: Attachment[]) => Attachment[]) => void }) {
   const [pending, setPending] = useState<Pending[]>([]);
@@ -26,9 +26,9 @@ export function AttachPanel({ attachments, onChange }: { attachments: Attachment
   const sequence = useRef(0);
 
   async function upload(file: File, localId = ++sequence.current) {
-    setPending((list) => [...list.filter((p) => p.localId !== localId), { localId, name: file.name, file }]);
+    setPending((list) => [...list.filter((p) => p.localId !== localId), { localId, name: file.name, file, progress: 0 }]);
     try {
-      const saved = await uploadAttachment(file);
+      const saved = await uploadAttachment(file, (progress) => setPending((list) => list.map((p) => (p.localId === localId ? { ...p, progress } : p))));
       setPending((list) => list.filter((p) => p.localId !== localId));
       onChange((list) => [...list, saved]);
     } catch (e) {
@@ -172,10 +172,19 @@ export function AttachPanel({ attachments, onChange }: { attachments: Attachment
                       {p.error}
                     </p>
                   ) : (
-                    <p className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
-                      <Spinner size={12} label={`${p.name} 올리는 중`} />
-                      올리는 중
-                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div
+                        role="progressbar"
+                        aria-label={`${p.name} 올리는 중`}
+                        aria-valuenow={p.progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="h-1 flex-1 rounded-full bg-line"
+                      >
+                        <div className="h-full rounded-full bg-thread" style={{ width: `${p.progress}%` }} />
+                      </div>
+                      <span className="num text-[12px] text-ink-soft">올리는 중 {p.progress}%</span>
+                    </div>
                   )}
                 </div>
                 {p.error && (

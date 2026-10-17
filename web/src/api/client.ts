@@ -37,14 +37,14 @@ export function setSessionExpiredHandler(handler: () => void) {
   onSessionExpired = handler;
 }
 
-type Options = { method?: string; body?: unknown; form?: FormData; auth?: boolean };
+type Options = { method?: string; body?: unknown; auth?: boolean };
 
-export async function request<T>(path: string, schema: z.ZodType<T> | null, { method = 'GET', body, form, auth = true }: Options = {}): Promise<T> {
+export async function request<T>(path: string, schema: z.ZodType<T> | null, { method = 'GET', body, auth = true }: Options = {}): Promise<T> {
   const send = () => {
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    return fetchOrNetworkError(path, { method, headers, body: form ?? (body !== undefined ? JSON.stringify(body) : undefined) });
+    return fetchOrNetworkError(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   };
 
   let response = await send();
@@ -55,6 +55,35 @@ export async function request<T>(path: string, schema: z.ZodType<T> | null, { me
   if (!response.ok) throw await toError(response);
   if (response.status === 204 || schema === null) return undefined as T;
   return schema.parse(await response.json());
+}
+
+/**
+ * 파일 올리기 — 진행률(%)을 알려 주려고 XMLHttpRequest로 보낸다(fetch는 업로드 진행을 알 수 없다, 사용자 결정 2026-10-18).
+ * 토큰·401 한 번 갱신·오류 모양은 request()와 같다.
+ */
+export async function upload<T>(path: string, schema: z.ZodType<T>, form: FormData, onProgress?: (percent: number) => void): Promise<T> {
+  let response = await sendXhr(path, form, onProgress);
+  if (response.status === 401) {
+    if (await refreshSession()) response = await sendXhr(path, form, onProgress);
+  }
+  if (!response.ok) throw await toError(response);
+  return schema.parse(await response.json());
+}
+
+function sendXhr(path: string, form: FormData, onProgress?: (percent: number) => void): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', path);
+    xhr.withCredentials = false; // 같은 주소라 쿠키는 기본으로 간다 — 다른 주소로는 보내지 않는다
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onProgress?.(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => resolve(new Response(xhr.responseText || null, { status: xhr.status }));
+    xhr.onerror = () => reject(new NetworkError());
+    xhr.send(form);
+  });
 }
 
 /** 웹 인증 경로(쿠키를 쓰는 곳) — 서버가 이 경로에만 CSRF를 켠다. XSRF-TOKEN 쿠키 값을 헤더로 함께 보낸다 */
