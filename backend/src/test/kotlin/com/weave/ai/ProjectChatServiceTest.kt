@@ -17,6 +17,8 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.mockk.every
 import com.weave.activity.domain.ActivityType
 import com.weave.activity.service.ActivityRecorder
@@ -63,6 +65,25 @@ class ProjectChatServiceTest : FunSpec({
         intro shouldContain "보고서, 발표자료"
         intro shouldContain "회로 구성은 끝냄"
         intro shouldContain "오늘 날짜: 2026-10-01"
+    }
+
+    test("마감이 없으면 상시 프로젝트라고 알린다 — '(입력 안 함)'으로 보냈더니 AI가 상시 프로젝트에도 마감을 물었다(2026-10-07 기록)") {
+        val turns = slot<List<AiTurn>>()
+        every { ai.converse(any(), capture(turns), any(), any()) } returns AiResult("어떤 주기로 하나요?", null)
+        service.chat(1L, ProjectChatRequest(info.copy(deadline = null), emptyList()))
+        val intro = turns.captured.single().text
+        intro shouldContain "마감 기한: 없음 — 상시 프로젝트(사용자가 마감 없이 계속하기로 정함)"
+        intro shouldNotContain "마감 기한: (입력 안 함)"
+    }
+
+    test("작업 마감일(dueDate)은 도구에서 선택 항목 — 서버가 다시 계산하므로 AI가 안 줘도 된다(사용자 결정 2026-10-01, 2026-10-18)") {
+        @Suppress("UNCHECKED_CAST")
+        val item = ((ProjectChatService.PROPOSE_TASKS.inputSchema["properties"] as Map<String, Any>)["tasks"] as Map<String, Any>)["items"] as Map<String, Any>
+        (item["required"] as List<*>) shouldNotContain "dueDate"
+        val noDue = mapOf("tasks" to listOf(mapOf("title" to "설계 문서 작성", "description" to "블록도", "estimatedHours" to 3, "dependsOnTitle" to null, "isPrerequisiteLearning" to false)))
+        every { ai.converse(any(), any(), any(), any()) } returns AiResult("정리했어요.", noDue)
+        val response = service.chat(2L, ProjectChatRequest(info, listOf(ChatMessage("assistant", "선행 지식?"), ChatMessage("user", "처음이에요"))))
+        response.tasks!!.single().aiDueDate shouldBe null
     }
 
     test("propose_tasks 호출이 오면 작업 목록으로: key(k1…)·제목으로 찾은 선행 key·0.5 단위 시간·세부 설명·AI 마감일(참고)·가정") {

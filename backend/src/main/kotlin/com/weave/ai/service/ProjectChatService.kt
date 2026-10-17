@@ -113,7 +113,8 @@ class ProjectChatService(
     private fun introduce(p: ChatProjectInfo) = buildString {
         appendLine(if (p.completedTasks.isEmpty()) "새 프로젝트를 등록할게요." else "이미 등록한 프로젝트의 남은 작업을 다시 나눌게요.")
         appendLine("프로젝트명: ${p.name}")
-        appendLine("마감 기한: ${p.deadline ?: "(입력 안 함)"}")
+        // 앱·웹에서 마감을 비우면 상시 프로젝트다 — "(입력 안 함)"으로 보냈더니 AI가 마감을 물었다(2026-10-18)
+        appendLine("마감 기한: ${p.deadline ?: "없음 — 상시 프로젝트(사용자가 마감 없이 계속하기로 정함)"}")
         appendLine("프로젝트 설명: ${p.description.ifBlank { "(입력 안 함)" }}")
         appendLine("결과물 형태: ${p.deliverable.ifBlank { "(입력 안 함)" }}")
         appendLine("기 진행사항: ${p.progress.ifBlank { "(입력 안 함)" }}")
@@ -179,7 +180,7 @@ class ProjectChatService(
         /** 프롬프트 대화 규칙 1 — 최초 제안까지 사용자 답 최대 5번 */
         const val MAX_TURNS_BEFORE_PROPOSAL = 5
 
-        /** 사용자 프롬프트 문서의 "출력 형식 (tool use)"와 같은 함수 정의 */
+        /** 사용자 프롬프트 문서의 "출력 형식 (tool use)"와 같은 함수 정의 — 단, dueDate는 선택(문서는 필수, 사용자가 고칠 예정) */
         val PROPOSE_TASKS = AiTool(
             name = "propose_tasks",
             description = "분할된 하위 작업 목록을 제안한다",
@@ -198,7 +199,8 @@ class ProjectChatService(
                                 "dependsOnTitle" to mapOf("type" to listOf("string", "null"), "description" to "선행 작업의 title. 없으면 null"),
                                 "isPrerequisiteLearning" to mapOf("type" to "boolean", "description" to "사전 지식 학습 작업이면 true"),
                             ),
-                            "required" to listOf("title", "description", "estimatedHours", "dueDate", "dependsOnTitle", "isPrerequisiteLearning"),
+                            // dueDate는 선택 — 작업 마감일은 서버가 다시 계산하고 AI 날짜는 검토 화면에 참고로만 쓴다(사용자 결정 2026-10-01, 2026-10-18)
+                            "required" to listOf("title", "description", "estimatedHours", "dependsOnTitle", "isPrerequisiteLearning"),
                         ),
                     ),
                     "assumptions" to mapOf(
