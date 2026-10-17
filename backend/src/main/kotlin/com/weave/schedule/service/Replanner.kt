@@ -1,5 +1,6 @@
 package com.weave.schedule.service
 
+import com.weave.holiday.service.AvailabilityService
 import com.weave.project.domain.Project
 import com.weave.project.domain.Task
 import com.weave.project.repository.ProjectRepository
@@ -9,6 +10,7 @@ import com.weave.schedule.domain.Placement
 import com.weave.schedule.domain.PlanProject
 import com.weave.schedule.domain.Scheduler
 import com.weave.schedule.domain.StandingSlots
+import com.weave.user.domain.User
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -23,10 +25,16 @@ import java.time.LocalDate
 class Replanner(
     private val projectRepository: ProjectRepository,
     private val taskRepository: TaskRepository,
+    private val availabilityService: AvailabilityService,
 ) {
+    /** 사용자의 요일별·공휴일 가용 시간과 상시 칸으로 배치한다 */
+    @Transactional
+    fun replan(user: User, today: LocalDate, includeDelayed: Boolean): Map<Long, Placement> =
+        replan(user.id!!, today, availabilityService.capacityOn(user, today), user.standingSlots(), includeDelayed)
+
     /** 반환: 작업 id → 배치 결과 */
     @Transactional
-    fun replan(userId: Long, today: LocalDate, capacity: Double, standing: StandingSlots, includeDelayed: Boolean): Map<Long, Placement> {
+    fun replan(userId: Long, today: LocalDate, capacityOn: (LocalDate) -> Double, standing: StandingSlots, includeDelayed: Boolean): Map<Long, Placement> {
         val projects = projectRepository.findByUserIdAndStatus(userId, Project.ACTIVE).sortedBy { it.id }
         if (projects.isEmpty()) return emptyMap()
         val tasks = taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(projects.map { it.id!! })
@@ -42,7 +50,7 @@ class Replanner(
                 )
             },
             today,
-            capacity,
+            capacityOn,
             standing,
         ).associateBy { it.key.toLong() }
         movable.forEach { t -> plan[t.id!!]?.let(t::reschedule) }

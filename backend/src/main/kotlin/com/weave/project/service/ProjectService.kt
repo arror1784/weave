@@ -51,7 +51,7 @@ class ProjectService(
         val project = projectRepository.save(Project(userId, request.name.trim(), request.description.trim(), request.deadline, request.color, request.deliverable.trim(), request.progress.trim()))
         val saved = saveTasks(project.id!!, request.tasks, firstPosition = 0)
 
-        val placements = replanner.replan(userId, today, user.dailyAvailableHours, user.standingSlots(), includeDelayed = false)
+        val placements = replanner.replan(user, today, includeDelayed = false)
         attachmentLinker.link(userId, request.attachmentIds, project.id!!)
 
         val tasks = saved.sortedBy { it.position }
@@ -90,7 +90,7 @@ class ProjectService(
         val saved = saveTasks(projectId, request.tasks, firstPosition = (kept.maxOfOrNull { it.position } ?: -1) + 1)
         attachmentLinker.sync(userId, request.attachmentIds, projectId)
 
-        val placements = replanner.replan(userId, today, user.dailyAvailableHours, user.standingSlots(), includeDelayed = false)
+        val placements = replanner.replan(user, today, includeDelayed = false)
         val tasks = (kept + saved).sortedBy { it.position }
         val lateCount = saved.count { placements[it.id!!]?.late == true }
         activityRecorder.record(
@@ -166,7 +166,7 @@ class ProjectService(
         attachmentLinker.deleteOfProject(projectId)
         taskRepository.deleteAll(tasks)
         projectRepository.delete(project)
-        replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, user.standingSlots(), includeDelayed = false)
+        replanner.replan(user, todayProvider.today(), includeDelayed = false)
     }
 
     private fun owned(userId: Long, projectId: Long) =

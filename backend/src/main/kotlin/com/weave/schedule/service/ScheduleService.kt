@@ -3,6 +3,7 @@ package com.weave.schedule.service
 import com.weave.activity.domain.ActivityType
 import com.weave.activity.service.ActivityRecorder
 import com.weave.global.time.TodayProvider
+import com.weave.holiday.service.AvailabilityService
 import com.weave.project.domain.Project
 import com.weave.project.dto.TaskResponse
 import com.weave.project.repository.ProjectRepository
@@ -23,14 +24,15 @@ class ScheduleService(
     private val replanner: Replanner,
     private val todayProvider: TodayProvider,
     private val activityRecorder: ActivityRecorder,
+    private val availabilityService: AvailabilityService,
 ) {
     /** 설정의 "작업 다시 배치" — 밀린 작업까지 오늘부터 다시 배치한 뒤의 일정(사용자 결정 2026-10-01) */
     @Transactional
     fun replan(userId: Long): ScheduleResponse {
         val user = userService.find(userId)
         overdueRoller.roll(userId)
-        val placements = replanner.replan(userId, todayProvider.today(), user.dailyAvailableHours, user.standingSlots(), includeDelayed = true)
-        activityRecorder.record(userId, ActivityType.SCHEDULE_REPLANNED, detail = mapOf("taskCount" to placements.size, "lateCount" to placements.values.count { it.late }, "dailyAvailableHours" to user.dailyAvailableHours))
+        val placements = replanner.replan(user, todayProvider.today(), includeDelayed = true)
+        activityRecorder.record(userId, ActivityType.SCHEDULE_REPLANNED, detail = mapOf("taskCount" to placements.size, "lateCount" to placements.values.count { it.late }, "weeklyAvailableHours" to user.weeklyAvailableHours))
         return snapshot(userId)
     }
 
@@ -41,6 +43,21 @@ class ScheduleService(
         val user = userService.find(userId)
         val projects = projectRepository.findByUserIdAndStatus(userId, Project.ACTIVE).sortedBy { it.id }
         val tasks = if (projects.isEmpty()) emptyList() else taskRepository.findByProjectIdInOrderByProjectIdAscPositionAsc(projects.map { it.id!! })
-        return ScheduleResponse(todayProvider.today(), user.dailyAvailableHours, projects.map(ProjectBriefResponse::of), tasks.map(TaskResponse::of))
+        val today = todayProvider.today()
+        val holidays = availabilityService.holidays(today.minusDays(HOLIDAYS_BEFORE), today.plusDays(AvailabilityService.PLAN_DAYS))
+        return ScheduleResponse(
+            today = today,
+            dailyAvailableHours = user.availableHoursOn(today, today in holidays),
+            weeklyAvailableHours = user.weeklyAvailableHours,
+            holidayAvailableHours = user.holidayAvailableHours,
+            holidays = holidays.sorted(),
+            projects = projects.map(ProjectBriefResponse::of),
+            tasks = tasks.map(TaskResponse::of),
+        )
+    }
+
+    companion object {
+        /** 지난 공휴일도 조금 준다 — 앱의 이번 주·달력이 지난 날 부하를 계산할 때 */
+        private const val HOLIDAYS_BEFORE = 62L
     }
 }

@@ -58,7 +58,7 @@ backend/
     ├── main/resources/
     │   ├── application.yml
     │   │                                # AI 시스템 프롬프트는 여기 두지 않는다 — 빌드할 때 ../docs/Weave-AI 작업 분할 시스템 프롬프트.md를 prompts/project-breakdown.md로 복사(build.gradle.kts)
-    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description · V6 tasks.day_hours(날짜별 배정 시간) · V7 회색 프로젝트 색 제거(회색 → 청록) · V8 projects.deliverable·progress · V9 activity_logs·tasks.done_at · V10 기능 전 데이터로 사용 기록 채우기(backfill) · V11 users.standing_sessions_per_week·standing_session_hours(상시 프로젝트 칸)
+    │   └── db/migration/                # V1 users·refresh_tokens · V2 projects·tasks · V3 attachments · V4 tasks.delayed_from · V5 tasks.description · V6 tasks.day_hours(날짜별 배정 시간) · V7 회색 프로젝트 색 제거(회색 → 청록) · V8 projects.deliverable·progress · V9 activity_logs·tasks.done_at · V10 기능 전 데이터로 사용 기록 채우기(backfill) · V11 users.standing_sessions_per_week·standing_session_hours(상시 프로젝트 칸) · V12 users.available_mon~sun·available_holiday(요일별·공휴일 가용 시간, daily_available_hours 삭제)·holidays
     └── test/kotlin/com/weave/           # main과 같은 패키지 구조
         ├── TestcontainersConfiguration.kt   # 통합 테스트는 @Import 해서 실제 PostgreSQL 사용
         └── support/ApiTestSupport.kt       # 가입 후 토큰 받기·JSON 헬퍼 (통합 테스트는 @ActiveProfiles("test") — src/test/resources/application-test.yml)
@@ -77,19 +77,19 @@ backend/
 
 확인용 엔드포인트: `GET /actuator/health`(공개) · `/swagger-ui.html`(공개) · 그 외는 토큰 없으면 401.
 
-**로컬 실행에 필요한 `.env` 값**(`backend/.env`, 커밋되지 않음): `JWT_SECRET`(32바이트 이상 임의 문자열) · `ANTHROPIC_API_KEY` · (선택) `WEAVE_STORAGE_ROOT`(첨부 저장 폴더, 기본 `uploads/`).
+**로컬 실행에 필요한 `.env` 값**(`backend/.env`, 커밋되지 않음): `JWT_SECRET`(32바이트 이상 임의 문자열) · `ANTHROPIC_API_KEY` · (선택) `HOLIDAY_API_KEY`(공공데이터포털 한국천문연구원 특일 정보의 디코딩된 키 — 없으면 공휴일 없이 배치) · (선택) `WEAVE_STORAGE_ROOT`(첨부 저장 폴더, 기본 `uploads/`).
 
 ```bash
 SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /api/v1/dev/login {email} 이 열린다
 ```
 
-**API 요약** (`/api/v1`, 모두 camelCase): `auth/signup·login·refresh·logout`(앱 — 본문으로 두 토큰) · `auth/web/csrf·login·refresh·logout`(PC 웹 — 리프레시 토큰은 HttpOnly 쿠키, 이 경로만 CSRF, 사용 기록에 `client: web`) · `me`(GET·DELETE) · `me/settings`(PATCH 하루 가용 시간·상시 칸 주 횟수·한 번 시간 — 바꿀 값만) · `projects`(POST 등록 → 서버가 날짜 배정 / GET `?status&page&size`) · `projects/{id}`(GET · PATCH 색·`status=done` · DELETE — 작업·첨부 파일까지) · `projects/{id}/replan-tasks`(POST, AI에게 재요청 확정 — 미완료 작업 교체·기본 정보 반영) · `tasks/{id}`(PATCH `done`) · `schedule`(오늘 기준 스냅샷) · `schedule/replan`(POST, 밀린 작업 포함 다시 배치) · `attachments`(POST multipart · `links` · `{id}/content` 내려받기 · DELETE) · `project-chat`(AI 챗봇, `attachmentIds`로 첨부 함께) · `activity/events`(POST, 앱 사용 기록 — 앱 열기·화면 보기·위젯 갱신만) · `me/activity/export`(GET, 내 사용 기록 .xlsx — Mac에서 `scripts/export-activity.sh <이메일>`).
+**API 요약** (`/api/v1`, 모두 camelCase): `auth/signup·login·refresh·logout`(앱 — 본문으로 두 토큰) · `auth/web/csrf·login·refresh·logout`(PC 웹 — 리프레시 토큰은 HttpOnly 쿠키, 이 경로만 CSRF, 사용 기록에 `client: web`) · `me`(GET·DELETE) · `me/settings`(PATCH 요일별 7개·공휴일 가용 시간·상시 칸 — 바꿀 값만, 가용 시간·상시 칸이 바뀌면 밀린 작업까지 바로 다시 배치. `dailyAvailableHours`는 요일별 전 앱용으로 7요일·공휴일을 모두 그 값으로) · `projects`(POST 등록 → 서버가 날짜 배정 / GET `?status&page&size`) · `projects/{id}`(GET · PATCH 색·`status=done` · DELETE — 작업·첨부 파일까지) · `projects/{id}/replan-tasks`(POST, AI에게 재요청 확정 — 미완료 작업 교체·기본 정보 반영) · `tasks/{id}`(PATCH `done`) · `schedule`(오늘 기준 스냅샷) · `schedule/replan`(POST, 밀린 작업 포함 다시 배치) · `attachments`(POST multipart · `links` · `{id}/content` 내려받기 · DELETE) · `project-chat`(AI 챗봇, `attachmentIds`로 첨부 함께) · `activity/events`(POST, 앱 사용 기록 — 앱 열기·화면 보기·위젯 갱신만) · `me/activity/export`(GET, 내 사용 기록 .xlsx — Mac에서 `scripts/export-activity.sh <이메일>`).
 
 **사용 기록**(사용자 결정 2026-10-07): 프로젝트·작업·AI 챗봇(대화 본문 포함)·설정·첨부·로그인은 서버가 `ActivityRecorder.record`로 남긴다 — 새 기능을 만들면 기록도 함께 넣고 `ActivityType`에 종류를 추가한다. 기록에는 개인정보가 담기므로 탈퇴 시 `AccountDeletionService`가 지운다. AI 챗봇 기록에는 대화 묶음 번호(`conversationId`, 앱이 등록 흐름마다 만든다 — 프로젝트 등록·재요청 기록에도 남아 대화와 이어진다)·모델·토큰(캐시 읽기/쓰기 포함)·비용(USD)이 남는다. 비용 단가는 `application.yml`의 `weave.anthropic.price`(기본: Sonnet 5.5 공식 단가) — 모델을 바꾸면 단가도 함께 바꾼다. **검토 화면 수정 기록**(2026-10-17, 보고서 향후 계획 — 프롬프트 개선 자료): AI 제안(`AI_CHAT.proposedTasks`)과 확정 목록(`PROJECT_CREATED`·`PROJECT_REPLANNED`의 `tasks`)을 같은 모양(`TaskLog.entry` — 이름·시간·선행 작업 이름·선행 지식)으로 남기고, 엑셀 "작업 검토 비교" 시트(`TaskReviewDiff`)가 같은 대화 번호끼리 비교한다. 작업은 이름으로 짝짓는다(이름을 바꾸면 삭제+추가로 보인다).
 
-**정기 작업**(`@EnableScheduling`, 한국 시간): 6시 5분 밀린 작업을 오늘로(하루가 6시에 바뀐다)(`OverdueRoller` — 일정 조회·등록 직전에도 그 사용자 것을 한 번 더) · 4시 연결 안 된 첨부 정리(`OrphanAttachmentCleaner`).
+**정기 작업**(`@EnableScheduling`, 한국 시간): 6시 5분 밀린 작업을 오늘로(하루가 6시에 바뀐다)(`OverdueRoller` — 일정 조회·등록 직전에도 그 사용자 것을 한 번 더) · 4시 연결 안 된 첨부 정리(`OrphanAttachmentCleaner`) · 매달 1일 4시 30분과 서버 시작 때 올해·내년 공휴일 맞추기(`HolidaySync` ← `client/DataGoKrHolidayClient`, XML은 XXE를 막고 읽는다).
 
-**일정 규칙**(`schedule/domain/Scheduler.kt` 머리 주석이 기준 — 바꾸면 주석과 `SchedulerTest`를 함께): 상시(마감 없는) 프로젝트는 사용자 설정의 칸(기본 주 2번 × 1시간)에만 배치한다(2026-10-17). 작업마다 날짜별 배정 시간(`Task.dayHours`, 응답 `days`)을 저장한다. 오늘은 `LocalDate.now`가 아닌 `TodayProvider.today()`로만 구한다(아침 6시 전이면 전날).
+**일정 규칙**(`schedule/domain/Scheduler.kt` 머리 주석이 기준 — 바꾸면 주석과 `SchedulerTest`를 함께): 상시(마감 없는) 프로젝트는 사용자 설정의 칸(기본 주 2번 × 1시간)에만 배치한다(2026-10-17). 가용 시간은 날짜마다 다르다 — `AvailabilityService.capacityOn`(요일별 + 공휴일 우선)을 `Scheduler.plan`에 넘긴다. 작업마다 날짜별 배정 시간(`Task.dayHours`, 응답 `days`)을 저장한다. 오늘은 `LocalDate.now`가 아닌 `TodayProvider.today()`로만 구한다(아침 6시 전이면 전날).
 
 **겪은 함정**
 - Jackson 3의 `JsonNode.map(...)`은 코틀린 컬렉션 `map`이 아니다(노드 자체를 변환) — 테스트에서 배열을 돌 땐 `asIterable().map`.

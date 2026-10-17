@@ -4,6 +4,7 @@ import com.weave.auth.domain.RefreshToken
 import com.weave.auth.dto.TokenResponse
 import com.weave.auth.repository.RefreshTokenRepository
 import com.weave.global.config.WeaveProperties
+import com.weave.global.time.TodayProvider
 import com.weave.user.domain.User
 import com.weave.user.dto.UserResponse
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm
@@ -24,6 +25,7 @@ class TokenService(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val properties: WeaveProperties,
     private val clock: Clock,
+    private val todayProvider: TodayProvider,
 ) {
     private val random = SecureRandom()
 
@@ -42,7 +44,7 @@ class TokenService(
 
         val raw = ByteArray(32).also(random::nextBytes).let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
         refreshTokenRepository.save(RefreshToken(user.id!!, hash(raw), now.plus(properties.jwt.refreshTokenTtl)))
-        return TokenResponse(accessToken, raw, ttl.seconds, UserResponse.of(user))
+        return TokenResponse(accessToken, raw, ttl.seconds, UserResponse.of(user, todayProvider.today()))
     }
 
     companion object {
