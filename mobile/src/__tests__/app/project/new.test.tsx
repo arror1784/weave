@@ -73,12 +73,14 @@ describe('등록 1/3 기본 정보', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/project/new/chat');
   });
 
-  it('달력: 오늘보다 앞선 날은 고를 수 없고, 이번 달보다 앞으로는 넘기지 않는다', async () => {
+  it('달력: 오늘보다 앞선 날도 고를 수 있고 이전 달로 넘길 수 있다 (사용자 결정 2026-10-17)', async () => {
     await renderWithProviders(<NewProjectScreen />);
     await fireEvent.press(screen.getByRole('button', { name: '마감일, 선택 안 함 (상시)' }));
-    expect(screen.getByRole('button', { name: '9월 29일 화요일' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '9월 30일 수요일, 오늘' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: '이전 달' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: '이전 달' }));
+    expect(screen.getByRole('header', { name: '2026년 8월' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: '8월 31일 월요일' }));
+    expect(screen.getByRole('button', { name: '마감일, 8월 31일 월요일' })).toBeOnTheScreen();
   });
 
   it('고른 마감일을 지우면 마감 없음(상시)으로 등록된다', async () => {

@@ -40,12 +40,13 @@ export function DateField({ label, value, emptyText, onPress, accessory }: { lab
 }
 
 /**
- * 달력 시트 — 오늘(min)보다 앞선 날은 고를 수 없다. onClear가 있으면 "날짜 없음" 버튼을 보인다(마감 없음 = 상시).
+ * 달력 시트 — 오늘 이전 날짜도 고를 수 있다(사용자 결정 2026-10-17). today는 오늘 표시와 처음 열리는 달에 쓴다.
+ * onClear가 있으면 "날짜 없음" 버튼을 보인다(마감 없음 = 상시).
  */
 export function DatePickerSheet({
   title,
   value,
-  min,
+  today,
   onSelect,
   onClear,
   clearLabel,
@@ -53,21 +54,20 @@ export function DatePickerSheet({
 }: {
   title: string;
   value: DateKey | null;
-  min: DateKey;
+  today: DateKey;
   onSelect: (date: DateKey) => void;
   onClear?: () => void;
   clearLabel?: string;
   onClose: () => void;
 }) {
   const { colors, radius } = useAppTheme();
-  const [month, setMonth] = useState(() => startOfMonthShift(value ?? min, 0));
-  const canGoBack = month > startOfMonthShift(min, 0);
+  const [month, setMonth] = useState(() => startOfMonthShift(value ?? today, 0));
 
   return (
     <BottomSheet visible onClose={onClose} label={title}>
       <AppText variant="sheetTitle">{title}</AppText>
       <View style={styles.nav}>
-        <NavButton label="이전 달" disabled={!canGoBack} onPress={() => setMonth(startOfMonthShift(month, -1))} icon={(c) => <IconBack size={18} color={c} />} />
+        <NavButton label="이전 달" onPress={() => setMonth(startOfMonthShift(month, -1))} icon={(c) => <IconBack size={18} color={c} />} />
         <AppText variant="label" accessibilityRole="header">{`${month.slice(0, 4)}년 ${monthOf(month)}월`}</AppText>
         <NavButton label="다음 달" onPress={() => setMonth(startOfMonthShift(month, 1))} icon={(c) => <IconChevron size={18} color={c} />} />
       </View>
@@ -82,20 +82,18 @@ export function DatePickerSheet({
         <View style={styles.grid}>
           {monthGrid(month).map((d, i) => {
             if (!d) return <View key={`empty-${i}`} style={styles.cell} />;
-            const disabled = d < min;
             const selected = d === value;
-            const isToday = d === min;
+            const isToday = d === today;
             return (
               <Pressable
                 key={d}
                 accessibilityRole="button"
                 accessibilityLabel={`${formatDateLabel(d)}${isToday ? ', 오늘' : ''}`}
-                accessibilityState={{ disabled, selected }}
-                disabled={disabled}
+                accessibilityState={{ selected }}
                 onPress={() => onSelect(d)}
                 style={styles.cell}>
                 <View style={[styles.day, { borderRadius: radius.control }, selected && { backgroundColor: colors.thread }, !selected && isToday && { borderWidth: 1, borderColor: colors.thread }]}>
-                  <AppText variant="mono" style={styles.dayText} color={selected ? colors.onThread : disabled ? colors.inkFaint : colors.ink}>
+                  <AppText variant="mono" style={styles.dayText} color={selected ? colors.onThread : colors.ink}>
                     {String(dayOfMonth(d))}
                   </AppText>
                 </View>
@@ -108,10 +106,10 @@ export function DatePickerSheet({
     </BottomSheet>
   );
 
-  function NavButton({ label, disabled = false, onPress, icon }: { label: string; disabled?: boolean; onPress: () => void; icon: (color: string) => ReactNode }) {
+  function NavButton({ label, onPress, icon }: { label: string; onPress: () => void; icon: (color: string) => ReactNode }) {
     return (
-      <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={styles.navButton}>
-        {icon(disabled ? colors.inkFaint : colors.ink)}
+      <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.navButton}>
+        {icon(colors.ink)}
       </Pressable>
     );
   }

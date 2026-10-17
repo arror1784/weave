@@ -147,7 +147,7 @@ export default function NewProjectScreen() {
           <DatePickerSheet
             title="마감일"
             value={deadline}
-            min={today}
+            today={today}
             onSelect={(d) => {
               setDeadline(d);
               setDateOpen(false);
