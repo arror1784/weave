@@ -1,6 +1,6 @@
 import type { Project, Task } from '@/api/types';
 
-import { isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
+import { capacityOn, isOverdue, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
 
 const T = '2026-09-30'; // 수요일
 
@@ -114,6 +114,20 @@ describe('일정 계산', () => {
     expect(days.map((d) => d.hours)).toEqual([4.75, 1, 4, 0, 0]);
     expect(days.map((d) => d.over)).toEqual([true, false, true, false, false]);
     expect(days[0].capacity).toBe(3);
+  });
+
+  it('요일별·공휴일 가용 시간(사용자 결정 2026-10-17): 날짜마다 그날 가용과 비교 — 공휴일은 요일보다 우선, 0시간이면 쉬는 날', () => {
+    // 월3 화3 수1 목0 금3 토5 일5, 공휴일 2 — 10/3(토)은 공휴일
+    const weekly = { ...data, weeklyAvailableHours: [3, 3, 1, 0, 3, 5, 5], holidayAvailableHours: 2, holidays: ['2026-10-03'] };
+    expect(['2026-09-30', '2026-10-01', '2026-10-03', '2026-10-04'].map((d) => capacityOn(weekly, d))).toEqual([1, 0, 2, 5]);
+    const days = selectWeekDays(weekly, T);
+    expect(days.map((d) => d.capacity)).toEqual([1, 0, 3, 2, 5]);
+    expect(days.map((d) => d.over)).toEqual([true, true, true, false, false]); // 4.75>1 · 1>0 · 4>3
+    expect(selectTodayWork(weekly, T).capacity).toBe(1);
+  });
+
+  it('요일별 값이 없는 옛 응답이면 하루 가용 시간을 쓴다', () => {
+    expect(capacityOn(data, T)).toBe(5);
   });
 
   it('날짜별 작업은 그날 드는 시간이 큰 순, 시간은 그날 몫', () => {

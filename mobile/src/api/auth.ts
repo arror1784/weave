@@ -26,7 +26,7 @@ export async function logout(): Promise<void> {
 
 export const getMe = () => request('/api/v1/me', userSchema);
 
-export type SettingsChange = Partial<Pick<User, 'dailyAvailableHours' | 'standingSessionsPerWeek' | 'standingSessionHours'>>;
+export type SettingsChange = Partial<Pick<User, 'weeklyAvailableHours' | 'holidayAvailableHours' | 'standingSessionsPerWeek' | 'standingSessionHours'>>;
 
 /** 바꾼 값만 보낸다 */
 export const updateSettings = (changes: SettingsChange) => request('/api/v1/me/settings', userSchema, { method: 'PATCH', body: changes });
