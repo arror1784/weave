@@ -42,7 +42,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 
 ## 2. 필수 규칙
 
-1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 값은 **Figma(Weave Make 디자인) 토큰**을 따른다: 잉크 `#1c1d22` · 실 `#2b4c8c` · 캔버스 `#f7f7f9` · 임박 주황 · 지연 빨강 · 프로젝트 7색(Figma 3색 teal·magenta·violet + 임시안 blue·green·amber·brown — Figma의 gray는 뺐다, 사용자 결정 2026-10-01). 원본 색이 글자 대비(§4-5)에 모자라면 글자용 변형(`warnText`·`dangerText`)을 쓰고, `inkFaint`는 장식·비활성에만 쓴다. **밝은 테마만**(다크 모드 미지원). 글꼴: 본문 Pretendard, 숫자·날짜·시간은 JetBrains Mono(`assets/fonts`, 둘 다 OFL) — 굵기는 `fontFamily`로 고른다(Android).
+1. **색상·간격·글자 크기·글꼴 단일 소스** — `src/theme/`(`colors` · `spacing`/`radius` · `typography`)에서만. 값은 **Figma(Weave Make 디자인) 토큰**을 따른다: 잉크 `#1c1d22` · 실 `#2b4c8c` · 캔버스 `#f7f7f9` · 임박 주황 · 지연 빨강 · 프로젝트 7색(Figma 3색 teal·magenta·violet + blue·green·amber·brown, 사용자 확정 2026-10-18 — Figma의 gray는 뺐다, 사용자 결정 2026-10-01). 원본 색이 글자 대비(§4-5)에 모자라면 글자용 변형(`warnText`·`dangerText`)을 쓰고, `inkFaint`는 장식·비활성에만 쓴다. **밝은 테마만**(다크 모드 미지원). 글꼴: 본문 Pretendard, 숫자·날짜·시간은 JetBrains Mono(`assets/fonts`, 둘 다 OFL) — 굵기는 `fontFamily`로 고른다(Android).
 2. **공통 컴포넌트로만 UI 제작** — `Screen` · `AppText`(+ 필요 시 `Button` · `TextField` · `ListItem` 추가). 화면에서 RN 기본 `<Text>`/`<Pressable>`/`<TextInput>`을 새로 스타일링하지 않는다.
 3. **API는 도메인 클라이언트로만** — 컴포넌트에서 `fetch` 직접 호출 금지. `src/api/<domain>.ts`(응답은 `api/types.ts`의 Zod로 검증) → `src/queries/<domain>.ts`(TanStack Query 훅). 토큰 첨부·401 시 한 번 갱신은 `api/client.ts`의 `request()` 전담 — 갱신은 공유 Promise 하나로만(동시 401에서 강제 로그아웃 방지).
 4. **서버 상태 ≠ 클라이언트 상태** — 서버 데이터는 Query 캐시, Zustand엔 UI 상태만.
