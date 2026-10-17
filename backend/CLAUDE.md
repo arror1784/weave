@@ -52,7 +52,7 @@ backend/
     │   ├── schedule/                    # domain/Scheduler(일정 알고리즘 — 등록 때 전부 다시 배치, 하루에 최대한 채워 앞당기기, 마감을 못 지키면 앞날에 몰기) · service/OverdueRoller(밀린 작업 → 오늘, 매일 6시 5분) · 일정 스냅샷 API
     │   ├── attachment/                  # 첨부 업로드·링크·내려받기 · storage/FileStorage(로컬 디스크) · OrphanAttachmentCleaner(연결 안 된 첨부 24시간 후 삭제, 매일 4시)
     │   ├── activity/                    # 사용 기록(ActivityRecorder — 각 서비스가 같은 트랜잭션에서 남긴다) · 앱 기록 받기 · 엑셀 내보내기(ActivityExportService, POI)
-    │   ├── ai/                          # 등록 챗봇(ProjectChatService — propose_tasks 도구, 5턴 뒤 강제) · AttachmentContentLoader(첨부 → AI 내용)
+    │   ├── ai/                          # 등록 챗봇(ProjectChatService — propose_tasks 도구, 5턴 뒤 강제, dueDate는 선택·마감 없으면 '상시 프로젝트'로 소개) · AttachmentContentLoader(첨부 → AI 내용)
     │   ├── client/                      # 외부 연동: AiClient ← ClaudeClient
     │   └── {feature}/{controller,dto,service,repository,domain}/
     ├── main/resources/
