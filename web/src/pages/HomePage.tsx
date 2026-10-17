@@ -116,7 +116,10 @@ function ProjectRow({ project: p, today, onReplan }: { project: ProjectSummary; 
       <div className="flex min-w-0 items-center gap-3">
         <span className="size-3 shrink-0 rounded-full" style={{ background: c.dot }} aria-hidden="true" />
         <div className="min-w-0">
-          <p className="truncate text-[16px] font-semibold">{p.name}</p>
+          {/* 길면 말줄임 — 마우스를 올리면 전체 이름(사용자 요청 2026-10-17) */}
+          <p className="truncate text-[16px] font-semibold" title={p.name}>
+            {p.name}
+          </p>
           <p className="mt-0.5 text-[13px]" style={{ color: c.text }}>
             {c.label}
           </p>
