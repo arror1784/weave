@@ -22,7 +22,7 @@ class User(
     var passwordHash: String,
 
 
-    /** 상시 프로젝트 칸 — 주 0~7번(0이면 상시 작업을 배치하지 않는다) */
+    /** 상시 프로젝트 칸 — 주 1~7번(사용자 결정 2026-10-18, 설정에서 0번은 막는다) */
     @Column(name = "standing_sessions_per_week", nullable = false)
     var standingSessionsPerWeek: Int = StandingSlots.DEFAULT.perWeek,
 

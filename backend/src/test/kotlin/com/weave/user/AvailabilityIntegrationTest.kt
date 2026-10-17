@@ -98,7 +98,7 @@ class AvailabilityIntegrationTest(private val mockMvc: MockMvc, objectMapper: Ob
         schedule(tokens)["tasks"][0]["scheduledDate"].asString() shouldBe today.plusDays(1).toString()
     }
 
-    test("상시 칸 설정을 바꿔도 바로 다시 배치한다 — 주 0번이면 상시 작업이 날짜를 잃는다") {
+    test("상시 칸 설정을 바꿔도 바로 다시 배치한다 — 한 번 시간을 0.5시간으로 줄이면 1시간 작업이 두 칸에 나뉜다") {
         val tokens = newUser()
         mockMvc.post("/api/v1/projects") {
             header("Authorization", api.bearer(tokens))
@@ -111,8 +111,16 @@ class AvailabilityIntegrationTest(private val mockMvc: MockMvc, objectMapper: Ob
                 ),
             )
         }.andExpect { status { isCreated() } }
-        settings(tokens, mapOf("standingSessionsPerWeek" to 0)).andExpect { status { isOk() } }
-        schedule(tokens)["tasks"][0]["scheduledDate"].isNull shouldBe true
+        schedule(tokens)["tasks"][0]["days"].size() shouldBe 1
+        settings(tokens, mapOf("standingSessionHours" to 0.5)).andExpect { status { isOk() } }
+        schedule(tokens)["tasks"][0]["days"].asIterable().map { it["hours"].asDouble() } shouldBe listOf(0.5, 0.5)
+    }
+
+    test("상시 칸은 주 1~7번 — 0번은 400 (사용자 결정 2026-10-18, 0번 막기)") {
+        val tokens = newUser()
+        settings(tokens, mapOf("standingSessionsPerWeek" to 0)).andExpect { status { isBadRequest() } }
+        settings(tokens, mapOf("standingSessionsPerWeek" to 8)).andExpect { status { isBadRequest() } }
+        settings(tokens, mapOf("standingSessionsPerWeek" to 1)).andExpect { status { isOk() } }
     }
 
     test("공휴일은 요일보다 우선한다 — 내일이 공휴일이고 공휴일 0시간이면 내일엔 작업을 넣지 않는다") {

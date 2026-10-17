@@ -78,7 +78,7 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         body["project"]["tasks"][0]["description"].asString() shouldBe "블록도와 시퀀스 다이어그램, 리뷰 1회"
     }
 
-    test("상시 프로젝트 작업은 내 설정의 칸(주 n번 × n시간)에만 배치한다 — 주 0번이면 날짜 없음 (사용자 결정 2026-10-17)") {
+    test("상시 프로젝트 작업은 내 설정의 칸(주 n번 × n시간)에만 배치한다 (사용자 결정 2026-10-17)") {
         val tokens = newUser()
         val settings = { body: Map<String, Any?> ->
             mockMvc.patch("/api/v1/me/settings") {
@@ -93,11 +93,6 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         days.asIterable().map { it["date"].asString() to it["hours"].asDouble() } shouldBe
             listOf(today to 1.0, today.plusDays(1) to 1.0, today.plusDays(2) to 1.0).map { it.first.toString() to it.second }
 
-        settings(mapOf("standingSessionsPerWeek" to 0))
-        val schedule = api.read(mockMvc.post("/api/v1/schedule/replan") { header("Authorization", api.bearer(tokens)) }
-            .andExpect { status { isOk() } }.andReturn().response.contentAsString)
-        schedule["tasks"][0]["scheduledDate"].isNull shouldBe true
-        schedule["tasks"][0]["days"].size() shouldBe 0
     }
 
     test("이미 지난 마감일로도 등록할 수 있다 — 작업은 오늘부터 몰아 배치하고 빠듯함으로 센다(사용자 결정 2026-10-17)") {

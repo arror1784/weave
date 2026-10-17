@@ -22,8 +22,8 @@ data class UpdateSettingsRequest(
     @field:DecimalMax(value = "24", message = "24시간 이하로 정해 주세요.")
     val holidayAvailableHours: Double? = null,
 
-    /** 상시 프로젝트 칸 — 주 0~7번 */
-    @field:Min(value = 0, message = "0번 이상으로 정해 주세요.")
+    /** 상시 프로젝트 칸 — 주 1~7번(0번은 막는다, 사용자 결정 2026-10-18) */
+    @field:Min(value = 1, message = "주 1번 이상으로 정해 주세요.")
     @field:Max(value = 7, message = "주 7번 이하로 정해 주세요.")
     val standingSessionsPerWeek: Int? = null,
 
