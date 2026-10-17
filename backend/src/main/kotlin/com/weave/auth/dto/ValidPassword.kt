@@ -8,7 +8,7 @@ import kotlin.reflect.KClass
 
 /**
  * 비밀번호 규칙 — 앱(mobile/src/lib/validation.ts)과 같다: 8~64자, 영문·숫자·특수문자 각 1개 이상, 공백 없음.
- * Claude 임시안(사용자 확인 필요). 앱 검증은 편의용, 진짜 검증은 여기서(§3-7).
+ * 사용자 확정(2026-10-18). 앱 검증은 편의용, 진짜 검증은 여기서(§3-7).
  */
 @Target(AnnotationTarget.FIELD)
 @Retention(AnnotationRetention.RUNTIME)

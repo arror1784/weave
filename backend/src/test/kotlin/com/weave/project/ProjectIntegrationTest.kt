@@ -5,6 +5,7 @@ import com.weave.support.ApiTestSupport
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -298,6 +299,29 @@ class ProjectIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         toggle(tasks[0]["id"].asLong(), true).andExpect { status { isOk() }; jsonPath("$.task.done") { value(true) }; jsonPath("$.projectAllDone") { value(false) } }
         toggle(tasks[1]["id"].asLong(), true).andExpect { status { isOk() }; jsonPath("$.projectAllDone") { value(true) } }
         toggle(tasks[1]["id"].asLong(), false).andExpect { status { isOk() }; jsonPath("$.projectAllDone") { value(false) } }
+    }
+
+    test("완료한 프로젝트의 작업 체크를 풀면 진행중으로 돌아간다 — 응답에 projectReopened, 사용 기록 '프로젝트 다시 진행' (사용자 결정 2026-10-18)") {
+        val tokens = newUser()
+        val project = createOk(tokens, tasks = listOf(task("a", "첫", 1.0)))["project"]
+        val projectId = project["id"].asLong()
+        val taskId = project["tasks"][0]["id"].asLong()
+        val toggle = { done: Boolean ->
+            mockMvc.patch("/api/v1/tasks/$taskId") {
+                header("Authorization", api.bearer(tokens))
+                contentType = MediaType.APPLICATION_JSON
+                content = api.json(mapOf("done" to done))
+            }
+        }
+        toggle(true).andExpect { status { isOk() }; jsonPath("$.projectReopened") { value(false) } }
+        mockMvc.patch("/api/v1/projects/$projectId") {
+            header("Authorization", api.bearer(tokens))
+            contentType = MediaType.APPLICATION_JSON
+            content = api.json(mapOf("status" to "done"))
+        }.andExpect { status { isOk() } }
+        toggle(false).andExpect { status { isOk() }; jsonPath("$.projectReopened") { value(true) }; jsonPath("$.projectAllDone") { value(false) } }
+        mockMvc.get("/api/v1/projects/$projectId") { header("Authorization", api.bearer(tokens)) }.andExpect { jsonPath("$.status") { value("active") } }
+        jdbc.queryForList("SELECT type FROM activity_logs WHERE project_id = ?", String::class.java, projectId) shouldContain "PROJECT_REOPENED"
     }
 
     test("일정 스냅샷: 오늘(한국 시간)·하루 가용 시간·진행중 프로젝트와 그 작업만 준다") {

@@ -9,6 +9,7 @@ enum class ActivityType(val label: String, val app: Boolean = false) {
     PROJECT_REPLANNED("AI에게 재요청(작업 교체)"),
     PROJECT_COLOR_CHANGED("프로젝트 색 변경"),
     PROJECT_COMPLETED("프로젝트 완료"),
+    PROJECT_REOPENED("프로젝트 다시 진행(완료 작업 체크 해제)"),
     PROJECT_DELETED("프로젝트 삭제"),
     TASK_DONE("작업 완료"),
     TASK_UNDONE("작업 완료 취소"),
