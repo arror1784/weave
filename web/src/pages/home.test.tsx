@@ -40,6 +40,13 @@ describe('W2 홈', () => {
     expect(screen.getByRole('progressbar', { name: 'TOEIC 스터디 진행률' })).toHaveAttribute('aria-valuenow', '45');
   });
 
+  it('긴 프로젝트 이름은 잘려도 마우스를 올리면(툴팁) 전체 이름이 보인다', async () => {
+    const long = '임베디드AC과제 중간발표 결과물 제출 — 보고서·발표자료·시연 영상';
+    projects.listProjects.mockResolvedValue(page([summary({ name: long })]));
+    renderWithProviders(<AppRoutes />);
+    expect(await screen.findByText(long)).toHaveAttribute('title', long);
+  });
+
   it('AI에게 재요청을 누르면 그 프로젝트의 기본 정보 단계로 간다', async () => {
     projects.listProjects.mockResolvedValue(page([summary({ id: 5 })]));
     projects.getProject.mockReturnValue(new Promise(() => {}));
