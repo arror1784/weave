@@ -50,7 +50,8 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled = f
       ]}>
       <View style={styles.row}>
         {icon?.(look.fg)}
-        <AppText variant={variant === 'primary' || variant === 'soft' || variant === 'danger' ? 'label' : 'small'} color={look.fg}>
+        {/* simple: 삼성 폰에서 목록이 바뀐 뒤 다시 그릴 때 마지막 단어가 둘째 줄로 밀려 잘렸다('개인 일정 추가' → '개인 일정', 2026-10-18) */}
+        <AppText textBreakStrategy="simple" variant={variant === 'primary' || variant === 'soft' || variant === 'danger' ? 'label' : 'small'} color={look.fg}>
           {label}
         </AppText>
       </View>
