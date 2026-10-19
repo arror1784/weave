@@ -54,7 +54,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 10. **기기 권한은 쓰는 순간에 요청하고 거부를 처리** — 권한 설명 문구는 `app.config.ts`(config plugin)에 반드시 넣는다.
 11. **로컬 API 주소는 `EXPO_PUBLIC_API_URL`로 주입** — 이 프로젝트는 **폰 테스트를 USB 케이블로만 한다(Wi-Fi·LAN IP 사용 안 함)**. 폰·에뮬레이터 모두 `adb reverse tcp:8080 tcp:8080`(API), `adb reverse tcp:8081 tcp:8081`(개발 서버) 후 `http://localhost:<포트>`로 접속한다. 케이블을 다시 꽂으면 `adb reverse`를 다시 실행한다. HTTP는 개발 중에만.
 12. **한 개념을 두 곳에 등록하는 구조는 문서화** — 예: 탭 화면(`src/app/(tabs)/`)과 탭 설정(`(tabs)/_layout.tsx`).
-13. **개발 빌드를 기본으로, Expo Go는 화면 확인용** — 소셜 로그인·푸시 등 네이티브 기능은 `npx expo run:android`로 만든 개발 빌드에서 확인.
+13. **개발 빌드를 기본으로, Expo Go는 화면 확인용** — 소셜 로그인·푸시 등 네이티브 기능은 `APP_VARIANT=development npx expo run:android`로 만든 개발 빌드에서 확인. **개발 빌드는 `com.weave.app.dev`(이름 weave dev, 스킴 `weave-dev`)라 배포 앱 `com.weave.app`과 폰에 나란히 설치된다**(사용자 결정 2026-10-19). `APP_VARIANT` 없이 만들면 배포 앱 설정이 된다.
 14. **`ios/`·`android/` 폴더는 직접 고치지 않는다** — `app.config.ts`에서 생성되는 폴더다(`.gitignore`됨). 네이티브 설정은 `app.config.ts`와 config plugin으로만.
 15. **`src/app/` 안에는 라우트 파일만 둔다 — 테스트 포함 금지** — Expo Router가 `src/app/`의 모든 파일을 라우트로 번들링한다. 화면 테스트는 `src/__tests__/app/<route>.test.tsx`에 둔다(그 외 파일은 대상 옆 `*.test.ts(x)`). (스캐폴딩 중 `src/app/index.test.tsx`가 앱 번들에 테스트 라이브러리를 끌어들여 `expo export`가 실패했다 — `npm test`는 통과했었다.)
 16. **목업 데이터는 앱 코드에 두지 않는다** — 화면은 실제 API(`src/queries/`)만 쓴다(2026-10-01 목업 제거). 테스트용 예시 데이터는 `src/test-utils/fixtures.ts`, 화면 테스트는 `jest.mock('@/api/<domain>')`으로 API를 가짜로 바꾼다. 등록 3단계가 함께 쓰는 초안은 `state/DraftProvider`(기기에만 있는 UI 상태).
@@ -141,7 +141,7 @@ CI=1 npx expo prebuild --platform android --no-install   # config plugin(위젯 
 **실기기(USB) 실행** — 폰은 **케이블로만** 연결한다(Wi-Fi 접속 안 함). (2026-09-30 Galaxy S22+에서 확인):
 ```bash
 adb devices                              # 폰이 'device'로 보여야 한다 ('unauthorized'면 폰에서 USB 디버깅 허용)
-npx expo run:android                     # 개발 빌드 생성 → 폰에 설치 → 개발 서버 시작 (첫 빌드 약 10분)
+APP_VARIANT=development npx expo run:android   # 개발 빌드(com.weave.app.dev) 생성 → 폰에 설치 → 개발 서버 시작 (첫 빌드 약 10분)
 adb reverse tcp:8081 tcp:8081            # 항상 실행 — USB로 개발 서버 연결
                                          # → 앱 시작 화면 주소칸에 http://localhost:8081 입력 후 Connect
 npx expo start                           # 이후 JS만 바꿀 땐 개발 서버만 (CI=1 없이 실행해야 코드 변경이 바로 반영된다)
@@ -160,6 +160,15 @@ adb -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.ap
 adb -s emulator-5554 reverse tcp:8081 tcp:8081        # 개발 서버 연결 → 앱에서 http://localhost:8081
 ```
 - 폰과 에뮬레이터가 둘 다 연결돼 있으면 `adb` 명령에 `-s <기기ID>`를 붙인다(`adb devices`로 확인). `npx expo run:android`는 어느 기기에 설치할지 묻는다.
+**배포 APK**(운영 서버 https://13-54-18-38.sslip.io, 사용자 결정 2026-10-19) — 배포용 키로 서명한다. 키는 저장소 밖 `~/.android/weave-release.keystore`, 비밀번호는 `~/.gradle/gradle.properties`의 `WEAVE_RELEASE_*`(설정 플러그인 `plugins/with-release-signing.js`가 읽는다 — 없으면 release 빌드 실패). **키를 잃으면 설치된 앱을 업데이트할 수 없다.**
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17) APP_VARIANT=production EXPO_PUBLIC_API_URL=https://13-54-18-38.sslip.io NODE_ENV=production
+CI=1 npx expo prebuild --platform android --clean --no-install && (cd android && ./gradlew assembleRelease)
+# → android/app/build/outputs/apk/release/app-release.apk  ·  설치: adb -s <기기> install -r <apk>
+```
+- 업데이트할 때마다 `app.config.ts`의 `version`과 Android `versionCode`를 올린다(같은 versionCode로는 덮어 설치만 된다).
+- 배포 APK를 만든 뒤 개발 빌드로 돌아갈 땐 `APP_VARIANT=development`로 다시 prebuild한다(`android/`가 마지막 prebuild 설정을 따른다).
+
 Android 빌드 환경(Expo SDK 57 문서 기준, macOS): **JDK 17**(배포판 무관, `JAVA_HOME=$(/usr/libexec/java_home -v 17)` — 경로를 직접 적지 않는다. zulu-17 경로를 박아 두었다가 JDK를 바꾼 뒤 `expo run:android`가 "JAVA_HOME is set to an invalid directory"로 실패했다, 2026-10-17) · Android Studio에서 **Android SDK Platform 36** + Build-Tools · `ANDROID_HOME=$HOME/Library/Android/sdk`, `PATH`에 `$ANDROID_HOME/platform-tools`·`$ANDROID_HOME/emulator`. 백엔드는 `jvmToolchain(25)`로 JDK 25를 따로 쓰므로 `JAVA_HOME`이 17이어도 된다.
 폰: 설정 → 휴대전화 정보 → 소프트웨어 정보 → 빌드 번호 7번 탭 → 개발자 옵션 → USB 디버깅 켜기 → 케이블 연결 후 "USB 디버깅 허용".
 

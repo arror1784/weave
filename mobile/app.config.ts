@@ -20,21 +20,25 @@ const widgetConfig: WithAndroidWidgetsParams = {
   ],
 };
 
+// 배포 앱과 개발 빌드를 폰에 나란히 설치한다(사용자 결정 2026-10-19) — 개발 빌드는 APP_VARIANT=development로 만든다.
+// 패키지·스킴이 다르면 두 앱이 같은 링크(weave://)를 두고 다투지 않는다.
+const isDev = process.env.APP_VARIANT === 'development';
+
 const config: ExpoConfig = {
-  name: 'weave',
+  name: isDev ? 'weave dev' : 'weave',
   slug: 'weave',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
-  scheme: 'weave',
+  scheme: isDev ? 'weave-dev' : 'weave',
   // 밝은 테마만 지원 — 다크 모드 미지원
   userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'com.weave.app',
   },
   android: {
-    // 출시 후엔 바꿀 수 없다
-    package: 'com.weave.app',
+    // 출시 후엔 바꿀 수 없다(배포 앱). 개발 빌드는 .dev를 붙여 따로 설치된다
+    package: isDev ? 'com.weave.app.dev' : 'com.weave.app',
     // Weave 로고(WeaveMark)로 만든 아이콘 — 바탕은 실 색(colors.thread), 전경은 날실·씨실
     adaptiveIcon: {
       backgroundColor: '#2B4C8C',
@@ -64,6 +68,8 @@ const config: ExpoConfig = {
       },
     ],
     ['react-native-android-widget', widgetConfig],
+    // 배포 앱 release 빌드는 배포용 키로 서명(키는 저장소 밖 — plugins/with-release-signing.js)
+    ...(isDev ? [] : ['./plugins/with-release-signing']),
   ],
   experiments: {
     typedRoutes: true,
