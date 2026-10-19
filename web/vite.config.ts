@@ -4,6 +4,10 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
+// 테스트는 한국 시간으로 돈다 — 날짜 테스트가 한국 기기를 가정하고 쓰였다(하루는 아침 6시에 바뀐다).
+// GitHub Actions 러너는 UTC라 D-day가 하루씩 어긋나 실패했다(2026-10-20 첫 CI 배포).
+process.env.TZ = 'Asia/Seoul';
+
 // 개발 중에는 /api를 로컬 백엔드(8080)로 넘긴다 — 웹과 API가 같은 주소(origin)라 CORS가 필요 없고 쿠키가 그대로 오간다.
 // 배포에서도 Caddy가 같은 주소로 / → 웹, /api → 서버로 나눈다.
 export default defineConfig({
