@@ -5,6 +5,8 @@ import com.weave.auth.dto.WebTokenResponse
 import com.weave.auth.service.AuthService
 import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
+import com.weave.global.ratelimit.RateLimitPolicy
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
@@ -27,7 +29,7 @@ import java.time.Duration
  */
 @RestController
 @RequestMapping("/api/v1/auth/web")
-class WebAuthController(private val authService: AuthService, private val properties: WeaveProperties) {
+class WebAuthController(private val authService: AuthService, private val properties: WeaveProperties, private val rateLimit: RateLimitPolicy) {
 
     /** 웹이 처음 열릴 때 부른다 — 응답에 XSRF-TOKEN 쿠키가 심긴다 */
     @GetMapping("/csrf")
@@ -37,7 +39,8 @@ class WebAuthController(private val authService: AuthService, private val proper
 
     @PostMapping("/login")
     @PreAuthorize("permitAll()")
-    fun login(@Valid @RequestBody request: LoginRequest, response: HttpServletResponse): WebTokenResponse {
+    fun login(@Valid @RequestBody request: LoginRequest, http: HttpServletRequest, response: HttpServletResponse): WebTokenResponse {
+        rateLimit.login(http.remoteAddr, request.email)
         val tokens = authService.login(request, client = CLIENT)
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, properties.jwt.refreshTokenTtl))
         return WebTokenResponse.of(tokens)
@@ -45,7 +48,8 @@ class WebAuthController(private val authService: AuthService, private val proper
 
     @PostMapping("/refresh")
     @PreAuthorize("permitAll()")
-    fun refresh(@CookieValue(COOKIE, required = false) refreshToken: String?, response: HttpServletResponse): WebTokenResponse {
+    fun refresh(@CookieValue(COOKIE, required = false) refreshToken: String?, http: HttpServletRequest, response: HttpServletResponse): WebTokenResponse {
+        rateLimit.refresh(http.remoteAddr)
         if (refreshToken.isNullOrBlank()) throw ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "다시 로그인해 주세요.")
         val tokens = authService.refresh(refreshToken)
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, properties.jwt.refreshTokenTtl))

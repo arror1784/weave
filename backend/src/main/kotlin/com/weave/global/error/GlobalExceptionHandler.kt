@@ -1,5 +1,6 @@
 package com.weave.global.error
 
+import com.weave.global.ratelimit.RateLimitExceededException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -16,6 +17,15 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
 @RestControllerAdvice
 class GlobalExceptionHandler {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    /** 요청 횟수 한도 초과 — 429 + Retry-After(초). 앱·웹은 message를 그대로 보여준다 */
+    @ExceptionHandler(RateLimitExceededException::class)
+    fun handleRateLimited(e: RateLimitExceededException): ResponseEntity<ErrorResponse> {
+        val seconds = maxOf(1L, e.retryAfter.toSeconds())
+        val wait = if (seconds < 60) "잠시" else "${(seconds + 59) / 60}분"
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", seconds.toString())
+            .body(ErrorResponse("RATE_LIMITED", "요청이 너무 많아요. $wait 뒤 다시 시도해 주세요."))
+    }
 
     @ExceptionHandler(ApiException::class)
     fun handleApi(e: ApiException): ResponseEntity<ErrorResponse> = respond(e.status, e.code, e.message)
