@@ -1,0 +1,18 @@
+# 운영(배포) 프로필 — deploy/compose.yaml이 SPRING_PROFILES_ACTIVE=prod로 켠다.
+# DB 주소·비밀값은 여기 두지 않고 환경 변수로 받는다(deploy/.env, §3-1): SPRING_DATASOURCE_URL·_USERNAME·_PASSWORD, JWT_SECRET, ANTHROPIC_API_KEY, HOLIDAY_API_KEY
+springdoc:
+  # 인터넷에 공개되는 서버라 API 문서를 끈다(배포 2026-10-19)
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+server:
+  # Caddy 뒤에서 돈다 — X-Forwarded-* 헤더로 원래 주소(https)를 안다
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+weave:
+  storage:
+    # 첨부 파일 — 컨테이너 볼륨(deploy/compose.yaml의 uploads)
+    root: ${WEAVE_STORAGE_ROOT:/data/uploads}
