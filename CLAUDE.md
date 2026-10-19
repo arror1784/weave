@@ -117,7 +117,7 @@
    │ 서버 데이터: TanStack Query 캐시                                                    └──▶ client/ ──▶ Claude API (AI 챗봇)
 [PC 웹 (web/, 등록 + AI 재요청)] ──같은 주소의 /api (리프레시 토큰은 HttpOnly 쿠키, /auth/web만 CSRF)──▶ [Spring Boot API]
 배포: Lightsail 시드니 1대 — Caddy(HTTPS, / 웹 · /api 서버) + 서버 + PostgreSQL, Docker Compose(deploy/)
-      ← GitHub Actions(.github/workflows/deploy.yml): release 브랜치 푸시 → 테스트 → 이미지 GHCR → SSH로 서버 반영
+      ← GitHub Actions: main 푸시 → ci.yml(테스트) / release 푸시 → deploy.yml(main 테스트 통과 확인 → 이미지 GHCR → SSH로 서버 반영)
 ```
 (인증은 소셜 로그인 대신 이메일+비밀번호 — 사용자 결정. 리프레시 토큰은 Secure Store, 서버 데이터는 TanStack Query.)
 
@@ -134,7 +134,7 @@
 
 **Layer 4 — 브랜치 + PR 게이트**
 - `main`에 직접 커밋 금지. 항상 **기능 브랜치 → PR → 리뷰 → 머지**.
-- **`release` 브랜치는 운영 배포다**(사용자 결정 2026-10-20) — 푸시하면 GitHub Actions가 테스트 후 서버에 반영한다. `main`에서 검증한 것만 `--ff-only`로 옮긴다. 배포도 사람이 푸시한다.
+- **`release` 브랜치는 운영 배포다**(사용자 결정 2026-10-20) — 테스트는 `main` 푸시 때 `ci.yml`이 돌고, `release`에 푸시하면 `deploy.yml`이 **같은 커밋이 main 테스트를 통과했는지 확인한 뒤** 서버에 반영한다. 그래서 `main`에서 `--ff-only`로만 옮긴다(main에 없는 커밋은 배포되지 않는다). 배포도 사람이 푸시한다.
 - **커밋·푸시는 사람이 직접 실행한다.** AI는 `git commit`/`git push`를 실행하지 않고, 검증이 끝나면 커밋 단위(어떤 파일을 어떤 순서로)와 메시지를 제안하고, 섞이면 안 되는 파일(`.env`·빌드 산출물·`ios/`·`android/` 생성 폴더·로컬 덤프)을 경고한다.
 - DB 데이터 삭제, 외부 전송처럼 되돌리기 어렵거나 밖으로 나가는 작업은 **실행 전 사용자 확인**.
 
