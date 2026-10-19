@@ -15,7 +15,7 @@
 | DB 스키마 변경 | `.claude/rules/migration.md` → `.claude/skills/db-migration/SKILL.md` |
 | 앱에 네이티브 패키지 추가 | `.claude/rules/native-modules.md` → `.claude/skills/add-native-module/SKILL.md` |
 | 테스트 작성 | `.claude/rules/testing.md` |
-| 배포(Lightsail·Docker Compose·Caddy) | `deploy/README.md` |
+| 배포(Lightsail·Docker Compose·Caddy, `release` 브랜치 푸시 = 자동 배포) | `deploy/README.md` |
 | AI 챗봇(작업 분할) | `docs/Weave-AI 작업 분할 시스템 프롬프트.md` (사용자가 쓴 원본 — 서버가 빌드할 때 그대로 시스템 프롬프트로 쓴다) |
 
 ---
@@ -116,6 +116,7 @@
    │ 서버 데이터: TanStack Query 캐시                                                    └──▶ client/ ──▶ Claude API (AI 챗봇)
 [PC 웹 (web/, 등록 + AI 재요청)] ──같은 주소의 /api (리프레시 토큰은 HttpOnly 쿠키, /auth/web만 CSRF)──▶ [Spring Boot API]
 배포: Lightsail 시드니 1대 — Caddy(HTTPS, / 웹 · /api 서버) + 서버 + PostgreSQL, Docker Compose(deploy/)
+      ← GitHub Actions(.github/workflows/deploy.yml): release 브랜치 푸시 → 테스트 → 이미지 GHCR → SSH로 서버 반영
 ```
 (인증은 소셜 로그인 대신 이메일+비밀번호 — 사용자 결정. 리프레시 토큰은 Secure Store, 서버 데이터는 TanStack Query.)
 
@@ -132,6 +133,7 @@
 
 **Layer 4 — 브랜치 + PR 게이트**
 - `main`에 직접 커밋 금지. 항상 **기능 브랜치 → PR → 리뷰 → 머지**.
+- **`release` 브랜치는 운영 배포다**(사용자 결정 2026-10-20) — 푸시하면 GitHub Actions가 테스트 후 서버에 반영한다. `main`에서 검증한 것만 `--ff-only`로 옮긴다. 배포도 사람이 푸시한다.
 - **커밋·푸시는 사람이 직접 실행한다.** AI는 `git commit`/`git push`를 실행하지 않고, 검증이 끝나면 커밋 단위(어떤 파일을 어떤 순서로)와 메시지를 제안하고, 섞이면 안 되는 파일(`.env`·빌드 산출물·`ios/`·`android/` 생성 폴더·로컬 덤프)을 경고한다.
 - DB 데이터 삭제, 외부 전송처럼 되돌리기 어렵거나 밖으로 나가는 작업은 **실행 전 사용자 확인**.
 
