@@ -7,7 +7,9 @@
 | `compose.yaml` | db(postgres 18.6) · server(`weave-server:latest`, `SPRING_PROFILES_ACTIVE=prod`) · caddy |
 | `Caddyfile` | `/api/*`·`/actuator/health` → server:8080, 그 밖은 `./web`(SPA), 보안 헤더 |
 | `.env.example` | 서버의 `deploy/.env`에 넣을 값 목록 — **`.env`는 커밋 금지** |
-| `build.sh` | Mac에서 jar → 이미지, 웹 → `deploy/web` |
+| `build.sh` | Mac에서 jar → 이미지, 웹 → `deploy/web` (손으로 올릴 때) |
+| `remote-deploy.sh` | 서버에서 GHCR 이미지 받기 → `weave-server:latest`로 태그 → 설정·웹 교체 → 다시 띄우기 (CI/CD가 부른다) |
+| `../.github/workflows/deploy.yml` | **`release` 브랜치에 푸시하면** 테스트 → 이미지 GHCR → 서버 반영 → 헬스체크 |
 | `backup.sh` | 서버에서 매일 DB 덤프(cron 03:30 KST) → `~/backups`, 14일 보관 |
 | `../backend/Dockerfile` | jar를 넣은 실행 이미지(JRE 25) |
 | `../backend/src/main/resources/application-prod.yml` | 운영 프로필: API 문서 끔, 프록시 헤더, 첨부 `/data/uploads` |
@@ -21,7 +23,27 @@ curl localhost:8088/actuator/health  # {"status":"UP"} — 브라우저는 http:
 docker compose down                  # 끄기(데이터 볼륨은 남는다)
 ```
 
-## 서버에 올리기
+## 자동 배포 (CI/CD, 사용자 결정 2026-10-20)
+`main`에서 검증한 것을 **`release` 브랜치에 머지·푸시하면** GitHub Actions가 배포한다.
+```bash
+git switch release && git merge --ff-only main && git push   # 배포
+```
+1. `test` — 백엔드 `./gradlew build`(Testcontainers) · 웹 `npm ci && npm test && npm run build`
+2. `image` — jar로 `linux/amd64` 이미지를 만들어 `ghcr.io/arror1784/weave-server:<커밋>`·`latest`로 올린다(비공개)
+3. `deploy` — `compose.yaml`·`Caddyfile`·`backup.sh`·웹 파일을 서버 `~/weave/.incoming`에 풀고 `remote-deploy.sh` 실행. 서버는 **이번 작업의 `GITHUB_TOKEN`으로만** GHCR에 로그인하고 끝나면 로그아웃한다(서버에 토큰을 남기지 않는다). `.env`·DB·첨부 볼륨은 건드리지 않는다.
+4. 헬스체크 — 밖에서 `DEPLOY_URL/actuator/health`가 200이 될 때까지(최대 2분 30초)
+
+**처음 한 번 설정**(Settings → Environments → `production`, 없으면 첫 실행 때 생긴다):
+| 이름 | 종류 | 값 |
+|---|---|---|
+| `DEPLOY_HOST` | Secret | 서버 고정 IP |
+| `DEPLOY_SSH_KEY` | Secret | 배포 전용 키(`~/.ssh/weave-deploy-gha`)의 개인 키 — 공개 키는 서버 `~/.ssh/authorized_keys`에 |
+| `DEPLOY_KNOWN_HOSTS` | Secret | `ssh-keyscan -t ed25519 <서버 IP>` 결과(서버 사칭 방지) |
+| `DEPLOY_URL` | Variable | `https://<IP를 -로>.sslip.io` |
+
+**되돌리기**: 되돌릴 커밋으로 `release`를 옮겨 다시 푸시하면 그 커밋으로 빌드·배포된다(`git switch release && git reset --hard <커밋> && git push --force-with-lease`).
+
+## 서버에 손으로 올리기 (CI/CD를 못 쓸 때)
 ```bash
 PLATFORM=linux/amd64 ./deploy/build.sh --save   # Lightsail은 x86 — deploy/weave-server.tar.gz
 # compose.yaml · Caddyfile · web/ · weave-server.tar.gz 를 서버로 복사한 뒤 서버에서:
