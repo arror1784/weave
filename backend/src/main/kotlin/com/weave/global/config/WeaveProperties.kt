@@ -11,7 +11,19 @@ data class WeaveProperties(
     val anthropic: Anthropic = Anthropic(),
     val holiday: Holiday = Holiday(),
     val defaults: Defaults = Defaults(),
+    val rateLimit: RateLimit = RateLimit(),
 ) {
+    /** 요청 횟수 제한(§3-14, 사용자 결정 2026-10-19) — 기본값이 운영 값. 테스트 프로필은 enabled=false */
+    data class RateLimit(
+        val enabled: Boolean = true,
+        val loginPerIpPerMinute: Int = 10,
+        val loginPerEmailPer15Minutes: Int = 10,
+        val signupPerIpPerHour: Int = 5,
+        val refreshPerIpPerMinute: Int = 60,
+        val chatPerUserPerHour: Int = 30,
+        val chatPerUserPerDay: Int = 100,
+    )
+
     data class Defaults(
         /** 새 가입자의 요일별·공휴일 가용 시간 처음 값 — 개인 일정을 빼고 쓰므로 크게(사용자 결정 2026-10-17: 8시간) */
         val availableHours: Double = 8.0,

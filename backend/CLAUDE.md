@@ -100,4 +100,4 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /a
 - **같은 클래스 안에서 부른 `@Transactional` 메서드는 트랜잭션이 걸리지 않는다**(프록시를 거치지 않음) — 엔티티 값을 바꿔 두기만 하면 저장되지 않는다. 정기 작업이 자기 메서드를 부를 땐 `repository.save`로 명시적으로 저장한다(공휴일 이름이 안 고쳐진 버그, 2026-10-17).
 - 테스트 프로필은 외부 API 키를 비운다(`application-test.yml`) — `.env`를 테스트도 읽어서, 키를 넣자 테스트 서버가 뜰 때마다 실제 공휴일 API를 부를 뻔했다.
 - **Sonnet 5.5는 `tool_choice`의 `tool`·`any`(도구 강제)를 거절한다**(400 "not supported for this model") — 테스트는 가짜 AI라 못 잡았고, 5번째 답에서 챗봇이 실패할 뻔했다(2026-10-18 실제 API로 발견). 도구는 AI가 고르게 두고, 꼭 제안받아야 할 때는 마지막 사용자 메시지에 글로 요청한다. 모델을 바꾸면 실제 API로 한 번 확인한다.
-- 요청 횟수 제한은 지금 없다(사용자 결정 — 배포 때 다시 고려). 넣을 때는 서버가 여러 대일 수 있으니 공유 저장소 기준으로, 통합 테스트는 모두 같은 IP라는 점을 고려한다.
+- **요청 횟수 제한**(2026-10-19): `RateLimitPolicy`(어디에 얼마나 — `weave.rate-limit`) → `RateLimiter`(메모리, 고정 시간 창, 10분마다 정리). IP는 `request.remoteAddr` — 운영은 Caddy가 덮어쓴 `X-Forwarded-For`를 `forward-headers-strategy`로 읽는다(서버 포트는 밖에 열지 않는다). **테스트 프로필은 끈다** — 통합 테스트가 모두 127.0.0.1로 가입을 많이 해서 켜 두면 엉뚱하게 429가 난다. 제한 자체는 `RateLimitIntegrationTest`가 작은 한도로 켜서 확인한다.
