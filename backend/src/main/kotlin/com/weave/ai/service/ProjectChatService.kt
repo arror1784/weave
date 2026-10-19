@@ -42,12 +42,14 @@ class ProjectChatService(
     fun chat(userId: Long, request: ProjectChatRequest): ProjectChatResponse {
         // 첨부는 첫 사용자 메시지(프로젝트 소개)에 붙인다 — 대화 내내 같은 내용이라 ClaudeClient가 캐시한다
         val attachments = attachmentContentLoader.load(userId, request.attachmentIds)
-        val turns = merge(listOf(AiTurn("user", introduce(request.project), attachments)) + request.messages.map(::toTurn))
-
         val forced = mustPropose(request.messages)
+        val merged = merge(listOf(AiTurn("user", introduce(request.project), attachments)) + request.messages.map(::toTurn))
+        // 최초 제안은 5턴 안에 — 도구 강제(tool_choice)는 Sonnet 5.5가 거절해서 마지막 답에 글로 요청한다(2026-10-18)
+        val turns = if (forced && merged.last().role == "user") merged.dropLast(1) + merged.last().let { it.copy(text = "${it.text}\n\n$PROPOSE_NOW") } else merged
+
         val started = System.nanoTime()
         val result = try {
-            aiClient.converse(prompt.system(), turns, PROPOSE_TASKS, forceTool = forced)
+            aiClient.converse(prompt.system(), turns, PROPOSE_TASKS)
         } catch (e: Exception) {
             activityRecorder.record(userId, ActivityType.AI_CHAT_FAILED, detail = chatDetail(request, started) + mapOf("model" to weaveProperties.anthropic.model, "error" to e.javaClass.simpleName))
             if (e is ApiException) throw e
@@ -103,7 +105,7 @@ class ProjectChatService(
         )
     }
 
-    /** 프롬프트 대화 규칙 1: 최초 제안은 5턴 안에 — 사용자 답이 5번 쌓였는데 아직 제안이 없으면 도구 호출을 강제한다 */
+    /** 프롬프트 대화 규칙 1: 최초 제안은 5턴 안에 — 사용자 답이 5번 쌓였는데 아직 제안이 없으면 제안을 요청한다 */
     private fun mustPropose(messages: List<ChatMessage>): Boolean {
         val proposedAlready = messages.any { it.role == "assistant" && !it.tasks.isNullOrEmpty() }
         return !proposedAlready && messages.count { it.role == "user" } >= MAX_TURNS_BEFORE_PROPOSAL
@@ -179,6 +181,9 @@ class ProjectChatService(
     companion object {
         /** 프롬프트 대화 규칙 1 — 최초 제안까지 사용자 답 최대 5번 */
         const val MAX_TURNS_BEFORE_PROPOSAL = 5
+
+        /** 5번째 답 뒤 마지막 사용자 메시지에 덧붙이는 요청 — Sonnet 5.5는 tool_choice 강제를 거절해서 글로 요청한다(2026-10-18) */
+        const val PROPOSE_NOW = "[지금까지의 답으로 더 묻지 말고 지금 propose_tasks로 작업 목록을 제안해 줘. 부족한 정보는 가정하고 assumptions에 적어 줘.]"
 
         /** 사용자 프롬프트 문서의 "출력 형식 (tool use)"와 같은 함수 정의 — 단, dueDate는 선택(문서는 필수, 사용자가 고칠 예정) */
         val PROPOSE_TASKS = AiTool(

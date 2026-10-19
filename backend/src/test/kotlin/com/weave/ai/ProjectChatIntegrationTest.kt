@@ -28,7 +28,7 @@ class FakeAiConfiguration {
     @Bean
     @Primary
     fun fakeAiClient(): AiClient = object : AiClient {
-        override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean) = AiResult("팀원은 몇 명인가요?", null)
+        override fun converse(system: String, turns: List<AiTurn>, tool: AiTool) = AiResult("팀원은 몇 명인가요?", null)
     }
 }
 

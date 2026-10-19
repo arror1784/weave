@@ -10,7 +10,6 @@ import com.anthropic.models.messages.DocumentBlockParam
 import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.Tool
-import com.anthropic.models.messages.ToolChoiceTool
 import com.weave.global.config.WeaveProperties
 import com.weave.global.error.ApiException
 import org.springframework.http.HttpStatus
@@ -27,7 +26,7 @@ class ClaudeClient(private val weaveProperties: WeaveProperties) : AiClient {
         weaveProperties.anthropic.apiKey.takeIf { it.isNotBlank() }?.let { AnthropicOkHttpClient.builder().apiKey(it).build() }
     }
 
-    override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean): AiResult {
+    override fun converse(system: String, turns: List<AiTurn>, tool: AiTool): AiResult {
         val api = client ?: throw ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AI_UNAVAILABLE", "AI 설정이 없어요.")
         @Suppress("UNCHECKED_CAST")
         val properties = tool.inputSchema["properties"] as Map<String, Any>
@@ -49,7 +48,6 @@ class ClaudeClient(private val weaveProperties: WeaveProperties) : AiClient {
                     )
                     .build(),
             )
-            .apply { if (forceTool) toolChoice(ToolChoiceTool.builder().name(tool.name).build()) }
             .apply {
                 turns.forEach {
                     when {

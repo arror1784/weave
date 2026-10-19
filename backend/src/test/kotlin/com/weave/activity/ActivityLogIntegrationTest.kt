@@ -43,7 +43,7 @@ class ActivityFakeAiConfiguration {
     @Bean
     @Primary
     fun activityFakeAiClient(): AiClient = object : AiClient {
-        override fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean) =
+        override fun converse(system: String, turns: List<AiTurn>, tool: AiTool) =
             AiResult("팀원은 몇 명인가요?", null, inputTokens = 1200, outputTokens = 40, model = "claude-sonnet-5-5", cacheReadTokens = 1000, cacheWriteTokens = 500)
     }
 }

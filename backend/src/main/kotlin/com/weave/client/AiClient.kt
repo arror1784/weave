@@ -21,6 +21,6 @@ data class AiResult(
 
 /** AI 호출 창구. 실제 구현은 ClaudeClient 하나이고, 테스트에서는 가짜로 바꾼다. */
 interface AiClient {
-    /** forceTool이면 반드시 tool을 부르게 한다 */
-    fun converse(system: String, turns: List<AiTurn>, tool: AiTool, forceTool: Boolean): AiResult
+    /** tool은 AI가 필요할 때 부른다 — 강제(tool_choice)는 쓰지 않는다: Sonnet 5.5가 거절한다(2026-10-18) */
+    fun converse(system: String, turns: List<AiTurn>, tool: AiTool): AiResult
 }

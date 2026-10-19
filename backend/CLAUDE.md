@@ -52,7 +52,7 @@ backend/
     │   ├── schedule/                    # domain/Scheduler(일정 알고리즘 — 등록 때 전부 다시 배치, 하루에 최대한 채워 앞당기기, 마감을 못 지키면 앞날에 몰기) · service/OverdueRoller(밀린 작업 → 오늘, 매일 6시 5분) · 일정 스냅샷 API
     │   ├── attachment/                  # 첨부 업로드·링크·내려받기 · storage/FileStorage(로컬 디스크) · OrphanAttachmentCleaner(연결 안 된 첨부 24시간 후 삭제, 매일 4시)
     │   ├── activity/                    # 사용 기록(ActivityRecorder — 각 서비스가 같은 트랜잭션에서 남긴다) · 앱 기록 받기 · 엑셀 내보내기(ActivityExportService, POI)
-    │   ├── ai/                          # 등록 챗봇(ProjectChatService — propose_tasks 도구, 5턴 뒤 강제, dueDate는 선택·마감 없으면 '상시 프로젝트'로 소개) · AttachmentContentLoader(첨부 → AI 내용)
+    │   ├── ai/                          # 등록 챗봇(ProjectChatService — propose_tasks 도구, 5턴 뒤 마지막 답에 제안 요청(PROPOSE_NOW), dueDate는 선택·마감 없으면 '상시 프로젝트'로 소개) · AttachmentContentLoader(첨부 → AI 내용)
     │   ├── client/                      # 외부 연동: AiClient ← ClaudeClient
     │   └── {feature}/{controller,dto,service,repository,domain}/
     ├── main/resources/
@@ -99,4 +99,5 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # 개발용 로그인 POST /a
 - **외부 API 응답은 바이트로 받아 형식이 정한 인코딩으로 읽는다** — 공공데이터 API가 `Content-Type: application/xml`에 charset을 주지 않아 `body(String)`이 ISO-8859-1로 읽었고, 공휴일 이름이 깨진 채 저장됐다(2026-10-17). XML은 바이트를 파서에 넘기면 머리말의 encoding을 따른다.
 - **같은 클래스 안에서 부른 `@Transactional` 메서드는 트랜잭션이 걸리지 않는다**(프록시를 거치지 않음) — 엔티티 값을 바꿔 두기만 하면 저장되지 않는다. 정기 작업이 자기 메서드를 부를 땐 `repository.save`로 명시적으로 저장한다(공휴일 이름이 안 고쳐진 버그, 2026-10-17).
 - 테스트 프로필은 외부 API 키를 비운다(`application-test.yml`) — `.env`를 테스트도 읽어서, 키를 넣자 테스트 서버가 뜰 때마다 실제 공휴일 API를 부를 뻔했다.
+- **Sonnet 5.5는 `tool_choice`의 `tool`·`any`(도구 강제)를 거절한다**(400 "not supported for this model") — 테스트는 가짜 AI라 못 잡았고, 5번째 답에서 챗봇이 실패할 뻔했다(2026-10-18 실제 API로 발견). 도구는 AI가 고르게 두고, 꼭 제안받아야 할 때는 마지막 사용자 메시지에 글로 요청한다. 모델을 바꾸면 실제 API로 한 번 확인한다.
 - 요청 횟수 제한은 지금 없다(사용자 결정 — 배포 때 다시 고려). 넣을 때는 서버가 여러 대일 수 있으니 공유 저장소 기준으로, 통합 테스트는 모두 같은 IP라는 점을 고려한다.
