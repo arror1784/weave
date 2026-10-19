@@ -12,7 +12,6 @@ data class ChatMessage(
     val text: String = "",
 
     /** assistant: 앞서 받은 작업 제안 / user: 직접 고친 작업 목록 (수정 루프) */
-    @field:Valid
     @field:Size(max = 60)
-    val tasks: List<ChatTask>? = null,
+    val tasks: List<@Valid ChatTask>? = null,
 )

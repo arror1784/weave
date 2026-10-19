@@ -29,9 +29,8 @@ data class CreateProjectRequest(
     @field:Size(max = 2000)
     val progress: String = "",
 
-    @field:Valid
     @field:Size(min = 1, max = 50, message = "작업이 1개 이상 있어야 해요.")
-    val tasks: List<CreateTaskRequest>,
+    val tasks: List<@Valid CreateTaskRequest>,
 
     @field:Size(max = 10, message = "첨부는 10개까지예요.")
     val attachmentIds: List<Long> = emptyList(),

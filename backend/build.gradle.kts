@@ -11,7 +11,8 @@ version = "0.0.1-SNAPSHOT"
 kotlin {
     jvmToolchain(25)
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+        // -Xemit-jvm-type-annotations: List<@Valid T>처럼 타입 인자에 붙인 애너테이션을 바이트코드에 남긴다 — 없으면 목록 항목 검증이 조용히 빠진다
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-Xemit-jvm-type-annotations")
     }
 }
 
