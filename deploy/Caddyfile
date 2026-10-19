@@ -1,0 +1,32 @@
+# 같은 주소(origin)에서 /api는 서버로, 나머지는 PC 웹(SPA)으로 — CORS 없이 쿠키가 그대로 오간다(web/CLAUDE.md §2-5).
+# SITE_ADDRESS가 도메인이면 Caddy가 HTTPS 인증서를 자동으로 받는다. 로컬 확인은 SITE_ADDRESS=http://localhost(포트 없이, 컨테이너 안은 80) + HTTP_PORT=8088.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# 첨부 10MB + 여유(서버도 11MB로 다시 막는다)
+	request_body {
+		max_size 12MB
+	}
+
+	handle /api/* {
+		reverse_proxy server:8080
+	}
+
+	# 배포 확인용 헬스체크만 연다(그 밖의 actuator는 서버가 노출하지 않는다)
+	handle /actuator/health {
+		reverse_proxy server:8080
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

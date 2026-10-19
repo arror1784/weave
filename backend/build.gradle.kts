@@ -78,3 +78,8 @@ tasks.processResources {
         rename { "project-breakdown.md" }
     }
 }
+
+// 배포 이미지(backend/Dockerfile)는 실행 가능한 jar 하나만 쓴다 — plain jar를 만들지 않아 COPY가 헷갈리지 않게
+tasks.jar {
+    enabled = false
+}

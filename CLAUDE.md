@@ -15,6 +15,7 @@
 | DB 스키마 변경 | `.claude/rules/migration.md` → `.claude/skills/db-migration/SKILL.md` |
 | 앱에 네이티브 패키지 추가 | `.claude/rules/native-modules.md` → `.claude/skills/add-native-module/SKILL.md` |
 | 테스트 작성 | `.claude/rules/testing.md` |
+| 배포(Lightsail·Docker Compose·Caddy) | `deploy/README.md` |
 | AI 챗봇(작업 분할) | `docs/Weave-AI 작업 분할 시스템 프롬프트.md` (사용자가 쓴 원본 — 서버가 빌드할 때 그대로 시스템 프롬프트로 쓴다) |
 
 ---
@@ -114,6 +115,7 @@
    │ 리프레시 토큰: Secure Store                                                        ├──▶ auth/ ──▶ 이메일·비밀번호(bcrypt) → 자체 JWT 발급
    │ 서버 데이터: TanStack Query 캐시                                                    └──▶ client/ ──▶ Claude API (AI 챗봇)
 [PC 웹 (web/, 등록 + AI 재요청)] ──같은 주소의 /api (리프레시 토큰은 HttpOnly 쿠키, /auth/web만 CSRF)──▶ [Spring Boot API]
+배포: Lightsail 시드니 1대 — Caddy(HTTPS, / 웹 · /api 서버) + 서버 + PostgreSQL, Docker Compose(deploy/)
 ```
 (인증은 소셜 로그인 대신 이메일+비밀번호 — 사용자 결정. 리프레시 토큰은 Secure Store, 서버 데이터는 TanStack Query.)
 
