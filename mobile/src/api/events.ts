@@ -9,3 +9,6 @@ export const listEvents = (page = 0, size = 100) => request(`/api/v1/me/events?p
 export const createEvent = (event: NewPersonalEvent) => request('/api/v1/me/events', personalEventSchema, { method: 'POST', body: event });
 
 export const deleteEvent = (id: number) => request(`/api/v1/me/events/${id}`, null, { method: 'DELETE' });
+
+/** 수정 — 추가와 같은 본문으로 모든 칸을 보낸다(종류까지, 사용자 결정 2026-10-23) */
+export const updateEvent = (id: number, event: NewPersonalEvent) => request(`/api/v1/me/events/${id}`, personalEventSchema, { method: 'PATCH', body: event });

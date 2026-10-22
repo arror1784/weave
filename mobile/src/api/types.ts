@@ -92,18 +92,36 @@ export const scheduleSchema = z.object({
   /** 서버가 계산한 날짜별 가용 시간(요일·공휴일 − 개인 일정) */
   availableHoursByDate: z.record(z.string(), z.number()).optional(),
   /** 날짜별 개인 일정(오늘 화면·달력 표시용) */
-  events: z.array(z.object({ eventId: z.number(), date: dateKey, title: z.string(), startTime: z.string(), endTime: z.string() })).optional(),
+  /** 이어진 일정(2026-10-23)은 날마다 그날 부분 — fromPreviousDay·toNextDay로 '~12:00'·'하루 종일'·'14:00~' (옛 서버엔 없음) */
+  events: z
+    .array(
+      z.object({
+        eventId: z.number(),
+        date: dateKey,
+        title: z.string(),
+        startTime: z.string(),
+        endTime: z.string(),
+        fromPreviousDay: z.boolean().optional(),
+        toNextDay: z.boolean().optional(),
+      }),
+    )
+    .optional(),
   projects: z.array(projectBriefSchema),
   tasks: z.array(taskSchema),
 });
 
-/** 개인 일정(사용자 결정 2026-10-17) — 매주 반복(weekdays: 월 1 … 일 7, 기간) 또는 한 번(date). 시각은 HH:mm */
+/**
+ * 개인 일정(사용자 결정 2026-10-17) — 매주 반복(weekdays: 월 1 … 일 7, 기간) 또는 한 번. 시각은 HH:mm.
+ * 한 번(2026-10-23): 날짜 지정(dates — 같은 시각) 또는 이어진 일정(untilDate — date startTime ~ untilDate endTime). 옛 서버엔 dates·untilDate가 없다.
+ */
 export const personalEventSchema = z.object({
   id: z.number(),
   title: z.string(),
   repeat: z.enum(['weekly', 'once']),
   weekdays: z.array(z.number()),
   date: dateKey.nullable(),
+  dates: z.array(dateKey).default([]),
+  untilDate: dateKey.nullable().default(null),
   startTime: z.string(),
   endTime: z.string(),
   startDate: dateKey.nullable(),

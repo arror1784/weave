@@ -11,7 +11,7 @@ import { dayOfMonth, formatDateLabel, formatMonthEyebrow, formatShortDate, month
 import type { EventOccurrence, Project } from '@/api/types';
 import { LoadError, Loading } from '@/components/QueryStatus';
 import { formatHours } from '@/lib/korean';
-import { selectDayEvents, selectDayItems, selectDayLoad, type DayItem } from '@/lib/schedule';
+import { eventTimeLabel, selectDayEvents, selectDayItems, selectDayLoad, type DayItem } from '@/lib/schedule';
 import { useSchedule } from '@/queries/schedule';
 import { useAppTheme } from '@/theme';
 import { projectPaletteFor } from '@/theme/colors';
@@ -193,7 +193,7 @@ function WeekView() {
 /** 개인 일정(사용자 결정 2026-10-17) — 프로젝트 색이 아닌 회색으로, 시각과 함께 */
 function EventChip({ event }: { event: EventOccurrence }) {
   const { colors } = useAppTheme();
-  const time = `${event.startTime}~${event.endTime}`;
+  const time = eventTimeLabel(event);
   return (
     <View accessible accessibilityLabel={`개인 일정, ${event.title}, ${time}`} style={[styles.chip, { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line }]}>
       <AppText variant="small" tone="soft" numberOfLines={1} style={styles.flex}>

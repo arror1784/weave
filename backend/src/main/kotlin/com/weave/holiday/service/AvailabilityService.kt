@@ -4,6 +4,7 @@ import com.weave.event.domain.PersonalEvent
 import com.weave.event.dto.EventOccurrenceResponse
 import com.weave.event.dto.PersonalEventResponse
 import com.weave.event.repository.PersonalEventRepository
+import com.weave.global.time.TodayProvider
 import com.weave.holiday.repository.HolidayRepository
 import com.weave.user.domain.User
 import org.springframework.stereotype.Service
@@ -40,30 +41,42 @@ class AvailabilityService(
             holidays = holidays.sorted(),
             availableHoursByDate = days.associateWith { available(user, it, it in holidays, events) },
             events = days.flatMap { day ->
-                events.filter { it.occursOn(day) }.sortedWith(compareBy({ it.startOffsetMinutes }, { it.id }))
-                    .map { EventOccurrenceResponse(it.id!!, day, it.title, it.startTime.format(PersonalEventResponse.HHMM), it.endTime.format(PersonalEventResponse.HHMM)) }
+                events.mapNotNull { e -> e.segmentOn(day)?.let { e to it } }.sortedWith(compareBy({ it.second.startMinute }, { it.first.id }))
+                    .map { (e, s) -> occurrence(e, day, s) }
             },
         )
     }
 
     data class Calendar(val holidays: List<LocalDate>, val availableHoursByDate: Map<LocalDate, Double>, val events: List<EventOccurrenceResponse>)
 
+    /** 하루짜리 일정은 입력한 시각 그대로, 이어진 일정은 그날 부분(이어지는 쪽 끝은 하루가 바뀌는 6시) */
+    private fun occurrence(e: PersonalEvent, day: LocalDate, s: PersonalEvent.DaySegment): EventOccurrenceResponse {
+        if (!e.isSpan) return EventOccurrenceResponse(e.id!!, day, e.title, e.startTime.format(PersonalEventResponse.HHMM), e.endTime.format(PersonalEventResponse.HHMM))
+        val dayStart = day.atTime(TodayProvider.DAY_STARTS_AT_HOUR.toInt(), 0)
+        return EventOccurrenceResponse(
+            e.id!!, day, e.title,
+            dayStart.plusMinutes(s.startMinute.toLong()).format(PersonalEventResponse.HHMM),
+            dayStart.plusMinutes(s.endMinute.toLong()).format(PersonalEventResponse.HHMM),
+            fromPreviousDay = s.fromPreviousDay,
+            toNextDay = s.toNextDay,
+        )
+    }
+
     private fun available(user: User, date: LocalDate, holiday: Boolean, events: List<PersonalEvent>): Double =
-        maxOf(0.0, user.availableHoursOn(date, holiday) - busyHours(events.filter { it.occursOn(date) }))
+        maxOf(0.0, user.availableHoursOn(date, holiday) - busyHoursOn(date, events))
 
     companion object {
         /** Scheduler.SEARCH_DAYS와 같다 — 1년 넘게 배치되는 일은 없다 */
         const val PLAN_DAYS = 366L
 
         /** 그날 개인 일정이 차지하는 시간 — 하루(6시~다음 날 6시) 흐름에서 겹치는 구간은 한 번만 센다 */
-        fun busyHours(events: List<PersonalEvent>): Double {
+        fun busyHoursOn(day: LocalDate, events: List<PersonalEvent>): Double {
             var total = 0
             var end: Int? = null
-            for (e in events.sortedBy { it.startOffsetMinutes }) {
-                val eventEnd = e.startOffsetMinutes + e.durationMinutes
-                val start = if (end != null && e.startOffsetMinutes < end) end else e.startOffsetMinutes
-                if (eventEnd > start) total += eventEnd - start
-                if (end == null || eventEnd > end) end = eventEnd
+            for (s in events.mapNotNull { it.segmentOn(day) }.sortedBy { it.startMinute }) {
+                val start = if (end != null && s.startMinute < end) end else s.startMinute
+                if (s.endMinute > start) total += s.endMinute - start
+                if (end == null || s.endMinute > end) end = s.endMinute
             }
             return total / 60.0
         }

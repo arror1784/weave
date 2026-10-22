@@ -1,4 +1,4 @@
-import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, startOfMonthShift, toDateKey, todayKey, weekDays, weekdayLabel } from './date';
+import { addDays, dDayLabel, dayOfMonth, diffInDays, formatDateLabel, formatMonthEyebrow, formatShortDate, monthGrid, startOfMonthShift, toDateKey, todayKey, weekDays, weekdayLabel, datesBetween } from './date';
 
 describe('date', () => {
   it('Date를 로컬 기준 YYYY-MM-DD 키로 바꾼다', () => {
@@ -56,5 +56,13 @@ describe('date', () => {
     expect(startOfMonthShift('2026-12-15', 1)).toBe('2027-01-01');
     expect(startOfMonthShift('2026-01-31', -1)).toBe('2025-12-01');
     expect(startOfMonthShift('2026-09-30', 0)).toBe('2026-09-01');
+  });
+});
+
+describe('datesBetween', () => {
+  it('양 끝을 포함한 사이 날짜를 모두 — 거꾸로 줘도 같다, 달을 넘어도 된다', () => {
+    expect(datesBetween('2026-09-29', '2026-10-01')).toEqual(['2026-09-29', '2026-09-30', '2026-10-01']);
+    expect(datesBetween('2026-10-01', '2026-09-29')).toEqual(['2026-09-29', '2026-09-30', '2026-10-01']);
+    expect(datesBetween('2026-09-29', '2026-09-29')).toEqual(['2026-09-29']);
   });
 });

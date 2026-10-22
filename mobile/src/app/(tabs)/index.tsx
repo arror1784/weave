@@ -9,7 +9,7 @@ import { SectionLabel } from '@/components/SectionLabel';
 import { TaskCard } from '@/components/TaskCard';
 import { formatDateLabel, formatMonthEyebrow } from '@/lib/date';
 import { formatHours } from '@/lib/korean';
-import { selectDayEvents, selectTodayTasks, selectTodayWork } from '@/lib/schedule';
+import { eventTimeLabel, selectDayEvents, selectTodayTasks, selectTodayWork } from '@/lib/schedule';
 import { useSchedule } from '@/queries/schedule';
 import { useToggleTask } from '@/queries/use-toggle-task';
 import { useAppTheme } from '@/theme';
@@ -106,7 +106,7 @@ export default function TodayScreen() {
           <View style={styles.list}>
             {events.map((e) => (
               <View key={`${e.eventId}-${e.startTime}`} style={[styles.event, { borderColor: colors.line, borderRadius: radius.card, backgroundColor: colors.surface }]}>
-                <AppText variant="mono" tone="soft">{`${e.startTime}~${e.endTime}`}</AppText>
+                <AppText variant="mono" tone="soft">{eventTimeLabel(e)}</AppText>
                 <AppText variant="small" style={styles.flex}>
                   {e.title}
                 </AppText>
