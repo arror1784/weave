@@ -51,7 +51,8 @@ export function SliderField({
         value={value}
         onValueChange={(v: number) => onChange(snap(v))}
         minimumTrackTintColor={colors.thread}
-        maximumTrackTintColor={colors.line}
+        // Android는 빈 선을 반투명하게 그려서 구분선 색(line)은 거의 안 보인다 → 입력칸 경계 색
+        maximumTrackTintColor={colors.control}
         thumbTintColor={colors.thread}
         style={styles.slider}
       />
