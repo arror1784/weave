@@ -42,6 +42,8 @@ function RootStack() {
         <Stack.Screen name="project/new/review" />
         <Stack.Screen name="overload" />
         <Stack.Screen name="widgets" />
+        <Stack.Screen name="availability" />
+        <Stack.Screen name="standing" />
         <Stack.Screen name="events/index" />
         <Stack.Screen name="events/new" />
       </Stack.Protected>
