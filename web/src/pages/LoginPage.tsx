@@ -11,6 +11,7 @@ export function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await signIn(email, password);
+      await signIn(email, password, rememberMe);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -81,6 +82,10 @@ export function LoginPage() {
               />
             </div>
           </div>
+          <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-[14px] text-ink-soft">
+            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="size-4 accent-thread" />
+            로그인 상태 유지
+          </label>
           <div id="login-error" className="mt-3 min-h-6">
             {error && (
               <p role="alert" className="flex items-center gap-1.5 text-[14px] font-medium text-danger-text">

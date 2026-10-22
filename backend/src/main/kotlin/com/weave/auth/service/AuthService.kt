@@ -42,14 +42,14 @@ class AuthService(
         return tokenService.issue(user)
     }
 
-    /** client: 사용 기록에 남길 접속 수단 — 앱은 기록하지 않던 그대로(null), PC 웹은 "web" */
+    /** client: 사용 기록에 남길 접속 수단 — 앱은 기록하지 않던 그대로(null), PC 웹은 "web". remember: PC 웹 '로그인 상태 유지' */
     @Transactional
-    fun login(request: LoginRequest, client: String? = null): TokenResponse {
+    fun login(request: LoginRequest, client: String? = null, remember: Boolean = true): TokenResponse {
         val user = userRepository.findByEmail(normalize(request.email))
         // 이메일이 없는지 비밀번호가 틀렸는지 구분해 알려주지 않는다
         if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) throw invalidCredentials()
         activityRecorder.record(user.id!!, ActivityType.LOGIN, detail = client?.let { mapOf("client" to it) } ?: emptyMap())
-        return tokenService.issue(user)
+        return tokenService.issue(user, remember)
     }
 
     /**
@@ -67,7 +67,7 @@ class AuthService(
         if (!token.isActive(now)) throw invalidRefresh()
         val user = userRepository.findById(token.userId).orElseThrow { invalidRefresh() }
         token.revoke(now)
-        return tokenService.issue(user)
+        return tokenService.issue(user, token.remember)
     }
 
     /** 로그아웃: 그 리프레시 토큰을 폐기한다. 다른 사람 토큰이면 조용히 무시한다. */

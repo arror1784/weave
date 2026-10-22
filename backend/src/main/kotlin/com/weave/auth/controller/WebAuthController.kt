@@ -1,6 +1,6 @@
 package com.weave.auth.controller
 
-import com.weave.auth.dto.LoginRequest
+import com.weave.auth.dto.WebLoginRequest
 import com.weave.auth.dto.WebTokenResponse
 import com.weave.auth.service.AuthService
 import com.weave.global.config.WeaveProperties
@@ -39,10 +39,10 @@ class WebAuthController(private val authService: AuthService, private val proper
 
     @PostMapping("/login")
     @PreAuthorize("permitAll()")
-    fun login(@Valid @RequestBody request: LoginRequest, http: HttpServletRequest, response: HttpServletResponse): WebTokenResponse {
+    fun login(@Valid @RequestBody request: WebLoginRequest, http: HttpServletRequest, response: HttpServletResponse): WebTokenResponse {
         rateLimit.login(http.remoteAddr, request.email)
-        val tokens = authService.login(request, client = CLIENT)
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, properties.jwt.refreshTokenTtl))
+        val tokens = authService.login(request.toLogin(), client = CLIENT, remember = request.rememberMe)
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, lifetime(tokens.remember)))
         return WebTokenResponse.of(tokens)
     }
 
@@ -52,7 +52,7 @@ class WebAuthController(private val authService: AuthService, private val proper
         rateLimit.refresh(http.remoteAddr)
         if (refreshToken.isNullOrBlank()) throw ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "다시 로그인해 주세요.")
         val tokens = authService.refresh(refreshToken)
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, properties.jwt.refreshTokenTtl))
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken, lifetime(tokens.remember)))
         return WebTokenResponse.of(tokens)
     }
 
@@ -65,13 +65,16 @@ class WebAuthController(private val authService: AuthService, private val proper
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie("", Duration.ZERO))
     }
 
-    private fun refreshCookie(value: String, maxAge: Duration) =
+    /** '로그인 상태 유지'를 끄면 null — Max-Age 없는 쿠키라 브라우저를 닫으면 사라진다 */
+    private fun lifetime(remember: Boolean): Duration? = if (remember) properties.jwt.refreshTokenTtl else null
+
+    private fun refreshCookie(value: String, maxAge: Duration?) =
         ResponseCookie.from(COOKIE, value)
             .httpOnly(true)
             .secure(true)
             .sameSite("Strict")
             .path("/api/v1/auth/web")
-            .maxAge(maxAge)
+            .apply { if (maxAge != null) maxAge(maxAge) }
             .build()
             .toString()
 

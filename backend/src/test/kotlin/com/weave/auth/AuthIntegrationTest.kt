@@ -42,6 +42,7 @@ class AuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectMapp
             jsonPath("$.expiresIn") { value(900) }
             jsonPath("$.user.id") { exists() }
             jsonPath("$.user.email") { value(email) }
+            jsonPath("$.remember") { doesNotExist() } // 웹 쿠키용 내부 값 — 앱 응답 모양은 그대로
         }
     }
 

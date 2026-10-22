@@ -2,8 +2,9 @@ import { refreshSession, setAccessToken, webAuthPost } from './client';
 import { webTokenSchema, type User } from './types';
 
 /** 로그인 — 서버가 리프레시 토큰을 HttpOnly 쿠키로 심고, 액세스 토큰은 메모리에만 둔다 */
-export async function login(email: string, password: string): Promise<User> {
-  const tokens = await webAuthPost('/api/v1/auth/web/login', webTokenSchema, { email: email.trim(), password });
+/** rememberMe: '로그인 상태 유지' — 끄면 서버가 브라우저를 닫으면 사라지는 쿠키를 준다(사용자 결정 2026-10-22) */
+export async function login(email: string, password: string, rememberMe = true): Promise<User> {
+  const tokens = await webAuthPost('/api/v1/auth/web/login', webTokenSchema, { email: email.trim(), password, rememberMe });
   setAccessToken(tokens.accessToken);
   return tokens.user;
 }
