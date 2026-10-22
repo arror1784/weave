@@ -43,13 +43,15 @@ class WebAuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
 
     fun refreshCookie(response: MockHttpServletResponse): Cookie? = response.getCookie("weave_refresh")
 
-    fun login(email: String, xsrf: Cookie = csrf()): MockHttpServletResponse =
+    fun login(email: String, xsrf: Cookie = csrf(), rememberMe: Boolean? = null): MockHttpServletResponse =
         mockMvc.post("/api/v1/auth/web/login") {
             cookie(xsrf)
             header("X-XSRF-TOKEN", xsrf.value)
             contentType = MediaType.APPLICATION_JSON
-            content = api.json(mapOf("email" to email, "password" to "weave2026!"))
+            content = api.json(mapOf("email" to email, "password" to "weave2026!") + listOfNotNull(rememberMe?.let { "rememberMe" to it }))
         }.andReturn().response
+
+    fun refreshHeader(response: MockHttpServletResponse) = response.getHeaders("Set-Cookie").first { it.startsWith("weave_refresh=") }
 
     fun refresh(refresh: Cookie?, xsrf: Cookie = csrf()): MockHttpServletResponse =
         mockMvc.post("/api/v1/auth/web/refresh") {
@@ -74,6 +76,29 @@ class WebAuthIntegrationTest(private val mockMvc: MockMvc, objectMapper: ObjectM
         header shouldContain "SameSite=Strict"
         header shouldContain "Path=/api/v1/auth/web"
         header shouldContain "Max-Age=2592000"
+    }
+
+    test("'로그인 상태 유지'를 끄면 리프레시 쿠키를 브라우저를 닫으면 사라지는 쿠키(Max-Age 없음)로 주고, 갱신해도 그대로다") {
+        val email = email()
+        api.signup(email)
+        val loggedIn = login(email, rememberMe = false)
+        loggedIn.status shouldBe 200
+        refreshHeader(loggedIn) shouldNotContain "Max-Age"
+        refreshHeader(loggedIn) shouldContain "HttpOnly"
+
+        val refreshed = refresh(refreshCookie(loggedIn))
+        refreshed.status shouldBe 200
+        refreshHeader(refreshed) shouldNotContain "Max-Age"
+    }
+
+    test("'로그인 상태 유지'를 켜면(빼먹어도) 30일 쿠키를 주고, 갱신해도 30일이다") {
+        val email = email()
+        api.signup(email)
+        val kept = login(email, rememberMe = true)
+        refreshHeader(kept) shouldContain "Max-Age=2592000"
+        refreshHeader(refresh(refreshCookie(kept))) shouldContain "Max-Age=2592000"
+
+        refreshHeader(login(email)) shouldContain "Max-Age=2592000" // 예전 웹(값 없음)은 지금처럼 30일
     }
 
     test("CSRF 토큰 없이 웹 로그인·갱신·로그아웃을 보내면 403") {

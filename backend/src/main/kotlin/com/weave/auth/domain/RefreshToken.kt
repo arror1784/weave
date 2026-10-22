@@ -22,6 +22,10 @@ class RefreshToken(
 
     @Column(name = "expires_at", nullable = false)
     val expiresAt: Instant,
+
+    /** PC 웹 '로그인 상태 유지' — false면 웹 쿠키를 브라우저를 닫으면 사라지게 준다. 교체한 토큰도 이어받는다 */
+    @Column(name = "remember", nullable = false)
+    val remember: Boolean = true,
 ) : BaseEntity() {
     @Column(name = "revoked_at")
     var revokedAt: Instant? = null

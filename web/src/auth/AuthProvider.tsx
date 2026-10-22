@@ -9,7 +9,7 @@ type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 type Auth = {
   status: AuthStatus;
   user: User | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, rememberMe: boolean) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -47,8 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
-      signIn: async (email, password) => {
-        setUser(await authApi.login(email, password));
+      signIn: async (email, password, rememberMe) => {
+        setUser(await authApi.login(email, password, rememberMe));
         setStatus('signedIn');
       },
       signOut: async () => {

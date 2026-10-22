@@ -30,7 +30,7 @@ class TokenService(
     private val random = SecureRandom()
 
     /** 호출하는 쪽의 트랜잭션 안에서 리프레시 토큰을 저장한다 */
-    fun issue(user: User): TokenResponse {
+    fun issue(user: User, remember: Boolean = true): TokenResponse {
         val now = clock.instant()
         val ttl = properties.jwt.accessTokenTtl
         val claims = JwtClaimsSet.builder()
@@ -43,8 +43,8 @@ class TokenService(
         val accessToken = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).tokenValue
 
         val raw = ByteArray(32).also(random::nextBytes).let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
-        refreshTokenRepository.save(RefreshToken(user.id!!, hash(raw), now.plus(properties.jwt.refreshTokenTtl)))
-        return TokenResponse(accessToken, raw, ttl.seconds, UserResponse.of(user, todayProvider.today()))
+        refreshTokenRepository.save(RefreshToken(user.id!!, hash(raw), now.plus(properties.jwt.refreshTokenTtl), remember))
+        return TokenResponse(accessToken, raw, ttl.seconds, UserResponse.of(user, todayProvider.today()), remember)
     }
 
     companion object {

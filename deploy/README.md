@@ -50,6 +50,9 @@ PLATFORM=linux/amd64 ./deploy/build.sh --save   # Lightsail은 x86 — deploy/we
 docker load < weave-server.tar.gz && docker compose up -d
 ```
 
+## 비밀번호 바꾸기 (앱에 재설정 기능 없음)
+`scripts/reset-password.sh <이메일>` — 이 Mac에서 비밀번호를 두 번 묻고(가입 규칙으로 확인) bcrypt 해시만 서버로 보낸다. 그 계정의 로그인(리프레시 토큰)은 모두 끊긴다.
+
 ## 백업 (사용자 결정 2026-10-19)
 - **DB 덤프**: 서버 cron `30 18 * * *`(UTC = 03:30 KST)이 `~/weave/backup.sh` 실행 → `~/backups/weave-<날짜>.dump`(pg_dump -Fc), 14일 지난 것 삭제, 기록은 `~/backups/backup.log`.
 - **서버 통째**: Lightsail 자동 스냅샷(매일 19:00 UTC = 04:00 KST, 최근 7개) — 첨부 파일(`uploads` 볼륨)·덤프까지 포함. 복원은 콘솔/CLI에서 스냅샷으로 새 인스턴스를 만들고 고정 IP를 옮긴다.

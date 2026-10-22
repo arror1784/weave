@@ -40,9 +40,22 @@ describe('W1 로그인', () => {
     await userEvent.type(await screen.findByLabelText('이메일'), 'me@example.com');
     await userEvent.type(screen.getByLabelText('비밀번호'), 'weave2026!');
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
-    expect(auth.login).toHaveBeenCalledWith('me@example.com', 'weave2026!');
+    expect(auth.login).toHaveBeenCalledWith('me@example.com', 'weave2026!', true);
     expect(await screen.findByRole('heading', { name: '안녕하세요' })).toBeInTheDocument();
     expect(screen.getByText('me@example.com')).toBeInTheDocument(); // 상단 바
+  });
+
+  it("'로그인 상태 유지'는 처음에 켜져 있고, 끄고 로그인하면 끈 채로 보낸다 (사용자 결정 2026-10-22)", async () => {
+    auth.login.mockResolvedValue(testUser);
+    renderWithProviders(<AppRoutes />, { route: '/login' });
+    const keep = await screen.findByRole('checkbox', { name: '로그인 상태 유지' });
+    expect(keep).toBeChecked();
+    await userEvent.click(keep);
+    expect(keep).not.toBeChecked();
+    await userEvent.type(screen.getByLabelText('이메일'), 'me@example.com');
+    await userEvent.type(screen.getByLabelText('비밀번호'), 'weave2026!');
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }));
+    expect(auth.login).toHaveBeenCalledWith('me@example.com', 'weave2026!', false);
   });
 
   it('틀리면 서버 메시지를 알리고 화면에 남는다', async () => {
