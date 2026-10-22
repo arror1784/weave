@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -26,7 +27,8 @@ import java.util.UUID
 
 /**
  * 개인 일정(사용자 결정 2026-10-17): 매주 반복 + 한 번. 그날 가용 시간에서 일정 시간만큼 뺀다(0 밑으로 안 내려감, 겹치면 한 번만).
- * 추가·삭제로는 바로 다시 배치하지 않는다 — 다음 등록·다시 배치 때 반영. 오늘·달력에 보여주려고 일정 응답에 날짜별로 넣는다.
+ * 오늘·달력에 보여주려고 일정 응답에 날짜별로 넣는다.
+ * 2026-10-23: 수정 · 한 번 일정은 날짜 여러 개 또는 이어진 일정 · 추가·수정·삭제하면 밀린 작업까지 바로 다시 배치(설정 변경과 같게).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -114,34 +116,104 @@ class PersonalEventIntegrationTest(private val mockMvc: MockMvc, objectMapper: O
         byDate[today.plusDays(14).toString()].asDouble() shouldBe 3.0
     }
 
-    test("추가해도 바로 다시 배치하지 않고, 다음 '작업 다시 배치' 때 반영한다") {
-        val tokens = newUser()
-        mockMvc.post("/api/v1/projects") {
-            header("Authorization", api.bearer(tokens))
-            contentType = MediaType.APPLICATION_JSON
-            content = api.json(
-                mapOf(
-                    "name" to "과제", "description" to "", "deadline" to today.plusDays(30).toString(), "color" to "teal", "deliverable" to "", "progress" to "",
-                    "tasks" to listOf(mapOf("key" to "a", "title" to "일", "description" to "", "estimatedHours" to 3.0, "dependsOnKey" to null, "prerequisite" to false)),
-                    "attachmentIds" to emptyList<Long>(),
-                ),
-            )
-        }.andExpect { status { isCreated() } }
-        add(tokens, once("약속", "10:00", "12:00")).andExpect { status { isCreated() } }
-        schedule(tokens)["tasks"][0]["days"][0]["hours"].asDouble() shouldBe 3.0 // 그대로
-        mockMvc.post("/api/v1/schedule/replan") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isOk() } }
-        schedule(tokens)["tasks"][0]["days"].asIterable().map { it["date"].asString() to it["hours"].asDouble() } shouldBe
-            listOf(today.toString() to 1.0, today.plusDays(1).toString() to 2.0)
+    fun edit(tokens: JsonNode, id: Long, body: Map<String, Any?>) = mockMvc.patch("/api/v1/me/events/$id") {
+        header("Authorization", api.bearer(tokens))
+        contentType = MediaType.APPLICATION_JSON
+        content = api.json(body)
+    }
+    fun registerProject(tokens: JsonNode, hours: Double) = mockMvc.post("/api/v1/projects") {
+        header("Authorization", api.bearer(tokens))
+        contentType = MediaType.APPLICATION_JSON
+        content = api.json(
+            mapOf(
+                "name" to "과제", "description" to "", "deadline" to today.plusDays(30).toString(), "color" to "teal", "deliverable" to "", "progress" to "",
+                "tasks" to listOf(mapOf("key" to "a", "title" to "일", "description" to "", "estimatedHours" to hours, "dependsOnKey" to null, "prerequisite" to false)),
+                "attachmentIds" to emptyList<Long>(),
+            ),
+        )
+    }.andExpect { status { isCreated() } }
+    fun taskDays(tokens: JsonNode) = schedule(tokens)["tasks"][0]["days"].asIterable().map { it["date"].asString() to it["hours"].asDouble() }
+
+    test("추가·수정·삭제하면 밀린 작업까지 바로 다시 배치한다 (사용자 결정 2026-10-23 — 전엔 다음 배치 때 반영)") {
+        val tokens = newUser() // 테스트 프로필 기본 가용 3시간
+        registerProject(tokens, 3.0)
+        taskDays(tokens) shouldBe listOf(today.toString() to 3.0)
+        val id = api.read(add(tokens, once("약속", "10:00", "12:00")).andExpect { status { isCreated() } }.andReturn().response.contentAsString)["id"].asLong()
+        taskDays(tokens) shouldBe listOf(today.toString() to 1.0, today.plusDays(1).toString() to 2.0)
+        edit(tokens, id, once("약속", "10:00", "11:00")).andExpect { status { isOk() } }
+        taskDays(tokens) shouldBe listOf(today.toString() to 2.0, today.plusDays(1).toString() to 1.0)
+        mockMvc.delete("/api/v1/me/events/$id") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNoContent() } }
+        taskDays(tokens) shouldBe listOf(today.toString() to 3.0)
     }
 
-    test("추가·삭제를 사용 기록에 남기고, 탈퇴하면 개인 일정도 지운다") {
+    test("수정은 모든 칸을 바꾼다 — 매주 반복을 한 번으로(200, camelCase·id) · 남의 일정은 404 · 검증은 추가와 같다") {
+        val tokens = newUser()
+        val id = api.read(
+            add(tokens, mapOf("title" to "수업", "repeat" to "weekly", "weekdays" to listOf(1), "startTime" to "10:00", "endTime" to "12:00")).andReturn().response.contentAsString,
+        )["id"].asLong()
+        edit(tokens, id, mapOf("title" to "보강", "repeat" to "once", "dates" to listOf(today.plusDays(2).toString(), today.toString()), "startTime" to "13:15", "endTime" to "14:45"))
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(id) }
+                jsonPath("$.title") { value("보강") }
+                jsonPath("$.repeat") { value("once") }
+                jsonPath("$.weekdays.length()") { value(0) }
+                jsonPath("$.date") { value(today.toString()) }
+                jsonPath("$.dates[1]") { value(today.plusDays(2).toString()) }
+                jsonPath("$.startTime") { value("13:15") }
+                jsonPath("$.untilDate") { value(null) }
+            }
+        edit(newUser(), id, once("남의 것", "10:00", "11:00")).andExpect { status { isNotFound() } }
+        edit(tokens, id, once("", "10:00", "11:00")).andExpect { status { isBadRequest() } }
+        mockMvc.patch("/api/v1/me/events/$id") { contentType = MediaType.APPLICATION_JSON; content = api.json(once("a", "10:00", "11:00")) }.andExpect { status { isUnauthorized() } }
+    }
+
+    test("날짜 지정 일정은 고른 날짜마다 같은 시각을 뺀다 — 분은 아무 값이나(10:15)") {
+        val tokens = newUser()
+        add(tokens, mapOf("title" to "회식", "repeat" to "once", "dates" to listOf(today.toString(), today.plusDays(3).toString()), "startTime" to "10:15", "endTime" to "11:45"))
+            .andExpect { status { isCreated() } }
+        val s = schedule(tokens)
+        s["availableHoursByDate"][today.toString()].asDouble() shouldBe 1.5
+        s["availableHoursByDate"][today.plusDays(1).toString()].asDouble() shouldBe 3.0
+        s["availableHoursByDate"][today.plusDays(3).toString()].asDouble() shouldBe 1.5
+        s["events"].asIterable().map { "${it["date"].asString()} ${it["startTime"].asString()}~${it["endTime"].asString()}" } shouldBe
+            listOf("$today 10:15~11:45", "${today.plusDays(3)} 10:15~11:45")
+    }
+
+    test("이어진 일정은 하루(6시~다음 날 6시)마다 겹치는 만큼 빼고, 날마다 그날 부분과 이어짐 표시를 준다") {
+        val tokens = newUser() // 기본 가용 3시간
+        add(tokens, mapOf("title" to "MT", "repeat" to "once", "date" to today.toString(), "untilDate" to today.plusDays(2).toString(), "startTime" to "20:00", "endTime" to "08:00"))
+            .andExpect {
+                status { isCreated() }
+                jsonPath("$.untilDate") { value(today.plusDays(2).toString()) }
+            }
+        val s = schedule(tokens)
+        s["availableHoursByDate"][today.toString()].asDouble() shouldBe 0.0 // 20:00~06:00 = 10h
+        s["availableHoursByDate"][today.plusDays(1).toString()].asDouble() shouldBe 0.0 // 하루 통째로
+        s["availableHoursByDate"][today.plusDays(2).toString()].asDouble() shouldBe 1.0 // 06:00~08:00 = 2h
+        s["availableHoursByDate"][today.plusDays(3).toString()].asDouble() shouldBe 3.0
+        s["events"].asIterable().map { "${it["date"].asString()} ${it["startTime"].asString()}~${it["endTime"].asString()} ${it["fromPreviousDay"].asBoolean()} ${it["toNextDay"].asBoolean()}" } shouldBe
+            listOf("$today 20:00~06:00 false true", "${today.plusDays(1)} 06:00~06:00 true true", "${today.plusDays(2)} 06:00~08:00 true false")
+    }
+
+    test("여러 날·이어진 일정 검증: 날짜 없음·끝 날짜가 시작보다 앞·끝 시각이 시작보다 앞(같은 날)·날짜 100개 넘음은 400") {
+        val tokens = newUser()
+        add(tokens, mapOf("title" to "a", "repeat" to "once", "dates" to emptyList<String>(), "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
+        add(tokens, mapOf("title" to "a", "repeat" to "once", "date" to today.toString(), "untilDate" to today.minusDays(1).toString(), "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
+        add(tokens, mapOf("title" to "a", "repeat" to "once", "date" to today.toString(), "untilDate" to today.toString(), "startTime" to "10:00", "endTime" to "09:00")).andExpect { status { isBadRequest() } }
+        add(tokens, mapOf("title" to "a", "repeat" to "once", "dates" to (0L..100L).map { today.plusDays(it).toString() }, "startTime" to "10:00", "endTime" to "11:00")).andExpect { status { isBadRequest() } }
+    }
+
+    test("추가·수정·삭제를 사용 기록에 남기고, 탈퇴하면 개인 일정도 지운다") {
         val tokens = newUser()
         val id = api.read(add(tokens, once("약속", "10:00", "12:00")).andReturn().response.contentAsString)["id"].asLong()
         mockMvc.delete("/api/v1/me/events/$id") { header("Authorization", api.bearer(tokens)) }
-        add(tokens, once("남을 약속", "10:00", "12:00"))
+        val kept = api.read(add(tokens, once("남을 약속", "10:00", "12:00")).andReturn().response.contentAsString)["id"].asLong()
+        edit(tokens, kept, once("남을 약속", "10:00", "13:00")).andExpect { status { isOk() } }
         val userId = tokens["user"]["id"].asLong()
         jdbc.queryForList("SELECT type FROM activity_logs WHERE user_id = ?", String::class.java, userId) shouldContain "EVENT_ADDED"
         jdbc.queryForList("SELECT type FROM activity_logs WHERE user_id = ?", String::class.java, userId) shouldContain "EVENT_DELETED"
+        jdbc.queryForList("SELECT type FROM activity_logs WHERE user_id = ?", String::class.java, userId) shouldContain "EVENT_UPDATED"
         mockMvc.delete("/api/v1/me") { header("Authorization", api.bearer(tokens)) }.andExpect { status { isNoContent() } }
         jdbc.queryForObject("SELECT count(*) FROM personal_events WHERE user_id = ?", Long::class.java, userId) shouldBe 0L
     }
