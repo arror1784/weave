@@ -160,3 +160,11 @@ const dayOrder = (time: string) => `${Number(time.slice(0, 2)) < DAY_START_HOUR 
 export function selectDayEvents(data: ScheduleData, date: DateKey): EventOccurrence[] {
   return (data.events ?? []).filter((e) => e.date === date).sort((a, b) => dayOrder(a.startTime).localeCompare(dayOrder(b.startTime)) || a.eventId - b.eventId);
 }
+
+/** 개인 일정 시각 표시 — 이어진 일정은 날마다 그날 부분(사용자 결정 2026-10-23): 첫날 '14:00~' · 중간 '하루 종일' · 마지막 날 '~12:00' */
+export function eventTimeLabel(e: EventOccurrence): string {
+  if (e.fromPreviousDay && e.toNextDay) return '하루 종일';
+  if (e.toNextDay) return `${e.startTime}~`;
+  if (e.fromPreviousDay) return `~${e.endTime}`;
+  return `${e.startTime}~${e.endTime}`;
+}

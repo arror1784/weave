@@ -85,12 +85,12 @@ mobile/
     │   │   └── projects/    # 탭 안 스택: index(04 목록) · [id](04-a/b 상세 — 탭이 보인다)
     │   ├── project/new/     # index(02-b-i 기본 정보) → chat(02-b-ii 챗봇) → review(02-b-iii 작업 검토)
     │   ├── overload.tsx     # 04-c 이번 주 과부하(날짜별)
-    │   ├── events/          # 개인 일정(설정에서 진입): index 목록·삭제 · new 추가(반복·한 번, 시각 30분 −/+, 끝 < 시작이면 '다음 날')
+    │   ├── events/          # 개인 일정(설정에서 진입): index 목록·삭제(누르면 수정) · new 추가 · [id] 수정 — 둘 다 components/EventForm(매주 반복·날짜 지정·이어진 일정, 시각은 TimeField: 30분 −/+ 또는 직접 입력)
     │   ├── availability.tsx # 설정 → 요일별 가용 시간(월~일·공휴일 슬라이더, '저장'으로 한 번에)
     │   ├── standing.tsx     # 설정 → 상시 프로젝트 시간(주 횟수·한 번 시간 슬라이더, '저장'으로 한 번에)
     │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
-    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · SliderField(설정 슬라이더 한 줄) · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트) · Dialog · ProjectCompleteDialog · icons
+    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · SliderField(설정 슬라이더 한 줄) · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트 + 여러 날 시트) · TimeField(시각 −/+ · 직접 입력) · EventForm(개인 일정 입력) · Dialog · ProjectCompleteDialog · icons
     ├── theme/               # colors(+프로젝트 팔레트) · spacing(+radius) · typography(Pretendard·JetBrains Mono) · useAppTheme (단일 소스, 밝은 테마만)
     ├── lib/                 # 순수 헬퍼: date · korean · validation(Zod) · contrast · scheduler(부하 계산) · schedule(오늘 할 일·밀림·부하·이번 주 날짜별 부하 선택 함수)
     ├── api/                 # client(request·토큰 갱신) · token-store(Secure Store) · types(Zod) · auth · projects · attachments · chat · errors

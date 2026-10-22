@@ -31,6 +31,12 @@ export function addDays(key: DateKey, days: number): DateKey {
 }
 
 /** from에서 to까지 며칠인지 (to가 뒤면 양수). */
+/** 두 날짜 사이(양 끝 포함)의 모든 날짜 — 순서는 상관없다 */
+export function datesBetween(a: DateKey, b: DateKey): DateKey[] {
+  const [from, to] = a <= b ? [a, b] : [b, a];
+  return Array.from({ length: diffInDays(from, to) + 1 }, (_, i) => addDays(from, i));
+}
+
 export function diffInDays(from: DateKey, to: DateKey): number {
   const ms = Date.UTC(...ymd(to)) - Date.UTC(...ymd(from));
   return Math.round(ms / 86_400_000);

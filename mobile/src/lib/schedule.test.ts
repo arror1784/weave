@@ -1,6 +1,6 @@
 import type { Project, Task } from '@/api/types';
 
-import { capacityOn, isOverdue, selectDayEvents, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
+import { capacityOn, eventTimeLabel, isOverdue, selectDayEvents, selectDayItems, selectDayLoad, selectGanttRange, selectOverdueTasks, selectTodayTasks, selectTodayWork, selectWeekDays, taskTone, type ScheduleData } from './schedule';
 
 const T = '2026-09-30'; // 수요일
 
@@ -144,6 +144,14 @@ describe('일정 계산', () => {
     };
     expect(selectDayEvents(withEvents, T).map((e) => e.title)).toEqual(['수업', '동아리']);
     expect(selectDayEvents(data, T)).toEqual([]);
+  });
+
+  it('개인 일정 시각 표시 — 이어진 일정은 날마다 그날 부분: 첫날 14:00~ · 중간 하루 종일 · 마지막 날 ~12:00 (사용자 결정 2026-10-23)', () => {
+    const e = { eventId: 1, date: T, title: 'MT', startTime: '14:00', endTime: '06:00' };
+    expect(eventTimeLabel({ ...e, startTime: '10:00', endTime: '12:00' })).toBe('10:00~12:00');
+    expect(eventTimeLabel({ ...e, toNextDay: true })).toBe('14:00~');
+    expect(eventTimeLabel({ ...e, startTime: '06:00', fromPreviousDay: true, toNextDay: true })).toBe('하루 종일');
+    expect(eventTimeLabel({ ...e, startTime: '06:00', endTime: '12:00', fromPreviousDay: true })).toBe('~12:00');
   });
 
   it('그날 개인 일정은 하루(아침 6시~다음 날 6시) 흐름 순 — 새벽 일정은 밤 일정 뒤 (사용자 결정 2026-10-18)', () => {
