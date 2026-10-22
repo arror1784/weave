@@ -27,7 +27,7 @@ const isDev = process.env.APP_VARIANT === 'development';
 const config: ExpoConfig = {
   name: isDev ? 'weave dev' : 'weave',
   slug: 'weave',
-  version: '1.0.0',
+  version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: isDev ? 'weave-dev' : 'weave',
@@ -39,6 +39,8 @@ const config: ExpoConfig = {
   android: {
     // 출시 후엔 바꿀 수 없다(배포 앱). 개발 빌드는 .dev를 붙여 따로 설치된다
     package: isDev ? 'com.weave.app.dev' : 'com.weave.app',
+    // 배포 APK를 새로 만들 때마다 올린다(1.0.0 = 1, 2026-10-19)
+    versionCode: 2,
     // Weave 로고(WeaveMark)로 만든 아이콘 — 바탕은 실 색(colors.thread), 전경은 날실·씨실
     adaptiveIcon: {
       backgroundColor: '#2B4C8C',
