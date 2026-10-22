@@ -27,7 +27,7 @@ Expo는 SDK마다 API가 이름이 바뀌거나 사라진다. Expo·EAS·React N
 | @expo/vector-icons (+ expo-asset) | 15.x (+ 57.0.x) | 아이콘. **expo-asset이 없으면 앱·테스트 모두 실행 중에 깨진다**(expo-font가 필요로 함) |
 | Zod | 4.x | 폼 입력 검증 (`src/lib/validation.ts`) |
 | react-native-svg | 15.x | Figma 아이콘·로고·간트 선 |
-| @react-native-community/slider | 5.x | 설정의 하루 가용 시간 |
+| @react-native-community/slider | 5.x | 요일별 가용 시간·상시 프로젝트 시간 화면(`components/SliderField`) |
 | @tanstack/react-query | 5.x | 서버 상태 캐시 (`src/queries/`) |
 | expo-secure-store | 57.0.x | 리프레시 토큰 보관(루트 §3-2) |
 | @react-native-community/netinfo | 12.x | 오프라인 감지 → Query `onlineManager` |
@@ -86,9 +86,11 @@ mobile/
     │   ├── project/new/     # index(02-b-i 기본 정보) → chat(02-b-ii 챗봇) → review(02-b-iii 작업 검토)
     │   ├── overload.tsx     # 04-c 이번 주 과부하(날짜별)
     │   ├── events/          # 개인 일정(설정에서 진입): index 목록·삭제 · new 추가(반복·한 번, 시각 30분 −/+, 끝 < 시작이면 '다음 날')
+    │   ├── availability.tsx # 설정 → 요일별 가용 시간(월~일·공휴일 슬라이더, '저장'으로 한 번에)
+    │   ├── standing.tsx     # 설정 → 상시 프로젝트 시간(주 횟수·한 번 시간 슬라이더, '저장'으로 한 번에)
     │   └── widgets.tsx      # 06 홈 화면 위젯 미리보기
     ├── __tests__/app/       # 라우트 화면 테스트 (src/app 구조와 대응)
-    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트) · Dialog · ProjectCompleteDialog · icons
+    ├── components/          # Screen · AppText · Button · TextField · Card · Badge · Checkbox · DDay · TopBar · StepHeader · Footer · SectionLabel · Segmented · BottomSheet · Toast · TimeBar · TaskCard · Gantt · SettingsGroup · TabBar · Splash · WeaveMark · SliderField(설정 슬라이더 한 줄) · ColorPicker · DatePicker(날짜 입력칸 + 달력 시트) · Dialog · ProjectCompleteDialog · icons
     ├── theme/               # colors(+프로젝트 팔레트) · spacing(+radius) · typography(Pretendard·JetBrains Mono) · useAppTheme (단일 소스, 밝은 테마만)
     ├── lib/                 # 순수 헬퍼: date · korean · validation(Zod) · contrast · scheduler(부하 계산) · schedule(오늘 할 일·밀림·부하·이번 주 날짜별 부하 선택 함수)
     ├── api/                 # client(request·토큰 갱신) · token-store(Secure Store) · types(Zod) · auth · projects · attachments · chat · errors
